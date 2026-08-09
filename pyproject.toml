@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=79", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "poptools"
+version = "0.1.0"
+description = "A self-contained Material 3 desktop toolbox for Android development and log analysis."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "PySide6-Essentials==6.11.1",
+  "platformdirs>=4.4,<5",
+  "pydantic>=2.12,<3",
+  "pypinyin>=0.55,<1",
+  "wexpect>=4,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.18",
+  "pyinstaller>=6.16",
+  "pytest>=9,<10",
+  "pytest-cov>=7,<8",
+  "pytest-qt>=4.5,<5",
+  "ruff>=0.14",
+]
+
+[project.scripts]
+poptools = "poptools.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+poptools = [
+  "ui/qml/**/*.qml",
+  "resources/vendor/*",
+  "ui/qml/**/qmldir",
+  "resources/tools/*.json",
+  "resources/scripts/*",
+  "resources/fonts/*",
+  "resources/icons/*",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["poptools"]
+
