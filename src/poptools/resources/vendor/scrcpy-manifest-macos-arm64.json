@@ -1,0 +1,11 @@
+{
+  "name": "scrcpy",
+  "version": "4.0",
+  "platform": "macos-arm64",
+  "archive": "scrcpy-macos-aarch64-v4.0.tar.gz",
+  "directory": "scrcpy-macos-aarch64-v4.0",
+  "url": "https://github.com/Genymobile/scrcpy/releases/download/v4.0/scrcpy-macos-aarch64-v4.0.tar.gz",
+  "sha256": "f5167fe047fe4a2ae2c2ea8634c7145a4d64d0b6005f24bb45639a965b8c60d4",
+  "required_files": ["adb", "scrcpy", "scrcpy-server"],
+  "executables": ["adb", "scrcpy"]
+}

@@ -1,0 +1,1 @@
+- [Theme config should be JSON](theme-config-should-be-json.md) — themes live in configs/*.json, not inline in ThemeConfig.qml

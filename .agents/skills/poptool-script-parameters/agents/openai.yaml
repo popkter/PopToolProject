@@ -1,0 +1,4 @@
+interface:
+  display_name: "PopTool 脚本编写"
+  short_description: "直接创建或改写带参数控件的 PopTool 客制脚本"
+  default_prompt: "Use $poptool-script-parameters to create a PopToolProject custom script from these requirements."

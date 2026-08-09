@@ -1,0 +1,207 @@
+from __future__ import annotations
+
+import base64
+import json
+from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qs, urlparse
+
+import pytest
+
+from poptools.infrastructure import jira_feishu_core as core
+from poptools.infrastructure.jira_feishu_profiles import JiraFeishuProfileStore
+from poptools.viewmodels.jira_feishu_controller import JiraFeishuController
+
+
+@pytest.mark.parametrize(
+    ("jql", "expected"),
+    [
+        ("", "assignee = currentUser()"),
+        ("project = APP", "(project = APP) AND assignee = currentUser()"),
+        (
+            "project = APP OR project = CORE",
+            "(project = APP OR project = CORE) AND assignee = currentUser()",
+        ),
+        (
+            "project = APP OR project = CORE ORDER BY created DESC",
+            "(project = APP OR project = CORE) AND assignee = currentUser() "
+            "ORDER BY created DESC",
+        ),
+        (
+            'summary ~ "order by failure" AND status = Open ORDER BY priority ASC',
+            '(summary ~ "order by failure" AND status = Open) AND assignee = currentUser() '
+            "ORDER BY priority ASC",
+        ),
+        (
+            r"summary ~ 'escaped \'order by\' text' ORDER BY updated DESC",
+            r"(summary ~ 'escaped \'order by\' text') AND assignee = currentUser() "
+            "ORDER BY updated DESC",
+        ),
+    ],
+)
+def test_my_issues_button_preserves_jql_scope(jql, expected):
+    config = {"jira": {"base_url": "https://jira.test", "jql_filter": jql}}
+
+    button = core._my_issues_button(config)
+    url = button["multi_url"]["url"]
+    actual = parse_qs(urlparse(url).query)["jql"][0]
+
+    assert actual == expected
+
+
+def test_profile_store_migrates_legacy_config(tmp_path):
+    legacy = {
+        "jira": {
+            "base_url": "https://jira.test",
+            "pat": "legacy-token",
+            "proxy": "http://legacy-proxy.test:7890",
+        },
+        "feishu": {"webhook_url": "https://feishu.test/hook"},
+        "message": {
+            "at_assignee": False,
+            "email_domain": base64.b64decode("QGdlZWx5LmNvbQ==").decode(),
+        },
+    }
+    (tmp_path / "config.json").write_text(json.dumps(legacy), encoding="utf-8")
+
+    profiles = JiraFeishuProfileStore(tmp_path).load()
+
+    assert len(profiles) == 1
+    assert profiles[0]["name"] == "默认"
+    assert core.jira_creds(profiles[0]["jira"])[1] == "legacy-token"
+    assert "proxy" not in profiles[0]["jira"]
+    assert profiles[0]["schedule"]["mode"] == "interval"
+    assert profiles[0]["message"]["email_domain"] == ""
+    legacy_domain = base64.b64decode("QGdlZWx5LmNvbQ==").decode()
+    assert legacy_domain not in (tmp_path / "profiles.json").read_text(encoding="utf-8")
+
+
+def test_new_profile_has_no_default_jira_address(tmp_path):
+    profile = JiraFeishuProfileStore(tmp_path).blank_profile()
+
+    assert profile["jira"]["base_url"] == ""
+    assert profile["message"]["email_domain"] == ""
+
+
+def test_resolve_open_ids_requires_a_configured_email_domain(monkeypatch):
+    monkeypatch.setattr(core, "load_user_mapping", lambda: {})
+    monkeypatch.setattr(core, "_load_open_id_cache", lambda: {})
+    monkeypatch.setattr(core, "_save_open_id_cache", lambda _cache: None)
+
+    assert core.resolve_open_ids({"message": {}}, ["owner@example.com"]) == {}
+    assert core.resolve_open_ids(
+        {"message": {"email_domain": "@example.com"}}, ["owner@example.com"]
+    ) == {"owner@example.com": "owner"}
+
+
+def test_controller_saves_feishu_keyword(qapp, tmp_path):
+    controller = JiraFeishuController(tmp_path)
+    try:
+        controller.updateField("feishu", "keyword", "质量播报")
+        controller.saveProfiles()
+
+        saved = JiraFeishuProfileStore(tmp_path / "jira_feishu").load()
+        assert saved[0]["feishu"]["keyword"] == "质量播报"
+        assert controller.status == "已保存"
+    finally:
+        controller.shutdown()
+
+
+def test_controller_status_only_summarizes_save_and_push(qapp, tmp_path):
+    controller = JiraFeishuController(tmp_path)
+    try:
+        assert controller.status == "已保存"
+
+        controller.updateField("root", "name", "已编辑方案")
+        assert controller.status == "未保存"
+
+        controller.saveProfiles()
+        assert controller.status == "已保存"
+
+        controller.newProfile()
+        new_profile_index = controller.currentIndex
+        assert controller.status == "未保存"
+
+        controller.selectProfile(0)
+        assert controller.status == "已保存"
+
+        controller.selectProfile(new_profile_index)
+        assert controller.status == "未保存"
+
+        controller.saveProfiles()
+        assert controller.status == "已保存"
+
+        controller._on_job_done("方案-push", True)
+        assert controller.status == "推送成功"
+
+        controller._on_job_done("方案-dry", False)
+        assert controller.status == "推送成功"
+
+        controller._on_job_done("方案-push", False)
+        assert controller.status == "推送失败"
+
+        controller.updateField("jira", "base_url", "https://jira.changed.test")
+        assert controller.status == "未保存"
+    finally:
+        controller.shutdown()
+
+
+def test_dwell_time_uses_latest_assignment_to_current_owner():
+    assigned_at = datetime.now(UTC) - timedelta(days=2, hours=3)
+    issue = {
+        "fields": {
+            "created": "2020-01-01T00:00:00.000+0000",
+            "assignee": {"name": "current", "displayName": "Current"},
+        },
+        "changelog": {
+            "histories": [
+                {
+                    "created": assigned_at.strftime("%Y-%m-%dT%H:%M:%S.000+0000"),
+                    "items": [
+                        {
+                            "field": "assignee",
+                            "fromString": "Previous",
+                            "toString": "Current",
+                        }
+                    ],
+                }
+            ]
+        },
+    }
+
+    seconds = core._assignee_dwell(issue, datetime.now(UTC))
+
+    assert 2 * 86400 + 2 * 3600 < seconds < 2 * 86400 + 4 * 3600
+
+
+def test_card_builder_splits_large_issue_sets(monkeypatch):
+    monkeypatch.setattr(core, "resolve_open_ids", lambda _config, _emails: {})
+    config = {
+        "jira": {"base_url": "https://jira.test"},
+        "feishu": {"keyword": "质量播报", "secret": ""},
+        "message": {"at_assignee": True, "email_domain": "@example.com"},
+    }
+    issues = []
+    for index in range(300):
+        issues.append(
+            {
+                "key": f"APP-{index}",
+                "fields": {
+                    "summary": f"Issue summary {index}",
+                    "status": {"name": "Open"},
+                    "priority": {"name": "P1"},
+                    "created": "2026-01-01T00:00:00.000+0000",
+                    "assignee": {
+                        "displayName": "Owner",
+                        "emailAddress": "owner@example.com",
+                    },
+                },
+                "changelog": {"histories": []},
+            }
+        )
+
+    messages = core.build_feishu_messages(config, issues)
+
+    assert len(messages) > 1
+    assert all(body["msg_type"] == "interactive" for _label, body in messages)
+    first_body = messages[0][1]
+    assert "质量播报" in first_body["card"]["header"]["title"]["content"]

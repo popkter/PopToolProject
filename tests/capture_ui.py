@@ -1,0 +1,304 @@
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+from typing import cast
+
+from PySide6.QtCore import QMetaObject, QObject, QTimer, QUrl
+from PySide6.QtGui import QFont, QFontDatabase, QWindow
+from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtWidgets import QApplication
+
+from poptools.infrastructure.app_updater import UpdateRelease
+from poptools.infrastructure.config_store import ConfigStore
+from poptools.infrastructure.json_tool_repository import JsonToolRepository
+from poptools.infrastructure.python_environment import PythonEnvironment
+from poptools.infrastructure.system_tray import SystemTrayController
+from poptools.infrastructure.tool_registry import ToolRegistry
+from poptools.native_terminal import register_terminal_type
+from poptools.paths import AppPaths, package_root, resource_path
+from poptools.runners import ExecutionCoordinator, ExecutionManager
+from poptools.viewmodels import (
+    AndroidController,
+    AppController,
+    DeveloperConsoleController,
+    JiraFeishuController,
+    PresetController,
+    SettingsController,
+    UpdateController,
+)
+
+
+def main() -> int:
+    output_path = Path(sys.argv[1] if len(sys.argv) > 1 else "implementation.png").resolve()
+    os.environ.setdefault("QT_QUICK_BACKEND", "software")
+    os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+    app = QApplication(sys.argv)
+    register_terminal_type()
+    system_font = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "msyh.ttc"
+    if system_font.exists():
+        QFontDatabase.addApplicationFont(str(system_font))
+    app.setFont(QFont("Microsoft YaHei UI", 10))
+    icon_font = resource_path("fonts", "MaterialIconsRound-Regular.otf")
+    if icon_font.exists():
+        QFontDatabase.addApplicationFont(str(icon_font))
+
+    paths = AppPaths.from_environment()
+    config_store = ConfigStore(paths)
+    config_store.load_config()
+    repository = JsonToolRepository(paths)
+    registry = ToolRegistry(resource_path("tools"), repository)
+    if os.environ.get("POPTOOLS_CAPTURE_GRID_SAMPLE") == "1":
+        samples = (
+            ("挂载设备", "使用 Remount 挂载 Android 设备", "batch"),
+            ("同步时间到设备", "同步电脑时间并校准设备时钟", "powershell"),
+            ("点亮 EX-G 屏幕", "唤醒并点亮测试设备屏幕", "python"),
+            ("开启点按位置", "显示设备触摸点与坐标", "batch"),
+            ("清除本地 CRASH 计数", "清理本地崩溃统计数据", "powershell"),
+            ("发送文本到 ASR", "向语音识别服务发送测试文本", "python"),
+            ("打开系统设置", "快速打开 Android 系统设置", "batch"),
+            ("监听设备进程", "持续观察目标进程运行状态", "powershell"),
+            ("查看进程 dumpsys 信息", "读取进程诊断与内存信息", "batch"),
+            ("设置台架环境", "配置台架设备与网络参数", "python"),
+            ("导出设备日志", "收集并导出当前设备日志", "powershell"),
+            ("检查网络连接", "验证设备网络与服务连通性", "batch"),
+        )
+        for title, description, kind in samples:
+            registry.create_custom(
+                title=title,
+                description=description,
+                kind=kind,
+                command="Write-Output preview",
+            )
+    python_environment = PythonEnvironment(paths, config_store)
+    execution = ExecutionManager(paths, python_environment)
+    coordinator = ExecutionCoordinator(execution, config_store.max_parallel())
+    android_controller = AndroidController(config_store)
+    controller = AppController(registry, coordinator, config_store, android_controller)
+    settings_controller = SettingsController(config_store, python_environment, coordinator)
+    if os.environ.get("POPTOOLS_CAPTURE_DIALOG") == "settings":
+        settings_controller.markUserGuideSeen()
+    if os.environ.get("POPTOOLS_CAPTURE_GRID_SAMPLE") == "1":
+        settings_controller.markUserGuideSeen()
+    preset_controller = PresetController()
+    jira_feishu_controller = JiraFeishuController(paths.data_dir)
+    developer_console_controller = DeveloperConsoleController(python_environment)
+    app.aboutToQuit.connect(developer_console_controller.shutdown)
+    app.aboutToQuit.connect(jira_feishu_controller.shutdown)
+    capture_terminal_tabs = int(os.environ.get("POPTOOLS_CAPTURE_TERMINAL_TABS", "1"))
+    for _ in range(max(1, min(capture_terminal_tabs, 7)) - 1):
+        developer_console_controller.createTerminalTab()
+    update_controller = UpdateController(config_store, auto_check_enabled=False)
+    capture_update_status = os.environ.get("POPTOOLS_CAPTURE_UPDATE_STATUS")
+    if capture_update_status == "latest":
+        update_controller._set_state("idle", "当前已是最新版本")
+    elif capture_update_status == "checking":
+        update_controller._set_state("checking", "正在检查更新…")
+    if len(sys.argv) > 2 and sys.argv[2] in {"developer", "powershell-plugin", "update"}:
+        settings_controller.markUserGuideSeen()
+    if len(sys.argv) > 2 and sys.argv[2] == "update":
+        update_controller._on_check_completed(
+            UpdateRelease(
+                version="0.2.0",
+                tag="v0.2.0",
+                name="泡泡工具箱 0.2.0",
+                notes="新增应用内自动更新功能。\n\n修复已知问题并优化启动性能。",
+                page_url="https://github.com/popkter/PopToolProject/releases/tag/v0.2.0",
+                asset_url="https://example.test/app.exe",
+                asset_name="泡泡工具箱.exe",
+                asset_size=191_000_000,
+            ),
+            "",
+        )
+    capture_theme = os.environ.get("POPTOOLS_CAPTURE_THEME", "").strip()
+    if capture_theme:
+        settings_controller.saveThemeMode(capture_theme)
+    capture_theme_style = os.environ.get("POPTOOLS_CAPTURE_THEME_STYLE", "").strip()
+    if capture_theme_style:
+        settings_controller.saveThemeStyle(capture_theme_style)
+    settings_controller.scriptsImported.connect(controller.reloadImportedScripts)
+    settings_controller.consoleMessage.connect(controller.appendConsoleMessage)
+    tray_controller = SystemTrayController(app)
+    if len(sys.argv) > 2 and sys.argv[2] not in {"developer", "powershell-plugin", "update"}:
+        controller.navigate(sys.argv[2])
+    if len(sys.argv) > 3:
+        if sys.argv[3] == "__dynamic__":
+            tool = registry.create_custom(
+                title="ADB 密码命令",
+                description="使用动态密码参数执行 ADB 命令",
+                kind="powershell",
+                command="adb shell ${输入密码}",
+            )
+            controller.selectTool(tool.id)
+        else:
+            controller.selectTool(sys.argv[3])
+    engine = QQmlApplicationEngine()
+    qml_warnings: list[str] = []
+    engine.warnings.connect(
+        lambda warnings: qml_warnings.extend(warning.toString() for warning in warnings)
+    )
+    engine.rootContext().setContextProperty("appController", controller)
+    engine.rootContext().setContextProperty("settingsController", settings_controller)
+    engine.rootContext().setContextProperty("presetController", preset_controller)
+    engine.rootContext().setContextProperty(
+        "jiraFeishuController", jira_feishu_controller
+    )
+    engine.rootContext().setContextProperty(
+        "developerConsoleController", developer_console_controller
+    )
+    engine.rootContext().setContextProperty("androidController", android_controller)
+    engine.rootContext().setContextProperty("trayController", tray_controller)
+    engine.rootContext().setContextProperty("updateController", update_controller)
+    if os.environ.get("POPTOOLS_CAPTURE_JIRA_LONG_JQL") == "1":
+        jira_feishu_controller.updateField(
+            "jira",
+            "jql_filter",
+            "\n".join(
+                f'AND summary ~ "scroll verification line {index:02d}"'
+                for index in range(1, 25)
+            ),
+        )
+    engine.load(QUrl.fromLocalFile(str(package_root() / "ui" / "qml" / "Main.qml")))
+    if not engine.rootObjects():
+        print("\n".join(qml_warnings), file=sys.stderr)
+        return 1
+    window = cast(QWindow, engine.rootObjects()[0])
+    if os.environ.get("POPTOOLS_CAPTURE_JIRA_OUTPUT_MAX") == "1":
+        jira_workspace = window.findChild(QObject, "jiraFeishuWorkspace")
+        if jira_workspace is not None:
+            QTimer.singleShot(
+                250,
+                lambda: jira_workspace.setProperty("outputExpanded", True),
+            )
+    if len(sys.argv) > 2 and sys.argv[2] == "developer":
+        window.setProperty("developerSelected", True)
+        if os.environ.get("POPTOOLS_CAPTURE_TERMINAL_MENU") == "1":
+            def open_terminal_menu() -> None:
+                menu = window.findChild(QObject, "terminalContextMenu")
+                if menu is None:
+                    return
+                menu.setProperty("x", 620)
+                menu.setProperty("y", 100)
+                QMetaObject.invokeMethod(menu, "open")
+
+            QTimer.singleShot(650, open_terminal_menu)
+        if os.environ.get("POPTOOLS_CAPTURE_TERMINAL_SAMPLE") == "faint":
+            QTimer.singleShot(
+                400,
+                lambda: developer_console_controller._append(
+                    "\r\nnormal text  \x1b[97;2;3mhint: adb shell\x1b[0m\r\n"
+                ),
+            )
+    elif len(sys.argv) > 2 and sys.argv[2] == "powershell-plugin":
+        QTimer.singleShot(100, developer_console_controller.requestTerminalAccess)
+    tray_controller.attach_window(window)
+    controller.attach_window(window)
+    capture_size = os.environ.get("POPTOOLS_CAPTURE_SIZE", "")
+    if "x" in capture_size:
+        capture_width, capture_height = capture_size.lower().split("x", maxsplit=1)
+        window.setWidth(int(capture_width))
+        window.setHeight(int(capture_height))
+        window.setX(0)
+        window.setY(0)
+    capture_primary_nav_width = os.environ.get("POPTOOLS_CAPTURE_PRIMARY_NAV_WIDTH", "")
+    if capture_primary_nav_width:
+        window.setProperty("primaryNavWidth", int(capture_primary_nav_width))
+        QMetaObject.invokeMethod(window, "clampPanelWidths")
+    if os.environ.get("POPTOOLS_CAPTURE_CUSTOM_DRAWER") == "1":
+        custom_tools = registry.for_section("custom")
+        if custom_tools:
+            controller.selectTool(custom_tools[0].id)
+            if os.environ.get("POPTOOLS_CAPTURE_CLOSING_DRAWER") == "1":
+                custom_scripts_page = window.findChild(QObject, "customScriptsPage")
+                QTimer.singleShot(
+                    1400,
+                    lambda: custom_scripts_page is not None
+                    and QMetaObject.invokeMethod(custom_scripts_page, "closeDrawer"),
+                )
+    capture_dialog = os.environ.get("POPTOOLS_CAPTURE_DIALOG")
+    if os.environ.get("POPTOOLS_CAPTURE_DEVICE_MENU") == "1":
+        def open_device_menu() -> None:
+            selector = window.findChild(QObject, "globalDeviceSelector")
+            if selector is not None:
+                QMetaObject.invokeMethod(selector, "openDeviceMenu")
+
+        QTimer.singleShot(650, open_device_menu)
+    if capture_dialog == "settings":
+        window.openSettingsDialog()
+        if os.environ.get("POPTOOLS_CAPTURE_SETTINGS_BOTTOM") == "1":
+            def scroll_settings_to_bottom() -> None:
+                settings_dialog = window.findChild(QObject, "settingsDialog")
+                if settings_dialog is None:
+                    return
+                QMetaObject.invokeMethod(settings_dialog, "scrollToBottom")
+                if os.environ.get("POPTOOLS_CAPTURE_UPDATE_DEBUG") == "1":
+                    update_button = settings_dialog.findChild(
+                        QObject, "updateCheckButton"
+                    )
+                    if update_button is not None:
+                        print(
+                            "update-button:",
+                            update_button.property("text"),
+                            update_button.property("latestState"),
+                            update_button.property("iconSpinning"),
+                            update_controller.state,
+                            update_controller.status,
+                        )
+                    if qml_warnings:
+                        print("\n".join(qml_warnings))
+
+            QTimer.singleShot(300, scroll_settings_to_bottom)
+        if os.environ.get("POPTOOLS_CAPTURE_SETTINGS_UPDATE_AVAILABLE") == "1":
+            def complete_manual_update_check() -> None:
+                settings_dialog = window.findChild(QObject, "settingsDialog")
+                if settings_dialog is None:
+                    return
+                settings_dialog.setProperty("manualUpdateCheckPending", True)
+                update_controller._check_is_manual = True
+                update_controller._on_check_completed(
+                    UpdateRelease(
+                        version="99.0.0",
+                        tag="v99.0.0",
+                        name="泡泡工具箱 99.0.0",
+                        notes="用于界面验证的更新说明。",
+                        page_url="https://example.test/release",
+                        asset_url="https://example.test/PopTools.exe",
+                        asset_name="PopTools.exe",
+                        asset_size=100,
+                    ),
+                    "",
+                )
+
+            QTimer.singleShot(350, complete_manual_update_check)
+    if capture_dialog == "update":
+        QTimer.singleShot(250, lambda: QMetaObject.invokeMethod(window, "queueUpdateDialog"))
+    if capture_dialog == "custom-import":
+        def open_custom_import_dialog() -> None:
+            dialog = window.findChild(QObject, "customScriptImportDialog")
+            if dialog is not None:
+                dialog.openForReplacement(
+                    {
+                        "title": "APK 本地签名",
+                        "existingTitle": "APK 本地签名",
+                    }
+                )
+
+        QTimer.singleShot(250, open_custom_import_dialog)
+
+    def capture() -> None:
+        if os.environ.get("POPTOOLS_CAPTURE_QML_WARNINGS") == "1" and qml_warnings:
+            print("\n".join(qml_warnings), file=sys.stderr)
+        screen = window.screen() or app.primaryScreen()
+        image = screen.grabWindow(window.winId()).toImage()
+        if image.isNull() or not image.save(str(output_path)):
+            app.exit(2)
+            return
+        app.quit()
+
+    QTimer.singleShot(1500, capture)
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

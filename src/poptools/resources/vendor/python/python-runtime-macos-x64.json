@@ -1,0 +1,8 @@
+{
+  "version": "3.13.14",
+  "platform": "macos-x64",
+  "file": "cpython-3.13.14+20260610-x86_64-apple-darwin-install_only_stripped.tar.gz",
+  "directory": "python",
+  "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260610/cpython-3.13.14%2B20260610-x86_64-apple-darwin-install_only_stripped.tar.gz",
+  "sha256": "064731aded38b1a12909088d40d9e0e385dc989e38a1e1de9917610254194962"
+}
