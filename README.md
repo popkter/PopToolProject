@@ -39,7 +39,7 @@
 .\packaging\build.ps1
 ```
 
-构建结果包括便携版 `dist\泡泡工具箱.exe` 和安装版 `dist\泡泡工具箱-Setup.exe`。安装版默认安装到 `%LOCALAPPDATA%\Programs\泡泡工具箱`，不需要管理员权限；使用 `-SkipInstaller` 可只构建便携版。两个版本均已包含应用管理的 Python 运行时、Qt/QML、ADB、scrcpy、应用脚本和依赖；用户脚本依赖安装到应用管理的用户专属 venv。
+构建一定会生成便携版 `dist\泡泡工具箱.exe`；如果本机安装了 Inno Setup 6，还会生成安装版 `dist\泡泡工具箱-Setup.exe`，否则会提示并跳过安装包。安装版默认安装到 `%LOCALAPPDATA%\Programs\泡泡工具箱`，不需要管理员权限；使用 `-SkipInstaller` 可明确只构建便携版。两个版本均已包含应用管理的 Python 运行时、Qt/QML、ADB、scrcpy、应用脚本和依赖；用户脚本依赖安装到应用管理的用户专属 venv。
 
 ### 发布与应用内更新
 

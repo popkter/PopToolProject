@@ -213,11 +213,16 @@ try {
             ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
         }
         if (-not $InnoCompiler) {
-            throw "Inno Setup 6 is required to build the installer. Install it or use -SkipInstaller."
+            Write-Host (
+                "Inno Setup 6 was not found; portable EXE build succeeded, " +
+                "installer creation was skipped."
+            ) -ForegroundColor Yellow
         }
-        & $InnoCompiler "/DMyAppVersion=$BuildVersion" "/DMyAppVersionInfoVersion=$VersionInfoVersion" "packaging\poptools.iss"
-        if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed" }
-        Write-Host "Per-user installer created at dist\泡泡工具箱-Setup.exe"
+        else {
+            & $InnoCompiler "/DMyAppVersion=$BuildVersion" "/DMyAppVersionInfoVersion=$VersionInfoVersion" "packaging\poptools.iss"
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed" }
+            Write-Host "Per-user installer created at dist\泡泡工具箱-Setup.exe"
+        }
     }
 }
 finally {
