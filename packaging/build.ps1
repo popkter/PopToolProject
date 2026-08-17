@@ -11,6 +11,22 @@ $PythonManifestPath = Join-Path $PythonVendorDir "python-runtime.json"
 $PythonManifest = Get-Content -LiteralPath $PythonManifestPath -Raw | ConvertFrom-Json
 $PythonRuntimePackage = Join-Path $PythonVendorDir $PythonManifest.file
 
+function Find-UvExecutable {
+    $UvCommand = Get-Command "uv" -ErrorAction SilentlyContinue
+    if ($UvCommand) { return $UvCommand.Source }
+
+    $Candidates = @(
+        (Join-Path $ProjectRoot ".venv\Scripts\uv.exe"),
+        (Join-Path $ProjectRoot "tools\uv.exe"),
+        (Join-Path $env:USERPROFILE ".local\bin\uv.exe"),
+        (Join-Path $env:USERPROFILE "scoop\shims\uv.exe"),
+        (Join-Path $env:USERPROFILE "scoop\apps\uv\current\uv.exe"),
+        (Join-Path $env:USERPROFILE ".cargo\bin\uv.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\uv\uv.exe")
+    )
+    return $Candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+}
+
 if (-not (Test-Path -LiteralPath $PythonRuntimePackage)) {
     New-Item -ItemType Directory -Path $PythonVendorDir -Force | Out-Null
     Write-Host "Downloading the private Python runtime package..."
@@ -34,13 +50,8 @@ if ($ActualPrefix.Trim() -ne $ExpectedPrefix) {
 Push-Location $ProjectRoot
 $TestWorkspace = Join-Path $ProjectRoot ("build\pytest-" + [guid]::NewGuid().ToString("N"))
 try {
-    # This venv is managed by uv and has no pip — use uv for all package operations.
-    # uv and python write progress/tracebacks to stderr; with $ErrorActionPreference =
-    # "Stop" (set at top of script) that becomes a terminating error. Relax it for the
-    # entire dependency-install phase and restore afterwards.
-    $UvExe = (Get-Command "uv" -ErrorAction SilentlyContinue).Source
-    if (-not $UvExe) { throw "uv is required to build but was not found on PATH" }
-
+    # A venv created by uv records the uv version in pyvenv.cfg, but it does not
+    # contain uv.exe. Only require a package installer when dependencies are missing.
     $PrevEAP = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
@@ -50,9 +61,26 @@ try {
         & $VenvPython -c "import pkg_resources" 2>$null
         $PkgResourcesMissing = ($LASTEXITCODE -ne 0)
 
+        if ($DevMissing -or $PkgResourcesMissing) {
+            $UvExe = Find-UvExecutable
+            if (-not $UvExe) {
+                Write-Host "uv executable not found; using pip inside the project venv." -ForegroundColor Yellow
+                & $VenvPython -c "import pip" 2>$null
+                if ($LASTEXITCODE -ne 0) {
+                    & $VenvPython -m ensurepip --upgrade 2>&1 | ForEach-Object { Write-Host "  $_" }
+                    if ($LASTEXITCODE -ne 0) { throw "Failed to bootstrap pip in the project venv" }
+                }
+            }
+        }
+
         if ($DevMissing) {
             Write-Host "Dev dependencies not found, installing..." -ForegroundColor Yellow
-            & $UvExe pip install -e ".[dev]" 2>&1 | ForEach-Object { Write-Host "  $_" }
+            if ($UvExe) {
+                & $UvExe pip install --python $VenvPython -e ".[dev]" 2>&1 | ForEach-Object { Write-Host "  $_" }
+            }
+            else {
+                & $VenvPython -m pip install -e ".[dev]" 2>&1 | ForEach-Object { Write-Host "  $_" }
+            }
             if ($LASTEXITCODE -ne 0) { throw "Failed to install dev dependencies" }
             Write-Host "Dev dependencies installed." -ForegroundColor Green
         }
@@ -61,7 +89,12 @@ try {
         # Ensure it's available at both build time (PyInstaller analysis) and runtime.
         if ($PkgResourcesMissing) {
             Write-Host "pkg_resources not found, installing setuptools<70..." -ForegroundColor Yellow
-            & $UvExe pip install "setuptools<70" 2>&1 | ForEach-Object { Write-Host "  $_" }
+            if ($UvExe) {
+                & $UvExe pip install --python $VenvPython "setuptools<70" 2>&1 | ForEach-Object { Write-Host "  $_" }
+            }
+            else {
+                & $VenvPython -m pip install "setuptools<70" 2>&1 | ForEach-Object { Write-Host "  $_" }
+            }
             if ($LASTEXITCODE -ne 0) { throw "Failed to install setuptools<70" }
             Write-Host "setuptools downgraded (pkg_resources now available)." -ForegroundColor Green
         }
