@@ -1,76 +1,196 @@
 # 泡泡工具箱
 
-泡泡工具箱是面向 Android 开发与测试的 Windows 桌面工具箱。应用使用 Python、PySide6 与 Qt Quick/QML 构建，采用 Material 3 风格，并可打包为不依赖用户系统 Python 的自包含程序。
+泡泡工具箱是一款面向 Android 开发与测试的 Windows 桌面工具箱，用来集中运行常用工具和个人脚本。
 
-## 当前实现
+项目只有本地功能，不区分 online 与 local：
 
-- 双栏 Material 3 主界面：客制与预设。
-- 启动时加载预置功能与用户客制脚本；二者都只在本机工作，不存在 online/local 运行模式。
-- 客制命令使用统一的创建、编辑和删除流程；预置功能由应用提供且不可编辑。
-- 新增和编辑命令使用同一套 Material 3 编辑器；只保留可水平、垂直滚动的脚本内容区域。
-- 预设包含 scrcpy、JSON、时间戳转换和调色盘；客制支持新建、编辑和删除 PowerShell、Bash、BAT 或 Python 脚本，脚本配置保存在 `%LOCALAPPDATA%\PopTools`。
-- 命令中的 `${参数名}` 会自动生成普通文本输入框；`${参数名=默认值}` 会预填默认值，运行时仍可修改。也可在脚本前用 `pVal vin = ${显示名称=默认值}` 声明变量，并在后续命令中多次使用 `${vin}`；声明行不会被执行，同时兼容 `pVal vin: ...` 冒号写法。
-- 运行按钮固定在标题操作区，参数表单过长时无需滚动到底部。
-- 内置 scrcpy 4.0 与所需 Android platform-tools 运行组件（ADB），无需配置 ADB 或 scrcpy 环境即可在应用内投屏。
-- 窗口最小尺寸为 960×720，第三栏保留至少 480×480 的可用区域；宽度不足时依次收起一级导航和工具列表文字，紧凑图标保留完整名称悬浮提示。
-- 全局 Android 设备选择器每 5 秒刷新并记住选择，所有 ADB 执行器统一使用当前设备。
-- 支持 Process、Python、PowerShell、Bash 与 Batch 执行，输出实时显示并可停止。并发总配额默认为 3：scrcpy 独占 1 个保留名额，普通任务共享其余 2 个名额。
-- 用户 Python 脚本统一运行在 PopTools 管理的用户专属 Python 环境中；Python Doctor、应用内 pip 安装和脚本执行始终使用同一个环境。
-- 提供基于 Windows ConPTY 的可选内置终端，功能默认关闭。用户在“设置”中开启终端时，如果尚未安装应用专用的 PowerShell 7，应用会请求确认并下载经过 SHA-256 校验的官方插件；拒绝或取消安装会保持关闭，安装成功后主界面才显示“终端”Tab。终端可直接运行 `python --version`、`pip list`、`pip install` 等命令，并支持 PSReadLine 历史预测、Tab 补全、方向键历史和 `Ctrl+R` 搜索。插件只写入用户应用数据目录，不修改或依赖系统 PowerShell，终端中的 Python 与 pip 均绑定到应用专属环境。用户从设置关闭终端后，Tab 会隐藏且当前会话会停止，但插件会保留以便再次开启。
-- 新建、编辑或运行 Python 脚本时会检查导入依赖；常见导入名会映射为正确的 pip 包名，用户确认后由应用自动安装并重新检查。
-- 设置页支持本地脚本导入导出；导入只替换 `tools` 与 `scripts`，不会覆盖外观和设备等应用偏好。
-- 点击窗口关闭按钮时隐藏到系统托盘；托盘右键可显示主界面或退出。
-- 高风险工具运行前要求二次确认。
-- 已集成 JSON 格式化与复制、时间戳和本地时间双向转换以及系统取色器。
+- **预设功能**由应用提供，开箱即用且不可编辑；
+- **客制功能**由用户创建，支持 PowerShell、Bash、BAT 和 Python 脚本；
+- 脚本、参数与执行结果均在本机处理，不会作为工具内容上传。
 
-## 开发环境
+应用仅在下载安装可选 PowerShell 7 插件或检查软件更新时访问网络。
 
-所有 Python 依赖必须安装在项目的 `.venv` 中，不要使用全局 `python`、`pip` 或 `py`。
+> 本文适用于当前 `0.2.0_beta` 代码版本。
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install --no-build-isolation -e ".[dev]"
-.\.venv\Scripts\python.exe -m pytest
-.\.venv\Scripts\python.exe -m poptools
-```
+## 快速开始
 
-## 构建自包含程序
+1. 在 Windows 10/11 中运行安装版或便携版程序。
+2. 首次启动后阅读应用内引导。
+3. 使用左侧的“客制”或“预设”进入工具列表。
+4. 如果要使用 Android 功能，请先在设备上开启 USB 调试并授权电脑，然后从左下角设备选择器选择目标设备。
+5. 点击窗口关闭按钮时，应用会隐藏到系统托盘；要完全退出，请使用托盘菜单中的“退出”。
 
-```powershell
-.\packaging\build.ps1
-```
+## 界面入口
 
-构建一定会生成便携版 `dist\泡泡工具箱.exe`；如果本机安装了 Inno Setup 6，还会生成安装版 `dist\泡泡工具箱-Setup.exe`，否则会提示并跳过安装包。安装版默认安装到 `%LOCALAPPDATA%\Programs\泡泡工具箱`，不需要管理员权限；使用 `-SkipInstaller` 可明确只构建便携版。两个版本均已包含应用管理的 Python 运行时、Qt/QML、ADB、scrcpy、应用脚本和依赖；用户脚本依赖安装到应用管理的用户专属 venv。
+| 入口 | 用途 |
+| --- | --- |
+| 客制 | 创建、编辑、排序、搜索、删除和运行自己的脚本 |
+| 预设 | 使用 Android 投屏与录制、JSON、时间戳和调色盘等内置工具 |
+| 终端 | 可选的交互式 PowerShell 7 终端，与客制 Python 共用同一环境 |
+| 时间 | 显示待机时钟 |
+| 设置 | 调整主题与中栏颜色、并发数、终端开关，导入导出脚本并查看版本与更新提示 |
 
-### 发布与应用内更新
+系统托盘提供预设工具和最近使用工具的快捷入口。有参数的工具会先打开参数窗口，无参数的工具可直接运行。
 
-打包还会生成 `dist\泡泡工具箱.exe.sha256`。创建 GitHub Release 时，版本标签使用
-`vYYYY-MM-DD_x.x.x` 格式，例如 `v2026-08-17_0.2.0`。GitHub 会规范化包含非 ASCII
-字符的资产文件名，因此 Release 实际上传 `PopTools.exe`、`PopTools.exe.sha256` 和
-`PopTools-Setup.exe`，并使用中文显示标签。应用启动后会读取公开 Release（包括预发行版），发现更高版本
-时显示应用内更新弹窗。Release 必须公开；不要在客户端中嵌入私有仓库访问令牌。
+## 使用预设功能
 
-版本先比较 `x.x.x`，基础版本相同时再比较日期，因此 `2026-08-18_0.2.0` 会被识别为
-比 `2026-08-17_0.2.0` 更新。
+当前预设功能包括：
 
-代码中的语义版本以 `pyproject.toml` 为唯一来源。发版前先修改其中的 `version`（例如
-`0.2.0`），然后在 GitHub 仓库的 `Actions` 页面选择 `Build and Release` 并点击
-`Run workflow`，无需再次输入版本。工作流会按香港时区读取构建日期并生成完整版本
-`YYYY-MM-DD_x.x.x`，随后执行测试和打包、验证 SHA-256，最后创建带有两个 OTA 文件的
-公开 Release。本地直接运行构建脚本时也会使用“当天日期 + `pyproject.toml` 版本”生成
-版本号；`-VersionOverride` 仅能覆盖日期，末尾语义版本仍须与 `pyproject.toml` 一致。
+- **记录案发现场**：录制 Android 设备画面、系统声音和麦克风，并同步保存 logcat 日志。需要 Android 11 或更高版本，设备还需支持 `VOICE_PERFORMANCE` 音源；部分应用可能禁止内部音频采集。
+- **Android 设备投屏**：使用应用内置的 ADB 与 scrcpy 将当前设备画面嵌入主界面，无需单独配置环境变量。
+- **JSON 解析**：格式化、压缩和复制 JSON；格式错误时会显示位置。
+- **时间戳转换**：在秒、毫秒时间戳与本地日期时间之间转换。
+- **调色盘**：输入、预览和转换常用颜色值，并支持应用内色盘与系统取色器。
 
-## 关键文档
+Android 设备列表会自动刷新并记住上次选择。启动投屏或录制前，请确认选择器显示的是目标设备。
 
-- [用户引导](docs/User-Guide.md)
-- [软件架构设计](docs/PopTools-Software-Architecture.md)
-- [架构重构说明](docs/ADR-010-Application-Composition-Root.md)
-- [视觉实现基线](docs/assets/poptools-material3-reference.png)
-- [设计验收记录](design-qa.md)
-- [ADR-009：工具存储仓库接口](docs/ADR-009-Tool-Repository.md)
+## 创建客制脚本
 
-## 测试
+1. 进入“客制”。
+2. 点击工具列表标题右侧的“新建命令”。
+3. 填写名称、说明并选择 `PowerShell`、`Bash`、`BAT 脚本` 或 `Python`。
+4. 输入脚本内容并保存。
+5. 从客制列表选择工具，填写参数后点击“运行命令”。
+
+客制脚本保存在本机，可以编辑、删除、排序和重复运行。预设功能不能直接编辑；需要不同逻辑时，请新建客制脚本。
+
+### 用占位符生成参数输入框
+
+脚本中的占位符会自动转换为运行前的输入框。变量名可以使用中文、字母、数字和下划线。
+
+使用 `${变量名}` 创建空输入框：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest
-.\.venv\Scripts\python.exe -m ruff check src\poptools\domain src\poptools\infrastructure src\poptools\runners src\poptools\viewmodels src\poptools\main.py src\poptools\paths.py tests --ignore E501,B008
+adb shell settings put global auto_time ${自动设置时间}
+adb shell settings put global auto_time_zone ${自动设置时区}
 ```
+
+使用 `${变量名=默认值}` 提供可修改的默认值：
+
+```powershell
+adb shell cmd alarm set-time ${时间戳=1786356497528}
+```
+
+变量需要多次使用，或希望分开内部名称与显示名称时，可以在脚本开头使用 `pVal`：
+
+```powershell
+pVal timestampMs = ${时间戳=1786356497528}
+
+Write-Host "即将设置 Android 设备时间"
+adb shell cmd alarm set-time ${timestampMs}
+adb shell date
+```
+
+- `timestampMs` 是脚本内部变量名；
+- `时间戳` 是输入框名称；
+- `1786356497528` 是默认值；
+- `pVal` 声明行不会交给脚本解释器执行；
+- 同时兼容 `pVal timestampMs: ${时间戳=...}` 写法。
+
+Python 中的替换发生在执行前，字符串占位符需要加引号：
+
+```python
+keyword = "${搜索关键词=Android 工具}"
+count = int("${数量=3}")
+print(keyword, count * 2)
+```
+
+不要把不可信内容直接拼接进复杂 shell 命令。涉及路径、引号或特殊字符时，请使用对应语言的转义或参数数组。
+
+## 使用 Python 脚本
+
+### 直接编写源码
+
+新建客制脚本并选择 `Python`，然后输入源码：
+
+```python
+import datetime
+
+print("当前时间：", datetime.datetime.now().isoformat(timespec="seconds"))
+```
+
+### 运行已有 `.py` 文件
+
+Python 类型的脚本内容也可以只填写文件路径：
+
+```text
+C:\Users\Public\Scripts\device_report.py
+```
+
+路径包含空格时请加引号：
+
+```text
+"C:\Tools\Android Scripts\device_report.py"
+```
+
+应用会把脚本同目录模块视为本地模块，不会误判为需要安装的第三方依赖。
+
+### Python 环境与依赖检查
+
+应用自带 Python 运行时，并在用户数据目录维护专属虚拟环境。客制 Python、Python Doctor、内置终端中的 `python`/`pip` 和自动安装依赖都使用这一个环境，不依赖或修改系统 Python。
+
+新建、编辑或运行 Python 脚本时，应用会分析 `import`。缺少常见第三方依赖时，确认提示即可自动安装；也可以点击“运行命令”左侧的依赖检查按钮手动检查。
+
+常见的导入名与安装包名并不完全相同：
+
+| 导入名 | pip 包名 |
+| --- | --- |
+| `PIL` | `Pillow` |
+| `cv2` | `opencv-python` |
+| `yaml` | `PyYAML` |
+| `bs4` | `beautifulsoup4` |
+| `dateutil` | `python-dateutil` |
+| `lunar_python` | `lunar-python` |
+
+自动建议不正确时，请按第三方库文档使用实际包名。
+
+## 开启内置终端
+
+终端默认关闭。在“设置”中开启终端功能后，如果应用专用 PowerShell 7 插件尚未安装，应用会请求确认并下载微软官方 ZIP 包，校验 SHA-256 后安装到当前用户的数据目录。拒绝或取消安装不会开启终端，也不会修改系统 PowerShell。
+
+安装成功后，主界面会显示“终端”。它是基于 Windows ConPTY 的交互式 PowerShell 7，支持历史记录、Tab 补全、方向键、`Ctrl+R` 搜索和原生光标编辑。可以直接执行：
+
+```text
+python --version
+pip list
+pip install requests Pillow
+pip install -r requirements.txt
+```
+
+切换页面不会结束终端会话；点击“重启会话”会创建干净的新会话。关闭终端功能会隐藏入口并停止会话，但保留已安装插件。完全退出应用时，终端进程与相关资源会一并回收。
+
+## 导入和导出客制脚本
+
+在“设置 → 客制脚本”中：
+
+1. 点击“导出脚本”，应用会在“文档”目录生成带时间戳的导出目录。
+2. 将该目录复制到另一台电脑。
+3. 点击“导入脚本”并选择导出目录。
+
+导入目录必须包含应用导出的 `tools` 和 `scripts` 子目录。导入会先备份现有脚本，再替换当前客制工具与脚本；主题、窗口、设备选择等设置不会被覆盖。单个 `.py` 文件请使用“运行已有 `.py` 文件”的方式，不要使用脚本导入功能。
+
+## 数据位置与隐私
+
+默认用户数据目录为：
+
+```text
+%LOCALAPPDATA%\PopTools
+```
+
+其中保存配置、客制工具、脚本、备份、输出、日志、运行时、插件和更新缓存。卸载或切换版本前，如果要保留客制脚本，建议先从设置页导出。
+
+工具执行、JSON、时间戳、颜色处理、Android 操作和脚本内容都在本机完成。网络只用于经用户确认的插件安装，以及发布版的软件更新检查与下载。
+
+## 常见问题
+
+- **找不到 Android 设备**：确认 USB 调试已开启并授权，尝试重新连接后刷新设备列表。
+- **Bash 无法运行**：Windows 需要存在可用的 Bash 环境，例如 Git Bash。
+- **Python 提示缺少依赖**：优先使用 Python Doctor 安装；需要自定义包名或版本时，在内置终端中执行 `pip install`。
+- **依赖安装失败**：检查网络、代理和 pip 源配置。
+- **终端入口不显示**：在设置中重新开启终端，并确认 PowerShell 7 插件安装完成。
+- **关闭窗口后程序仍在运行**：这是系统托盘行为，请从托盘菜单完全退出。
+- **同时运行的任务达到上限**：应用会提示停止最早启动的普通任务；Android 投屏保留独立运行名额。
+
+## 开发者文档
+
+项目结构、架构边界、构建发布和重构说明统一见 [软件设计文档](docs/Software-Design.md)。第三方组件及许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

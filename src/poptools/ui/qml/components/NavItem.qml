@@ -11,16 +11,22 @@ Rectangle {
     property bool selected: false
     property bool compact: false
     property bool dense: false
+    property string actionText: ""
+    property string actionIconName: "system_update"
     signal clicked()
+    signal actionClicked()
 
     implicitHeight: dense ? 58 : 66
     radius: Theme.radiusLarge
     color: selected ? Theme.primaryContainer : (mouseArea.containsMouse ? Theme.surfaceContainer : "transparent")
 
     RowLayout {
+        z: 1
         anchors.fill: parent
         anchors.leftMargin: root.compact ? 8 : 20
-        anchors.rightMargin: root.compact ? 8 : 14
+        anchors.rightMargin: root.actionText.length > 0
+                             ? (root.compact ? 34 : actionButton.width + 20)
+                             : (root.compact ? 8 : 14)
         spacing: root.compact ? 0 : 16
 
         Item { visible: root.compact; Layout.fillWidth: true }
@@ -43,12 +49,54 @@ Rectangle {
         Item { visible: root.compact; Layout.fillWidth: true }
     }
 
+    Rectangle {
+        id: actionButton
+        z: 2
+        visible: root.actionText.length > 0
+        anchors.right: parent.right
+        anchors.rightMargin: root.compact ? 4 : 10
+        anchors.verticalCenter: parent.verticalCenter
+        width: root.compact ? 28 : actionLabel.implicitWidth + 18
+        height: root.compact ? 28 : 34
+        radius: height / 2
+        color: actionMouse.containsMouse
+               ? Theme.primaryContainerHover : Theme.primaryContainer
+
+        MaterialIcon {
+            visible: root.compact
+            anchors.centerIn: parent
+            icon: root.actionIconName
+            iconSize: 17
+            color: Theme.primaryText
+        }
+        Text {
+            id: actionLabel
+            visible: !root.compact
+            anchors.centerIn: parent
+            text: root.actionText
+            color: Theme.primaryText
+            font.pixelSize: 12
+            font.weight: Font.DemiBold
+        }
+        ToolTip.visible: root.compact && actionMouse.containsMouse
+        ToolTip.text: root.actionText
+        ToolTip.delay: 450
+        MouseArea {
+            id: actionMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.actionClicked()
+        }
+    }
+
     ToolTip.visible: root.compact && mouseArea.containsMouse
     ToolTip.text: root.label
     ToolTip.delay: 450
 
     MouseArea {
         id: mouseArea
+        z: 0
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor

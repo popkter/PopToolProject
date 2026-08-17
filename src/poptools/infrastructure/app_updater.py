@@ -249,6 +249,7 @@ for ($attempt = 0; $attempt -lt 30; $attempt++) {
     }
 }
 if (-not $installed) { exit 1 }
+$env:PYINSTALLER_RESET_ENVIRONMENT = '1'
 Start-Process -FilePath $Target
 Remove-Item -LiteralPath $Source -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue

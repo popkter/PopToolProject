@@ -7,8 +7,10 @@ from typing import Any
 
 import pytest
 
+from poptools.infrastructure import app_updater as updater_module
 from poptools.infrastructure.app_updater import (
     GitHubReleaseClient,
+    UpdateInstaller,
     UpdateRelease,
     is_newer_version,
 )
@@ -132,3 +134,30 @@ def test_update_download_rejects_a_bad_checksum(
         GitHubReleaseClient.download(release, tmp_path / "update.exe")
 
     assert not (tmp_path / "update.exe").exists()
+
+
+def test_update_restart_resets_the_pyinstaller_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    downloaded = tmp_path / "downloaded.exe"
+    current = tmp_path / "current.exe"
+    downloaded.write_bytes(b"new executable")
+    current.write_bytes(b"old executable")
+    launches: list[tuple[str, list[str], str]] = []
+
+    class FakeProcess:
+        @staticmethod
+        def startDetached(program: str, arguments: list[str], directory: str):
+            launches.append((program, arguments, directory))
+            return True, 123
+
+    monkeypatch.setattr(updater_module.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(updater_module, "QProcess", FakeProcess)
+
+    assert UpdateInstaller.launch(downloaded, current) is True
+    script = (tmp_path / "apply-poptools-update.ps1").read_text(encoding="utf-8-sig")
+    reset = "$env:PYINSTALLER_RESET_ENVIRONMENT = '1'"
+    assert reset in script
+    assert script.index(reset) < script.index("Start-Process -FilePath $Target")
+    assert launches

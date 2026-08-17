@@ -9,7 +9,7 @@ Dialog {
     required property var parentWindow
 
     width: Math.min(620, parentWindow.width - 24)
-    height: Math.min(520, parentWindow.height - 24)
+    height: Math.min(300, parentWindow.height - 24)
     anchors.centerIn: Overlay.overlay
     modal: true
     padding: 24
@@ -87,7 +87,7 @@ Dialog {
         Rectangle {
             visible: root.controller.state === "available"
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            Layout.preferredHeight: 76
             radius: Theme.radiusMedium
             color: Theme.surfaceContainerLow
             border.color: Theme.outlineVariant
@@ -102,20 +102,6 @@ Dialog {
                     font.pixelSize: 16
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
-                }
-                ScrollView {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    TextArea {
-                        text: root.controller.releaseNotes
-                        readOnly: true
-                        wrapMode: TextEdit.Wrap
-                        color: Theme.textSecondary
-                        font.pixelSize: 13
-                        selectByMouse: true
-                        background: null
-                    }
                 }
                 Text {
                     visible: root.controller.releasePageUrl.length > 0
@@ -138,16 +124,20 @@ Dialog {
                      || root.controller.state === "installing"
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 16
+            spacing: 6
             Item { Layout.fillHeight: true }
-            MaterialIcon {
-                Layout.alignment: Qt.AlignHCenter
-                icon: root.controller.state === "downloaded" ? "check_circle" : "download"
-                iconSize: 56
-                color: root.controller.state === "downloaded" ? Theme.success : Theme.primary
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 44
+                MaterialIcon {
+                    anchors.centerIn: parent
+                    icon: root.controller.state === "downloaded" ? "check_circle" : "download"
+                    iconSize: 44
+                    color: root.controller.state === "downloaded" ? Theme.success : Theme.primary
+                }
             }
             Text {
-                Layout.alignment: Qt.AlignHCenter
+                Layout.fillWidth: true
                 text: root.controller.status
                 color: Theme.textPrimary
                 font.pixelSize: 16
@@ -178,12 +168,13 @@ Dialog {
             Text {
                 visible: root.controller.state === "downloading"
                          && root.controller.downloadedSize.length > 0
-                Layout.alignment: Qt.AlignHCenter
+                Layout.fillWidth: true
                 text: root.controller.totalSize.length > 0
                       ? root.controller.downloadedSize + " / " + root.controller.totalSize
                       : root.controller.downloadedSize
                 color: Theme.textSecondary
                 font.pixelSize: 13
+                horizontalAlignment: Text.AlignHCenter
             }
             Item { Layout.fillHeight: true }
         }

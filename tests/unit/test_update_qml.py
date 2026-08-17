@@ -6,6 +6,9 @@ QML_ROOT = Path(__file__).parents[2] / "src" / "poptools" / "ui" / "qml"
 def test_update_dialog_and_startup_check_are_wired() -> None:
     main = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
     dialog = (QML_ROOT / "components" / "UpdateDialog.qml").read_text(encoding="utf-8")
+    settings = (QML_ROOT / "components" / "SettingsDialog.qml").read_text(
+        encoding="utf-8"
+    )
 
     assert "updateController.checkForUpdates()" in main
     assert "function onUpdateAvailable()" in main
@@ -18,4 +21,12 @@ def test_update_dialog_and_startup_check_are_wired() -> None:
     assert "root.controller.downloadUpdate()" in dialog
     assert "root.controller.skipVersion()" in dialog
     assert "root.controller.installAndRestart()" in dialog
+    assert "root.controller.releaseNotes" not in dialog
+    assert "height: Math.min(300, parentWindow.height - 24)" in dialog
+    assert dialog.count("Layout.fillWidth: true") >= 8
+    assert dialog.count("horizontalAlignment: Text.AlignHCenter") >= 2
     assert dialog.count("radius: 24") >= 8
+    assert "有新版本可用" not in settings
+    assert 'actionText: updateController.state === "available"' in main
+    assert '? "有新版本可用" : ""' in main
+    assert "onActionClicked: window.queueUpdateDialog()" in main

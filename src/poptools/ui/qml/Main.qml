@@ -783,6 +783,9 @@ ApplicationWindow {
                     compact: window.compactPrimaryNav
                     dense: window.compactHeight
                     selected: false
+                    actionText: updateController.state === "available"
+                                ? "有新版本可用" : ""
+                    onActionClicked: window.queueUpdateDialog()
                     onClicked: window.openSettingsDialog()
                 }
             }
