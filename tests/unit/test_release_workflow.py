@@ -18,6 +18,8 @@ def test_manual_release_workflow_builds_and_publishes_ota_assets() -> None:
         "-VersionOverride $env:RELEASE_VERSION"
     ) in workflow
     assert "Get-FileHash" in workflow
+    assert "Upload test report on failure" in workflow
+    assert "build/test-results/pytest.xml" in workflow
     assert "dist/泡泡工具箱.exe" in workflow
     assert "dist/泡泡工具箱.exe.sha256" in workflow
     assert '"release", "create", $env:RELEASE_TAG' in workflow
@@ -30,3 +32,5 @@ def test_build_script_accepts_a_full_release_version_override() -> None:
 
     assert '[string]$VersionOverride = ""' in build_script
     assert "VersionOverride must use YYYY-MM-DD_x.x.x" in build_script
+    assert "ensurepip --default-pip" in build_script
+    assert '"--junitxml=$JunitReport"' in build_script

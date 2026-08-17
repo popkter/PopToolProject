@@ -69,6 +69,14 @@ jobs:
       - name: Build and test application
         run: .\packaging\build.ps1 -SkipInstaller -VersionOverride $env:RELEASE_VERSION
 
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: PopTools-test-report-${{ env.RELEASE_VERSION }}
+          path: build/test-results/pytest.xml
+          if-no-files-found: warn
+
       - name: Verify OTA artifacts
         run: |
           $exe = "dist\泡泡工具箱.exe"

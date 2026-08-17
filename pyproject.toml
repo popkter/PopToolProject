@@ -16,6 +16,7 @@ dependencies = [
   "pypinyin>=0.55,<1",
   "psutil>=7,<8",
   "pywinpty>=3,<4",
+  "setuptools>=65,<70",
   "wexpect>=4,<5",
 ]
 

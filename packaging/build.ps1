@@ -56,21 +56,26 @@ try {
     $PrevEAP = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
+        # uv creates intentionally minimal virtual environments without pip.
+        # The application developer console exposes a managed `pip` command,
+        # so tests and builds must also work in a freshly created uv venv.
+        & $VenvPython -c "import pip" 2>$null
+        $PipMissing = ($LASTEXITCODE -ne 0)
+        if ($PipMissing) {
+            Write-Host "pip not found in the project venv, bootstrapping with ensurepip..." -ForegroundColor Yellow
+            & $VenvPython -m ensurepip --default-pip 2>&1 | ForEach-Object { Write-Host "  $_" }
+            if ($LASTEXITCODE -ne 0) { throw "Failed to bootstrap pip in the project venv" }
+            Write-Host "pip bootstrapped." -ForegroundColor Green
+        }
+
         # Ensure dev dependencies (pytest, pyinstaller, etc.) are installed.
         & $VenvPython -c "import pytest, PyInstaller" 2>$null
         $DevMissing = ($LASTEXITCODE -ne 0)
-        & $VenvPython -c "import pkg_resources" 2>$null
-        $PkgResourcesMissing = ($LASTEXITCODE -ne 0)
 
-        if ($DevMissing -or $PkgResourcesMissing) {
+        if ($DevMissing) {
             $UvExe = Find-UvExecutable
             if (-not $UvExe) {
                 Write-Host "uv executable not found; using pip inside the project venv." -ForegroundColor Yellow
-                & $VenvPython -c "import pip" 2>$null
-                if ($LASTEXITCODE -ne 0) {
-                    & $VenvPython -m ensurepip --upgrade 2>&1 | ForEach-Object { Write-Host "  $_" }
-                    if ($LASTEXITCODE -ne 0) { throw "Failed to bootstrap pip in the project venv" }
-                }
             }
         }
 
@@ -86,10 +91,13 @@ try {
             Write-Host "Dev dependencies installed." -ForegroundColor Green
         }
 
-        # setuptools >= 70 removed pkg_resources, but wexpect still imports it unconditionally.
+        # Recent setuptools releases can omit pkg_resources, but wexpect still imports it.
         # Ensure it's available at both build time (PyInstaller analysis) and runtime.
+        & $VenvPython -c "import pkg_resources" 2>$null
+        $PkgResourcesMissing = ($LASTEXITCODE -ne 0)
         if ($PkgResourcesMissing) {
             Write-Host "pkg_resources not found, installing setuptools<70..." -ForegroundColor Yellow
+            if (-not $UvExe) { $UvExe = Find-UvExecutable }
             if ($UvExe) {
                 & $UvExe pip install --python $VenvPython "setuptools<70" 2>&1 | ForEach-Object { Write-Host "  $_" }
             }
@@ -116,9 +124,16 @@ try {
     if (-not $SkipTests) {
         $PytestBaseTemp = Join-Path $TestWorkspace "tmp"
         $PytestCacheDir = Join-Path $TestWorkspace "cache"
+        $TestResultsDir = Join-Path $ProjectRoot "build\test-results"
+        $JunitReport = Join-Path $TestResultsDir "pytest.xml"
         New-Item -ItemType Directory -Path $TestWorkspace -Force | Out-Null
-        & $VenvPython -m pytest "--basetemp=$PytestBaseTemp" -o "cache_dir=$PytestCacheDir"
-        if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
+        New-Item -ItemType Directory -Path $TestResultsDir -Force | Out-Null
+        & $VenvPython -m pytest "--basetemp=$PytestBaseTemp" -o "cache_dir=$PytestCacheDir" `
+            "--junitxml=$JunitReport" --tb=long -ra
+        $TestExitCode = $LASTEXITCODE
+        if ($TestExitCode -ne 0) {
+            throw "Tests failed with exit code $TestExitCode. JUnit report: $JunitReport"
+        }
     }
 
     $PyprojectPath = Join-Path $ProjectRoot "pyproject.toml"
