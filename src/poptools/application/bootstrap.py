@@ -21,6 +21,7 @@ from poptools.viewmodels import (
     DeveloperConsoleController,
     PresetController,
     SettingsController,
+    UpdateController,
 )
 
 
@@ -43,6 +44,7 @@ class ApplicationComponents:
     settings_controller: SettingsController
     preset_controller: PresetController
     developer_console_controller: DeveloperConsoleController
+    update_controller: UpdateController
 
 
 def build_components(paths: AppPaths) -> ApplicationComponents:
@@ -71,6 +73,7 @@ def build_components(paths: AppPaths) -> ApplicationComponents:
     )
     preset_controller = PresetController(paths)
     developer_console_controller = DeveloperConsoleController(python_environment, paths.data_dir)
+    update_controller = UpdateController(config_store)
     settings_controller.scriptsImported.connect(app_controller.reloadImportedScripts)
     settings_controller.consoleMessage.connect(app_controller.appendConsoleMessage)
     return ApplicationComponents(
@@ -84,4 +87,5 @@ def build_components(paths: AppPaths) -> ApplicationComponents:
         settings_controller=settings_controller,
         preset_controller=preset_controller,
         developer_console_controller=developer_console_controller,
+        update_controller=update_controller,
     )

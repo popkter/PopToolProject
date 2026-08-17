@@ -158,6 +158,10 @@ class AppPaths:
         return self.data_dir / "plugins"
 
     @property
+    def updates_dir(self) -> Path:
+        return self.data_dir / "updates"
+
+    @property
     def powershell_plugin_dir(self) -> Path:
         return self.plugins_dir / "powershell"
 
@@ -172,5 +176,6 @@ class AppPaths:
             self.logs_dir,
             self.runtime_dir,
             self.plugins_dir,
+            self.updates_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)

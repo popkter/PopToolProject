@@ -1,0 +1,118 @@
+name: Build and Release
+run-name: Release v${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version from pyproject.toml, for example 0.2.0-beta.1
+        required: true
+        type: string
+      prerelease:
+        description: Publish as a GitHub pre-release
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Build Windows release
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.3"
+          enable-cache: true
+
+      - name: Validate release version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $requestedVersion = $env:INPUT_VERSION.Trim().TrimStart("v")
+          if ($requestedVersion -notmatch '^\d+\.\d+\.\d+(?:[-._]?[0-9A-Za-z][0-9A-Za-z.-]*)?$') {
+              throw "Invalid release version: $requestedVersion"
+          }
+
+          $pyproject = Get-Content -LiteralPath "pyproject.toml" -Raw
+          if ($pyproject -notmatch '(?m)^version\s*=\s*"([^"\r\n]+)"\s*$') {
+              throw "Could not read the project version from pyproject.toml"
+          }
+          $projectVersion = $Matches[1]
+          if ($requestedVersion -ne $projectVersion) {
+              throw "Requested version $requestedVersion does not match pyproject.toml version $projectVersion"
+          }
+
+          "RELEASE_VERSION=$requestedVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_TAG=v$requestedVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Create project virtual environment
+        run: uv venv --python 3.11 .venv
+
+      - name: Build and test application
+        run: .\packaging\build.ps1 -SkipInstaller
+
+      - name: Verify OTA artifacts
+        run: |
+          $exe = "dist\泡泡工具箱.exe"
+          $checksumFile = "dist\泡泡工具箱.exe.sha256"
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+              throw "Missing release executable: $exe"
+          }
+          if (-not (Test-Path -LiteralPath $checksumFile -PathType Leaf)) {
+              throw "Missing OTA checksum: $checksumFile"
+          }
+          $expected = ((Get-Content -LiteralPath $checksumFile -Raw) -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) {
+              throw "OTA checksum verification failed"
+          }
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: PopTools-${{ env.RELEASE_VERSION }}
+          path: |
+            dist/泡泡工具箱.exe
+            dist/泡泡工具箱.exe.sha256
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TARGET: ${{ github.sha }}
+          IS_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          $arguments = @(
+              "release", "create", $env:RELEASE_TAG,
+              "dist\泡泡工具箱.exe",
+              "dist\泡泡工具箱.exe.sha256",
+              "--repo", $env:GH_REPO,
+              "--target", $env:RELEASE_TARGET,
+              "--title", "泡泡工具箱 $env:RELEASE_VERSION",
+              "--generate-notes"
+          )
+          if ($env:IS_PRERELEASE -eq "true") {
+              $arguments += "--prerelease"
+          }
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) {
+              throw "GitHub Release creation failed"
+          }

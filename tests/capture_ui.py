@@ -11,6 +11,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication
 
+from poptools.infrastructure.app_updater import UpdateRelease
 from poptools.infrastructure.config_store import ConfigStore
 from poptools.infrastructure.json_tool_repository import JsonToolRepository
 from poptools.infrastructure.python_environment import PythonEnvironment
@@ -24,6 +25,7 @@ from poptools.viewmodels import (
     DeveloperConsoleController,
     PresetController,
     SettingsController,
+    UpdateController,
 )
 
 
@@ -57,15 +59,30 @@ def main() -> int:
     developer_console_controller = DeveloperConsoleController(
         python_environment, paths.data_dir
     )
-    if len(sys.argv) > 2 and sys.argv[2] in {"developer", "powershell-plugin"}:
+    update_controller = UpdateController(config_store, auto_check_enabled=False)
+    if len(sys.argv) > 2 and sys.argv[2] in {"developer", "powershell-plugin", "update"}:
         settings_controller.markUserGuideSeen()
+    if len(sys.argv) > 2 and sys.argv[2] == "update":
+        update_controller._on_check_completed(
+            UpdateRelease(
+                version="0.2.0",
+                tag="v0.2.0",
+                name="泡泡工具箱 0.2.0",
+                notes="新增应用内自动更新功能。\n\n修复已知问题并优化启动性能。",
+                page_url="https://github.com/popkter/PopToolProject/releases/tag/v0.2.0",
+                asset_url="https://example.test/app.exe",
+                asset_name="泡泡工具箱.exe",
+                asset_size=191_000_000,
+            ),
+            "",
+        )
     capture_theme = os.environ.get("POPTOOLS_CAPTURE_THEME", "").strip()
     if capture_theme:
         settings_controller.saveThemeMode(capture_theme)
     settings_controller.scriptsImported.connect(controller.reloadImportedScripts)
     settings_controller.consoleMessage.connect(controller.appendConsoleMessage)
     tray_controller = SystemTrayController(app)
-    if len(sys.argv) > 2 and sys.argv[2] not in {"developer", "powershell-plugin"}:
+    if len(sys.argv) > 2 and sys.argv[2] not in {"developer", "powershell-plugin", "update"}:
         controller.navigate(sys.argv[2])
     if len(sys.argv) > 3:
         if sys.argv[3] == "__dynamic__":
@@ -91,6 +108,7 @@ def main() -> int:
     )
     engine.rootContext().setContextProperty("androidController", android_controller)
     engine.rootContext().setContextProperty("trayController", tray_controller)
+    engine.rootContext().setContextProperty("updateController", update_controller)
     engine.load(QUrl.fromLocalFile(str(package_root() / "ui" / "qml" / "Main.qml")))
     if not engine.rootObjects():
         print("\n".join(qml_warnings), file=sys.stderr)
@@ -117,6 +135,8 @@ def main() -> int:
                 QMetaObject.invokeMethod(settings_dialog, "openMiddlePanelColorDialog")
 
         QTimer.singleShot(250, open_middle_panel_color_dialog)
+    if capture_dialog == "update":
+        QTimer.singleShot(250, lambda: QMetaObject.invokeMethod(window, "queueUpdateDialog"))
 
     def capture() -> None:
         screen = window.screen() or app.primaryScreen()

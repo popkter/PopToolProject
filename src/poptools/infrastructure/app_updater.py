@@ -1,0 +1,286 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import sys
+import urllib.request
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+from pathlib import Path
+from typing import Any
+
+from PySide6.QtCore import QProcess
+
+GITHUB_RELEASES_URL = "https://api.github.com/repos/popkter/PopToolProject/releases?per_page=20"
+UPDATE_ASSET_NAME = "泡泡工具箱.exe"
+NETWORK_TIMEOUT_SECONDS = 30
+DOWNLOAD_TIMEOUT_SECONDS = 180
+
+
+@dataclass(frozen=True)
+class UpdateRelease:
+    version: str
+    tag: str
+    name: str
+    notes: str
+    page_url: str
+    asset_url: str
+    asset_name: str
+    asset_size: int
+    sha256: str = ""
+    checksum_url: str = ""
+
+
+def version_key(value: str) -> tuple[tuple[int, int, int, int], int, int, int, str]:
+    """Return a comparable key for SemVer-like and generated build versions."""
+
+    candidate = value.strip().lower()
+    dated = re.fullmatch(r"\d{4}-\d{2}-\d{2}_(.+)", candidate)
+    if dated:
+        candidate = dated.group(1)
+    candidate = candidate.removeprefix("v")
+    match = re.search(r"(\d+(?:\.\d+){1,3})(.*)$", candidate)
+    if not match:
+        return (0, 0, 0, 0), 0, 0, 0, candidate
+
+    parts = [int(part) for part in match.group(1).split(".")]
+    padded = (parts + [0, 0, 0, 0])[:4]
+    core = (padded[0], padded[1], padded[2], padded[3])
+    suffix = str(match.group(2)).split("+", 1)[0].strip("-._")
+    if not suffix:
+        return core, 1, 0, 0, ""
+
+    prerelease = re.fullmatch(
+        r"(a|alpha|b|beta|pre|preview|rc)[-._]?(\d*)", suffix
+    )
+    if prerelease:
+        label = prerelease.group(1)
+        ranks: dict[str, int] = {
+            "a": 0,
+            "alpha": 0,
+            "pre": 0,
+            "preview": 0,
+            "b": 1,
+            "beta": 1,
+            "rc": 2,
+        }
+        number = int(prerelease.group(2) or 0)
+        return core, 0, ranks[label], number, suffix
+    return core, 0, -1, 0, suffix
+
+
+def is_newer_version(candidate: str, current: str) -> bool:
+    return version_key(candidate) > version_key(current)
+
+
+class GitHubReleaseClient:
+    """Read public GitHub releases and download the single-file application."""
+
+    def __init__(self, releases_url: str = GITHUB_RELEASES_URL) -> None:
+        self.releases_url = releases_url
+
+    def latest_release(self) -> UpdateRelease | None:
+        request = urllib.request.Request(
+            self.releases_url,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "PopTools-Updater",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=NETWORK_TIMEOUT_SECONDS) as response:
+            payload: Any = json.load(response)
+        release = self.select_latest_release(payload)
+        if release is None or release.sha256 or not release.checksum_url:
+            return release
+        checksum_request = urllib.request.Request(
+            release.checksum_url,
+            headers={"User-Agent": "PopTools-Updater"},
+        )
+        with urllib.request.urlopen(
+            checksum_request, timeout=NETWORK_TIMEOUT_SECONDS
+        ) as response:
+            checksum_text = response.read(512).decode("ascii", errors="ignore")
+        checksum_match = re.search(r"\b([0-9a-fA-F]{64})\b", checksum_text)
+        return replace(
+            release,
+            sha256=checksum_match.group(1).lower() if checksum_match else "",
+        )
+
+    @staticmethod
+    def select_latest_release(payload: Any) -> UpdateRelease | None:
+        if not isinstance(payload, list):
+            raise ValueError("GitHub Release 返回格式不正确")
+
+        releases: list[UpdateRelease] = []
+        for item in payload:
+            if not isinstance(item, dict) or item.get("draft") is True:
+                continue
+            assets = item.get("assets")
+            if not isinstance(assets, list):
+                continue
+            asset = next(
+                (
+                    value
+                    for value in assets
+                    if isinstance(value, dict)
+                    and str(value.get("name", "")).lower() == UPDATE_ASSET_NAME.lower()
+                ),
+                None,
+            )
+            if asset is None:
+                continue
+            checksum_asset = next(
+                (
+                    value
+                    for value in assets
+                    if isinstance(value, dict)
+                    and str(value.get("name", "")).lower()
+                    == f"{UPDATE_ASSET_NAME}.sha256".lower()
+                ),
+                None,
+            )
+            tag = str(item.get("tag_name", "")).strip()
+            url = str(asset.get("browser_download_url", "")).strip()
+            if not tag or not url.startswith("https://"):
+                continue
+            digest = str(asset.get("digest") or "").lower()
+            checksum = digest.removeprefix("sha256:") if digest.startswith("sha256:") else ""
+            if checksum and re.fullmatch(r"[0-9a-f]{64}", checksum) is None:
+                checksum = ""
+            releases.append(
+                UpdateRelease(
+                    version=tag.removeprefix("v"),
+                    tag=tag,
+                    name=str(item.get("name") or tag),
+                    notes=str(item.get("body") or "本次发行未提供更新说明。"),
+                    page_url=str(item.get("html_url") or ""),
+                    asset_url=url,
+                    asset_name=str(asset.get("name") or UPDATE_ASSET_NAME),
+                    asset_size=max(0, int(asset.get("size") or 0)),
+                    sha256=checksum,
+                    checksum_url=_https_url(
+                        checksum_asset.get("browser_download_url")
+                        if checksum_asset
+                        else ""
+                    ),
+                )
+            )
+        return max(releases, key=lambda release: version_key(release.version), default=None)
+
+    @staticmethod
+    def download(
+        release: UpdateRelease,
+        destination: Path,
+        progress: Callable[[int, int], None] | None = None,
+        cancelled: Callable[[], bool] | None = None,
+    ) -> Path:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        partial = destination.with_suffix(destination.suffix + ".part")
+        partial.unlink(missing_ok=True)
+        request = urllib.request.Request(
+            release.asset_url,
+            headers={
+                "Accept": "application/octet-stream",
+                "User-Agent": "PopTools-Updater",
+            },
+        )
+        received = 0
+        digest = hashlib.sha256()
+        try:
+            with urllib.request.urlopen(
+                request, timeout=DOWNLOAD_TIMEOUT_SECONDS
+            ) as response, partial.open("wb") as output:
+                total = int(response.headers.get("Content-Length") or release.asset_size or 0)
+                while chunk := response.read(1024 * 1024):
+                    if cancelled and cancelled():
+                        raise InterruptedError("更新下载已取消")
+                    output.write(chunk)
+                    digest.update(chunk)
+                    received += len(chunk)
+                    if progress:
+                        progress(received, total)
+
+            if release.asset_size and received != release.asset_size:
+                raise ValueError("更新文件大小与 GitHub Release 记录不一致")
+            if release.sha256 and digest.hexdigest().lower() != release.sha256:
+                raise ValueError("更新文件 SHA-256 校验失败")
+            os.replace(partial, destination)
+            return destination
+        except Exception:
+            partial.unlink(missing_ok=True)
+            raise
+
+
+class UpdateInstaller:
+    """Replace the running portable EXE after it exits, then restart it."""
+
+    @staticmethod
+    def launch(downloaded: Path, current_executable: Path | None = None) -> bool:
+        source = downloaded.resolve()
+        target = (current_executable or Path(sys.executable)).resolve()
+        if not source.is_file() or not getattr(sys, "frozen", False):
+            return False
+
+        script = source.parent / "apply-poptools-update.ps1"
+        script.write_text(
+            """param(
+    [Parameter(Mandatory=$true)][int]$ProcessId,
+    [Parameter(Mandatory=$true)][string]$Source,
+    [Parameter(Mandatory=$true)][string]$Target
+)
+$ErrorActionPreference = 'Stop'
+try { Wait-Process -Id $ProcessId -Timeout 90 -ErrorAction SilentlyContinue } catch {}
+$installed = $false
+for ($attempt = 0; $attempt -lt 30; $attempt++) {
+    try {
+        Copy-Item -LiteralPath $Source -Destination $Target -Force
+        $installed = $true
+        break
+    } catch {
+        Start-Sleep -Seconds 1
+    }
+}
+if (-not $installed) { exit 1 }
+Start-Process -FilePath $Target
+Remove-Item -LiteralPath $Source -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+""",
+            encoding="utf-8-sig",
+        )
+        powershell = (
+            Path(os.environ.get("SYSTEMROOT", r"C:\Windows"))
+            / "System32"
+            / "WindowsPowerShell"
+            / "v1.0"
+            / "powershell.exe"
+        )
+        if not powershell.is_file():
+            return False
+        result = QProcess.startDetached(
+            str(powershell),
+            [
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(script),
+                "-ProcessId",
+                str(os.getpid()),
+                "-Source",
+                str(source),
+                "-Target",
+                str(target),
+            ],
+            str(target.parent),
+        )
+        return result[0] if isinstance(result, tuple) else bool(result)
+
+
+def _https_url(value: object) -> str:
+    candidate = str(value or "").strip()
+    return candidate if candidate.startswith("https://") else ""

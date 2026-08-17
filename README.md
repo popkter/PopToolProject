@@ -41,6 +41,20 @@
 
 构建结果包括便携版 `dist\泡泡工具箱.exe` 和安装版 `dist\泡泡工具箱-Setup.exe`。安装版默认安装到 `%LOCALAPPDATA%\Programs\泡泡工具箱`，不需要管理员权限；使用 `-SkipInstaller` 可只构建便携版。两个版本均已包含应用管理的 Python 运行时、Qt/QML、ADB、scrcpy、应用脚本和依赖；用户脚本依赖安装到应用管理的用户专属 venv。
 
+### 发布与应用内更新
+
+打包还会生成 `dist\泡泡工具箱.exe.sha256`。创建 GitHub Release 时，版本标签使用
+`v0.2.0`、`v0.2.0-beta.1` 这类递增版本，并同时上传 `泡泡工具箱.exe` 和
+`泡泡工具箱.exe.sha256`。应用启动后会读取公开 Release（包括预发行版），发现更高版本
+时显示应用内更新弹窗。Release 必须公开；不要在客户端中嵌入私有仓库访问令牌。
+
+同一个基础版本的日期构建不会互相覆盖，例如 `2026-08-17_0.2.0-beta` 与
+`2026-08-18_0.2.0-beta` 会被视为同一版本；重新发布时应提升 `pyproject.toml` 中的版本号。
+
+提交版本变更后，也可以在 GitHub 仓库的 `Actions` 页面选择 `Build and Release`，点击
+`Run workflow`，输入与 `pyproject.toml` 完全一致的版本号。工作流会在 Windows Runner
+上执行测试和打包、验证 SHA-256，并创建带有两个 OTA 文件的公开 Release。
+
 ## 关键文档
 
 - [用户引导](docs/User-Guide.md)

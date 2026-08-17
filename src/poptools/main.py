@@ -112,7 +112,9 @@ def main() -> int:
         settings_controller = components.settings_controller
         preset_controller = components.preset_controller
         developer_console_controller = components.developer_console_controller
+        update_controller = components.update_controller
         app.aboutToQuit.connect(developer_console_controller.shutdown)
+        app.aboutToQuit.connect(update_controller.shutdown)
         tray_controller.set_app_controller(controller)
         if python_setup_error:
             settings_controller.setStatus(f"Python 环境初始化失败：{python_setup_error}")
@@ -126,6 +128,7 @@ def main() -> int:
         )
         engine.rootContext().setContextProperty("androidController", android_controller)
         engine.rootContext().setContextProperty("trayController", tray_controller)
+        engine.rootContext().setContextProperty("updateController", update_controller)
         qml_file = package_root() / "ui" / "qml" / "Main.qml"
         engine.load(QUrl.fromLocalFile(str(qml_file)))
         if not engine.rootObjects():

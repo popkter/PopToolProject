@@ -21,6 +21,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "terminal_enabled": False,
         "user_guide_seen": False,
         "merit_count": 0,
+        "skipped_update_version": "",
     },
     "execution": {
         "max_parallel": 3,
@@ -121,6 +122,23 @@ class ConfigStore:
             app = {}
             config["app"] = app
         app["user_guide_seen"] = bool(seen)
+        self.save_config(config)
+
+    def skipped_update_version(self) -> str:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            return ""
+        value = app.get("skipped_update_version", "")
+        return str(value).strip() if isinstance(value, str) else ""
+
+    def set_skipped_update_version(self, version: str) -> None:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+        app["skipped_update_version"] = version.strip()
         self.save_config(config)
 
     def terminal_enabled(self) -> bool:

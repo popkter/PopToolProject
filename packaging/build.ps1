@@ -152,7 +152,16 @@ try {
     & $VenvPython -m PyInstaller --noconfirm --clean "packaging\poptools.spec"
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 
+    $BuiltExe = Join-Path $ProjectRoot "dist\泡泡工具箱.exe"
+    $BuiltExeHash = (Get-FileHash -LiteralPath $BuiltExe -Algorithm SHA256).Hash.ToLowerInvariant()
+    $ChecksumFile = Join-Path $ProjectRoot "dist\泡泡工具箱.exe.sha256"
+    [System.IO.File]::WriteAllText(
+        $ChecksumFile,
+        "$BuiltExeHash  泡泡工具箱.exe`n",
+        [System.Text.UTF8Encoding]::new($false)
+    )
     Write-Host "Self-contained single-file application created at dist\泡泡工具箱.exe"
+    Write-Host "OTA checksum created at dist\泡泡工具箱.exe.sha256"
 
     if (-not $SkipInstaller) {
         $InnoCompiler = (Get-Command "ISCC.exe" -ErrorAction SilentlyContinue).Source

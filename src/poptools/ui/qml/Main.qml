@@ -38,6 +38,7 @@ ApplicationWindow {
     property bool standbySelected: false
     property bool developerSelected: false
     property bool terminalEnablePending: false
+    property bool updateDialogPending: false
     property string standbyDateTime: formatStandbyDateTime(new Date())
     readonly property real minimumPrimaryNavWidth: 76
     readonly property real minimumToolListWidth: 120
@@ -65,6 +66,7 @@ ApplicationWindow {
         compactSearchPopup.visible
         || executionCapacityDialog.visible
         || powershellPluginDialog.visible
+        || (updateDialogLoader.item && updateDialogLoader.item.visible)
         || (settingsDialogLoader.item && settingsDialogLoader.item.visible)
         || (commandEditorDialogLoader.item && commandEditorDialogLoader.item.visible)
         || (deleteCommandDialogLoader.item && deleteCommandDialogLoader.item.visible)
@@ -188,6 +190,11 @@ ApplicationWindow {
         Qt.callLater(function () { userGuideDialogLoader.item.open() })
     }
 
+    function queueUpdateDialog() {
+        updateDialogPending = true
+        updateDialogOpenTimer.start()
+    }
+
     function preparePythonDoctorDialog(callback) {
         pythonDoctorDialogLoader.active = true
         Qt.callLater(function () { callback(pythonDoctorDialogLoader.item) })
@@ -196,6 +203,20 @@ ApplicationWindow {
     Timer {
         id: meritClickCooldown
         interval: 180
+    }
+
+    Timer {
+        id: updateDialogOpenTimer
+        interval: 250
+        repeat: true
+        onTriggered: {
+            if (window.applicationOverlayVisible)
+                return
+            stop()
+            window.updateDialogPending = false
+            updateDialogLoader.active = true
+            Qt.callLater(function () { updateDialogLoader.item.open() })
+        }
     }
 
     Timer {
@@ -355,6 +376,7 @@ ApplicationWindow {
             settingsController.saveTerminalEnabled(false)
         if (!settingsController.userGuideSeen)
             window.openUserGuideDialog()
+        updateController.checkForUpdates()
     }
 
     component ResizeHandle: MouseArea {
@@ -1421,6 +1443,16 @@ ApplicationWindow {
     }
 
     Loader {
+        id: updateDialogLoader
+        active: false
+        sourceComponent: UpdateDialog {
+            controller: updateController
+            parentWindow: window
+            onClosed: updateDialogLoader.active = false
+        }
+    }
+
+    Loader {
         id: deleteCommandDialogLoader
         active: false
         sourceComponent: DeleteToolDialog {
@@ -1484,6 +1516,13 @@ ApplicationWindow {
     }
 
     property var recentToolWindow: null
+
+    Connections {
+        target: updateController
+        function onUpdateAvailable() {
+            window.queueUpdateDialog()
+        }
+    }
 
     Connections {
         target: appController
