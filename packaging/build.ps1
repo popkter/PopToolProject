@@ -1,6 +1,7 @@
 ﻿param(
     [switch]$SkipTests,
-    [switch]$SkipInstaller
+    [switch]$SkipInstaller,
+    [string]$VersionOverride = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -126,13 +127,34 @@ try {
         throw "Could not find the project version in pyproject.toml"
     }
     $BaseVersion = $Matches[1]
-    $BuildDate = Get-Date -Format "yyyy-MM-dd"
-    $BuildVersion = "${BuildDate}_$BaseVersion"
+    if ($VersionOverride) {
+        $BuildVersion = $VersionOverride.Trim().TrimStart("v")
+        if ($BuildVersion -notmatch '^(\d{4}-\d{2}-\d{2})_(\d+\.\d+\.\d+)$') {
+            throw "VersionOverride must use YYYY-MM-DD_x.x.x, for example 2026-08-17_0.2.0"
+        }
+        $BuildDate = $Matches[1]
+        $EffectiveBaseVersion = $Matches[2]
+        try {
+            [datetime]::ParseExact(
+                $BuildDate,
+                "yyyy-MM-dd",
+                [System.Globalization.CultureInfo]::InvariantCulture
+            ) | Out-Null
+        }
+        catch {
+            throw "VersionOverride contains an invalid calendar date: $BuildVersion"
+        }
+    }
+    else {
+        $BuildDate = Get-Date -Format "yyyy-MM-dd"
+        $BuildVersion = "${BuildDate}_$BaseVersion"
+        $EffectiveBaseVersion = $BaseVersion
+    }
 
     # Inno Setup requires VersionInfoVersion to contain four numeric parts.
     # Keep the user-facing build version above, including date and prerelease
     # suffix, for AppVersion and the application runtime.
-    $VersionCore = ($BaseVersion -split "-", 2)[0]
+    $VersionCore = ($EffectiveBaseVersion -split "-", 2)[0]
     $VersionParts = @($VersionCore -split "\.")
     $InvalidVersionPart = $VersionParts | Where-Object { $_ -notmatch '^\d+$' }
     if ($VersionParts.Count -gt 4 -or $InvalidVersionPart) {

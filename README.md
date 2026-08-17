@@ -44,16 +44,18 @@
 ### 发布与应用内更新
 
 打包还会生成 `dist\泡泡工具箱.exe.sha256`。创建 GitHub Release 时，版本标签使用
-`v0.2.0`、`v0.2.0-beta.1` 这类递增版本，并同时上传 `泡泡工具箱.exe` 和
+`vYYYY-MM-DD_x.x.x` 格式，例如 `v2026-08-17_0.2.0`，并同时上传 `泡泡工具箱.exe` 和
 `泡泡工具箱.exe.sha256`。应用启动后会读取公开 Release（包括预发行版），发现更高版本
 时显示应用内更新弹窗。Release 必须公开；不要在客户端中嵌入私有仓库访问令牌。
 
-同一个基础版本的日期构建不会互相覆盖，例如 `2026-08-17_0.2.0-beta` 与
-`2026-08-18_0.2.0-beta` 会被视为同一版本；重新发布时应提升 `pyproject.toml` 中的版本号。
+版本先比较 `x.x.x`，基础版本相同时再比较日期，因此 `2026-08-18_0.2.0` 会被识别为
+比 `2026-08-17_0.2.0` 更新。
 
-提交版本变更后，也可以在 GitHub 仓库的 `Actions` 页面选择 `Build and Release`，点击
-`Run workflow`，输入与 `pyproject.toml` 完全一致的版本号。工作流会在 Windows Runner
-上执行测试和打包、验证 SHA-256，并创建带有两个 OTA 文件的公开 Release。
+在 GitHub 仓库的 `Actions` 页面选择 `Build and Release`，点击 `Run workflow`，输入完整
+版本号（例如 `2026-08-17_0.2.0`）。工作流会把该版本直接写入应用，无需同步修改
+`pyproject.toml`，并在 Windows Runner 上执行测试和打包、验证 SHA-256，最后创建带有
+两个 OTA 文件的公开 Release。本地直接运行构建脚本时，仍会使用“当天日期 +
+`pyproject.toml` 版本”生成版本号；也可通过 `-VersionOverride 2026-08-17_0.2.0` 指定。
 
 ## 关键文档
 

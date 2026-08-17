@@ -1,11 +1,11 @@
 name: Build and Release
-run-name: Release v${{ inputs.version }}
+run-name: Release ${{ inputs.version }}
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version from pyproject.toml, for example 0.2.0-beta.1
+        description: Release version, for example 2026-08-17_0.2.0
         required: true
         type: string
       prerelease:
@@ -45,17 +45,19 @@ jobs:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
           $requestedVersion = $env:INPUT_VERSION.Trim().TrimStart("v")
-          if ($requestedVersion -notmatch '^\d+\.\d+\.\d+(?:[-._]?[0-9A-Za-z][0-9A-Za-z.-]*)?$') {
-              throw "Invalid release version: $requestedVersion"
+          if ($requestedVersion -notmatch '^(\d{4}-\d{2}-\d{2})_(\d+\.\d+\.\d+)$') {
+              throw "Invalid release version '$requestedVersion'. Expected YYYY-MM-DD_x.x.x, for example 2026-08-17_0.2.0"
           }
-
-          $pyproject = Get-Content -LiteralPath "pyproject.toml" -Raw
-          if ($pyproject -notmatch '(?m)^version\s*=\s*"([^"\r\n]+)"\s*$') {
-              throw "Could not read the project version from pyproject.toml"
+          $releaseDate = $Matches[1]
+          try {
+              [datetime]::ParseExact(
+                  $releaseDate,
+                  "yyyy-MM-dd",
+                  [System.Globalization.CultureInfo]::InvariantCulture
+              ) | Out-Null
           }
-          $projectVersion = $Matches[1]
-          if ($requestedVersion -ne $projectVersion) {
-              throw "Requested version $requestedVersion does not match pyproject.toml version $projectVersion"
+          catch {
+              throw "Invalid calendar date in release version '$requestedVersion'"
           }
 
           "RELEASE_VERSION=$requestedVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -65,7 +67,7 @@ jobs:
         run: uv venv --python 3.11 .venv
 
       - name: Build and test application
-        run: .\packaging\build.ps1 -SkipInstaller
+        run: .\packaging\build.ps1 -SkipInstaller -VersionOverride $env:RELEASE_VERSION
 
       - name: Verify OTA artifacts
         run: |

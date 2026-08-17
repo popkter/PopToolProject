@@ -19,7 +19,8 @@ def test_version_comparison_supports_build_dates_and_prereleases() -> None:
     assert is_newer_version("0.2.0-beta.2", "0.2.0-beta.1")
     assert is_newer_version("0.2.0-rc1", "0.2.0-beta.9")
     assert is_newer_version("0.2.0", "0.2.0-rc2")
-    assert not is_newer_version("2026-08-18_0.2.0-beta", "2026-08-17_0.2.0-beta")
+    assert is_newer_version("2026-08-18_0.2.0", "2026-08-17_0.2.0")
+    assert is_newer_version("2026-08-01_0.3.0", "2026-09-01_0.2.0")
     assert not is_newer_version("0.1.9", "0.2.0")
 
 

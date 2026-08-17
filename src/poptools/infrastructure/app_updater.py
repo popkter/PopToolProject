@@ -33,24 +33,27 @@ class UpdateRelease:
     checksum_url: str = ""
 
 
-def version_key(value: str) -> tuple[tuple[int, int, int, int], int, int, int, str]:
+def version_key(
+    value: str,
+) -> tuple[tuple[int, int, int, int], int, int, int, str, int]:
     """Return a comparable key for SemVer-like and generated build versions."""
 
-    candidate = value.strip().lower()
-    dated = re.fullmatch(r"\d{4}-\d{2}-\d{2}_(.+)", candidate)
+    candidate = value.strip().lower().removeprefix("v")
+    build_date = 0
+    dated = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})_(.+)", candidate)
     if dated:
-        candidate = dated.group(1)
-    candidate = candidate.removeprefix("v")
+        build_date = int("".join(dated.group(1, 2, 3)))
+        candidate = dated.group(4)
     match = re.search(r"(\d+(?:\.\d+){1,3})(.*)$", candidate)
     if not match:
-        return (0, 0, 0, 0), 0, 0, 0, candidate
+        return (0, 0, 0, 0), 0, 0, 0, candidate, build_date
 
     parts = [int(part) for part in match.group(1).split(".")]
     padded = (parts + [0, 0, 0, 0])[:4]
     core = (padded[0], padded[1], padded[2], padded[3])
     suffix = str(match.group(2)).split("+", 1)[0].strip("-._")
     if not suffix:
-        return core, 1, 0, 0, ""
+        return core, 1, 0, 0, "", build_date
 
     prerelease = re.fullmatch(
         r"(a|alpha|b|beta|pre|preview|rc)[-._]?(\d*)", suffix
@@ -67,8 +70,8 @@ def version_key(value: str) -> tuple[tuple[int, int, int, int], int, int, int, s
             "rc": 2,
         }
         number = int(prerelease.group(2) or 0)
-        return core, 0, ranks[label], number, suffix
-    return core, 0, -1, 0, suffix
+        return core, 0, ranks[label], number, suffix, build_date
+    return core, 0, -1, 0, suffix, build_date
 
 
 def is_newer_version(candidate: str, current: str) -> bool:
