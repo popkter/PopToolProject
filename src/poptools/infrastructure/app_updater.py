@@ -14,7 +14,9 @@ from typing import Any
 from PySide6.QtCore import QProcess
 
 GITHUB_RELEASES_URL = "https://api.github.com/repos/popkter/PopToolProject/releases?per_page=20"
-UPDATE_ASSET_NAME = "泡泡工具箱.exe"
+# GitHub normalizes non-ASCII release asset filenames. Keep the actual OTA
+# filename ASCII-only and use a Chinese display label in the release workflow.
+UPDATE_ASSET_NAME = "PopTools.exe"
 NETWORK_TIMEOUT_SECONDS = 30
 DOWNLOAD_TIMEOUT_SECONDS = 180
 

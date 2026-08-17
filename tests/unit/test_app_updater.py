@@ -35,13 +35,13 @@ def test_release_selection_includes_prereleases_and_requires_the_expected_exe() 
             "prerelease": True,
             "assets": [
                 {
-                    "name": "泡泡工具箱.exe",
+                    "name": "PopTools.exe",
                     "browser_download_url": "https://example.test/app.exe",
                     "size": 123,
                     "digest": "sha256:" + "a" * 64,
                 },
                 {
-                    "name": "泡泡工具箱.exe.sha256",
+                    "name": "PopTools.exe.sha256",
                     "browser_download_url": "https://example.test/app.exe.sha256",
                 },
             ],
@@ -86,7 +86,7 @@ def test_update_download_verifies_checksum_and_commits_atomically(
         notes="Changes",
         page_url="https://example.test/release",
         asset_url="https://example.test/app.exe",
-        asset_name="泡泡工具箱.exe",
+        asset_name="PopTools.exe",
         asset_size=len(payload),
         sha256=hashlib.sha256(payload).hexdigest(),
     )
@@ -119,7 +119,7 @@ def test_update_download_rejects_a_bad_checksum(
         notes="",
         page_url="",
         asset_url="https://example.test/app.exe",
-        asset_name="泡泡工具箱.exe",
+        asset_name="PopTools.exe",
         asset_size=len(payload),
         sha256="0" * 64,
     )
