@@ -23,6 +23,11 @@ def test_update_dialog_and_startup_check_are_wired() -> None:
     assert "root.controller.installAndRestart()" in dialog
     assert "root.controller.releaseNotes" not in dialog
     assert "height: Math.min(300, parentWindow.height - 24)" in dialog
+    assert 'controller.state === "downloaded"' in dialog
+    assert 'controller.state === "installing"' in dialog
+    assert "? Popup.NoAutoClose : Popup.CloseOnEscape" in dialog
+    assert 'icon: "close"' not in dialog
+    assert "id: closeMouse" not in dialog
     assert dialog.count("Layout.fillWidth: true") >= 8
     assert dialog.count("horizontalAlignment: Text.AlignHCenter") >= 2
     assert dialog.count("radius: 24") >= 8

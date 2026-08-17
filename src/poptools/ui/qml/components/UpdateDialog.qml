@@ -14,6 +14,8 @@ Dialog {
     modal: true
     padding: 24
     closePolicy: controller.state === "downloading"
+                 || controller.state === "downloaded"
+                 || controller.state === "installing"
                  ? Popup.NoAutoClose : Popup.CloseOnEscape
 
     background: Rectangle {
@@ -59,27 +61,6 @@ Dialog {
                           + "  →  最新 " + root.controller.availableVersion
                     color: Theme.textSecondary
                     font.pixelSize: 13
-                }
-            }
-            Rectangle {
-                visible: root.controller.state !== "downloading"
-                         && root.controller.state !== "installing"
-                Layout.preferredWidth: 40
-                Layout.preferredHeight: 40
-                radius: 20
-                color: closeMouse.containsMouse ? Theme.surfaceContainerHigh : "transparent"
-                MaterialIcon {
-                    anchors.centerIn: parent
-                    icon: "close"
-                    iconSize: 22
-                    color: Theme.textSecondary
-                }
-                MouseArea {
-                    id: closeMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.close()
                 }
             }
         }
