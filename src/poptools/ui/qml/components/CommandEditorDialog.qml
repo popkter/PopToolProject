@@ -281,10 +281,7 @@ Dialog {
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-
-        }
-
-              ColumnLayout {
+            ColumnLayout {
                 width: formScroll.availableWidth
                 spacing: 15
 
@@ -451,7 +448,8 @@ Dialog {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 292
+                    Layout.minimumHeight: 140
+                    Layout.preferredHeight: Math.max(140, Math.min(292, root.height - 428))
                     Layout.leftMargin: 22
                     Layout.rightMargin: 22
                     radius: Theme.radiusLarge
@@ -549,6 +547,7 @@ Dialog {
 
                 Item { Layout.preferredHeight: 5 }
             }
+        }
 
         Rectangle {
             Layout.fillWidth: true

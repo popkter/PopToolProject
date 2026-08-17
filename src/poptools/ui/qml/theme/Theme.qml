@@ -9,7 +9,7 @@ QtObject {
     readonly property color primaryContainer: darkMode ? "#34316E" : "#E7E4FF"
     readonly property color primaryContainerHover: darkMode ? "#423F80" : "#DBD7FF"
     readonly property color primaryText: darkMode ? "#E7E4FF" : "#34319E"
-    readonly property color surface: darkMode ? "#141318" : "#FCF9FF"
+    readonly property color surface: darkMode ? "#211F26" : "#FCF9FF"
     readonly property color surfaceContainerLow: darkMode ? "#1D1B20" : "#F8F5FC"
     readonly property color surfaceContainer: darkMode ? "#211F26" : "#F2EFF8"
     readonly property color surfaceContainerHigh: darkMode ? "#2B2930" : "#ECE8F3"

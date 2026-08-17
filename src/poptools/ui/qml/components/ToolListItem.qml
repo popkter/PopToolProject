@@ -8,6 +8,9 @@ Rectangle {
     required property string title
     required property string iconName
     required property bool selected
+    property bool running: false
+    property color foregroundColor: Theme.textPrimary
+    property color hoverColor: Theme.surfaceContainer
     property bool compact: false
     property bool draggable: false
     property Item dragTarget: null
@@ -19,7 +22,8 @@ Rectangle {
 
     implicitHeight: 64
     radius: Theme.radiusMedium
-    color: selected ? Theme.primaryContainer : (mouseArea.containsMouse || dragging ? Theme.surfaceContainer : "transparent")
+    color: selected ? Theme.primaryContainer
+                    : (mouseArea.containsMouse || dragging ? root.hoverColor : "transparent")
     border.color: dragging ? Theme.primary : "transparent"
     border.width: dragging ? 2 : 0
     z: dragging ? 10 : 0
@@ -31,16 +35,23 @@ Rectangle {
         spacing: root.compact ? 0 : 14
 
         Item { visible: root.compact; Layout.fillWidth: true }
+        Rectangle {
+            visible: root.running
+            Layout.preferredWidth: 8
+            Layout.preferredHeight: 8
+            radius: 4
+            color: Theme.success
+        }
         MaterialIcon {
             icon: root.iconName
             iconSize: 25
-            color: root.selected ? Theme.primary : Theme.textSecondary
+            color: root.selected ? Theme.primary : root.foregroundColor
             Layout.preferredWidth: 30
         }
         Text {
             visible: !root.compact
             text: root.title
-            color: root.selected ? Theme.primary : Theme.textPrimary
+            color: root.selected ? Theme.primary : root.foregroundColor
             font.pixelSize: 16
             font.weight: root.selected ? Font.DemiBold : Font.Normal
             elide: Text.ElideRight

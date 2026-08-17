@@ -6,6 +6,8 @@ import "../theme"
 Rectangle {
     id: root
     required property var controller
+    property color foregroundColor: Theme.primary
+    property color hoverColor: Theme.primaryContainerHover
     readonly property var options: [
         { "label": "按添加时间", "value": "added_time", "icon": "schedule" },
         { "label": "按名称", "value": "name", "icon": "sort_by_alpha" },
@@ -17,7 +19,7 @@ Rectangle {
     implicitHeight: 40
     radius: 20
     color: buttonMouse.containsMouse || sortPopup.opened
-           ? Theme.primaryContainerHover : "transparent"
+           ? root.hoverColor : "transparent"
 
     function openMenu() {
         var point = root.mapToItem(Overlay.overlay, 0, root.height)
@@ -32,7 +34,7 @@ Rectangle {
         anchors.centerIn: parent
         icon: "sort"
         iconSize: 24
-        color: Theme.primary
+        color: root.foregroundColor
     }
 
     ToolTip.visible: buttonMouse.containsMouse

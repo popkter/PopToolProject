@@ -9,6 +9,33 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+PIP_PACKAGE_NAME_OVERRIDES = {
+    "bs4": "beautifulsoup4",
+    "Crypto": "pycryptodome",
+    "cv2": "opencv-python",
+    "dateutil": "python-dateutil",
+    "dotenv": "python-dotenv",
+    "fitz": "PyMuPDF",
+    "jwt": "PyJWT",
+    "lunar_python": "lunar-python",
+    "PIL": "Pillow",
+    # wexpect still imports the legacy module removed from setuptools 82+.
+    "pkg_resources": "setuptools<82",
+    "serial": "pyserial",
+    "sklearn": "scikit-learn",
+    "yaml": "PyYAML",
+}
+
+
+def pip_package_names(modules: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    """Translate import names to pip distribution names without duplicates."""
+    names: list[str] = []
+    for module in modules:
+        package = PIP_PACKAGE_NAME_OVERRIDES.get(module, module)
+        if package not in names:
+            names.append(package)
+    return tuple(names)
+
 
 @dataclass(frozen=True)
 class PythonDoctorResult:
@@ -71,7 +98,13 @@ class PythonDoctor:
         local_modules = {
             module for module in modules if self._is_local(module, script_directory)
         }
-        modules_to_check = tuple(module for module in modules if module not in local_modules)
+        modules_to_check = tuple(
+            module
+            for module in modules
+            if module not in local_modules
+            and module not in sys.stdlib_module_names
+            and module not in sys.builtin_module_names
+        )
         if self._module_finder is not None:
             missing = tuple(
                 module for module in modules_to_check if not self._is_available_locally(module)
@@ -90,14 +123,15 @@ class PythonDoctor:
     @staticmethod
     def probe_source() -> str:
         return (
-            "import importlib.util, json, sys\n"
+            "import contextlib, importlib, io, json, sys\n"
             "missing = []\n"
             "for name in sys.argv[1:]:\n"
             "    try:\n"
-            "        available = importlib.util.find_spec(name) is not None\n"
-            "    except (ImportError, AttributeError, ValueError):\n"
-            "        available = False\n"
-            "    if not available:\n"
+            "        with contextlib.redirect_stdout(io.StringIO()):\n"
+            "            importlib.import_module(name)\n"
+            "    except ModuleNotFoundError as exc:\n"
+            "        missing.append(exc.name or name)\n"
+            "    except ImportError:\n"
             "        missing.append(name)\n"
             "print(json.dumps(missing))\n"
         )

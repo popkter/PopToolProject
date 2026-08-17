@@ -8,16 +8,22 @@ ColumnLayout {
 
     required property var toolController
     required property var utilities
+    required property var androidController
     property bool compact: false
     property string jsonOutput: ""
 
+    function openRecordingFolderDialog() {
+        recordingWorkspace.openSaveDialog()
+    }
+
     spacing: 14
 
-    StackLayout {
+        StackLayout {
         Layout.fillWidth: true
         Layout.fillHeight: true
-        currentIndex: root.toolController.selectedTool.executor.command === "timestamp" ? 1
-                      : root.toolController.selectedTool.executor.command === "colors" ? 2 : 0
+            currentIndex: root.toolController.selectedTool.executor.command === "timestamp" ? 1
+                      : root.toolController.selectedTool.executor.command === "colors" ? 2
+                      : root.toolController.selectedTool.executor.command === "recording" ? 3 : 0
 
         RowLayout {
             spacing: root.compact ? 0 : 14
@@ -67,18 +73,18 @@ ColumnLayout {
                             Layout.fillWidth: true
                             text: "格式化"
                             iconName: "play_arrow"
-                            onClicked: root.jsonOutput = root.utilities.formatJson(
-                                jsonInput.text, false
-                            )
+                            onClicked: {
+                                root.jsonOutput = root.utilities.formatJson(jsonInput.text, false)
+                            }
                         }
                         PrimaryButton {
                             Layout.preferredWidth: 150
                             text: "压缩"
                             iconName: "compress"
                             tonal: true
-                            onClicked: root.jsonOutput = root.utilities.formatJson(
-                                jsonInput.text, true
-                            )
+                            onClicked: {
+                                root.jsonOutput = root.utilities.formatJson(jsonInput.text, true)
+                            }
                         }
                     }
                 }
@@ -166,9 +172,9 @@ ColumnLayout {
                 Layout.fillWidth: true
                 text: "立即转换"
                 iconName: "schedule"
-                onClicked: timestampResult.text = root.utilities.convertTimestamp(
-                    timestampInput.text
-                )
+                onClicked: {
+                    timestampResult.text = root.utilities.convertTimestamp(timestampInput.text)
+                }
             }
             Rectangle {
                 Layout.fillWidth: true
@@ -194,6 +200,15 @@ ColumnLayout {
         InteractiveColorPicker {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            utilities: root.utilities
+        }
+
+        RecordingWorkspace {
+            id: recordingWorkspace
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            controller: root.utilities
+            androidController: root.androidController
         }
     }
 }

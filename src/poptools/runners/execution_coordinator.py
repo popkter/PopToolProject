@@ -63,6 +63,9 @@ class ExecutionCoordinator(QObject):
         manager = self._executions.get(tool_id)
         return manager.running if manager is not None else False
 
+    def set_ordinary_limit(self, limit: int) -> None:
+        self._ordinary_limit = max(1, min(limit, 5))
+
     def start(self, tool: ToolDefinition, values: dict[str, Any], device_serial: str = "") -> bool:
         if self.is_scrcpy(tool):
             if self._scrcpy.active:

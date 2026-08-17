@@ -9,7 +9,30 @@ from PySide6.QtCore import QObject, QRect, QTimer, Signal
 from PySide6.QtGui import QWindow
 
 from poptools.infrastructure.background_process import BackgroundProcess
-from poptools.paths import bundled_adb_path, bundled_android_tools_dir, bundled_scrcpy_path
+from poptools.paths import (
+    bundled_adb_path,
+    bundled_android_tools_dir,
+    bundled_scrcpy_path,
+)
+
+_SCRCPY_STARTUP_POSITION = -32000
+
+
+def _projection_arguments(serial: str, window_title: str) -> list[str]:
+    """Create the scrcpy window outside the desktop until it is embedded."""
+    return [
+        "--serial",
+        serial,
+        "--window-title",
+        window_title,
+        "--window-borderless",
+        "--no-window-aspect-ratio-lock",
+        "--no-audio",
+        f"--window-x={_SCRCPY_STARTUP_POSITION}",
+        f"--window-y={_SCRCPY_STARTUP_POSITION}",
+        "--window-width=1",
+        "--window-height=1",
+    ]
 
 
 class ScrcpyController(QObject):
@@ -31,7 +54,7 @@ class ScrcpyController(QObject):
         self._window_title = ""
         self._embed_attempts = 0
         self._embed_timer = QTimer(self)
-        self._embed_timer.setInterval(50)
+        self._embed_timer.setInterval(10)
         self._embed_timer.timeout.connect(self._try_embed_window)
 
     @property
@@ -82,15 +105,7 @@ class ScrcpyController(QObject):
         environment["PATH"] = f"{scrcpy.parent}{os.pathsep}{environment.get('PATH', '')}"
         accepted = process.start(
             str(scrcpy),
-            [
-                "--serial",
-                serial,
-                "--window-title",
-                self._window_title,
-                "--window-borderless",
-                "--no-window-aspect-ratio-lock",
-                "--no-audio",
-            ],
+            _projection_arguments(serial, self._window_title),
             cwd=scrcpy.parent,
             environment=environment,
         )
@@ -128,6 +143,10 @@ class ScrcpyController(QObject):
         handle = _find_process_window(process.process_id, self._window_title)
         if handle:
             self._embed_timer.stop()
+            # scrcpy creates a normal SDL top-level window. Hide it before
+            # changing its style/parent so Windows never composites that
+            # transient black window over the application.
+            _show_window(handle, False)
             self._scrcpy_window = handle
             if self._host_window is None or not _embed_window(
                 handle, int(self._host_window.winId())
@@ -137,7 +156,7 @@ class ScrcpyController(QObject):
                 return
             self._sync_embedded_window()
             self.output.emit("投屏已连接。\n")
-        elif self._embed_attempts >= 200:
+        elif self._embed_attempts >= 1000:
             self._embed_timer.stop()
             self.output.emit("等待 scrcpy 投屏窗口超时。\n")
             self.stop()
@@ -209,8 +228,6 @@ def _find_process_window(process_id: int, title: str) -> int:
     user32.EnumWindows.restype = ctypes.c_bool
     user32.GetWindowThreadProcessId.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
     user32.GetWindowThreadProcessId.restype = ctypes.c_ulong
-    user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
-    user32.IsWindowVisible.restype = ctypes.c_bool
     user32.GetWindowTextLengthW.argtypes = [ctypes.c_void_p]
     user32.GetWindowTextLengthW.restype = ctypes.c_int
     user32.GetWindowTextW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_int]
@@ -220,7 +237,9 @@ def _find_process_window(process_id: int, title: str) -> int:
         nonlocal found
         window_pid = ctypes.c_ulong()
         user32.GetWindowThreadProcessId(handle, ctypes.byref(window_pid))
-        if window_pid.value != process_id or not user32.IsWindowVisible(handle):
+        # Match the SDL window while it is still hidden so it can become a
+        # child window before scrcpy performs its first top-level show.
+        if window_pid.value != process_id:
             return True
         length = user32.GetWindowTextLengthW(handle)
         buffer = ctypes.create_unicode_buffer(length + 1)
@@ -290,6 +309,36 @@ def _show_window(handle: int, visible: bool) -> None:
         user32 = _user32()
         user32.ShowWindow.argtypes = [ctypes.c_void_p, ctypes.c_int]
         user32.ShowWindow(handle, 5 if visible else 0)
+
+
+def _hide_window_from_taskbar(handle: int) -> bool:
+    """Hide a top-level window and turn it into a non-taskbar tool window."""
+    if os.name != "nt" or not handle:
+        return False
+    user32 = _user32()
+    get_style = user32.GetWindowLongPtrW
+    set_style = user32.SetWindowLongPtrW
+    get_style.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    get_style.restype = ctypes.c_ssize_t
+    set_style.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_ssize_t]
+    set_style.restype = ctypes.c_ssize_t
+    user32.SetWindowPos.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_uint,
+    ]
+    user32.SetWindowPos.restype = ctypes.c_bool
+
+    _show_window(handle, False)
+    extended_style = int(get_style(handle, -20))
+    extended_style = (extended_style | 0x00000080) & ~0x00040000
+    set_style(handle, -20, extended_style)
+    # Apply the changed non-client style without moving, resizing or showing it.
+    return bool(user32.SetWindowPos(handle, 0, 0, 0, 0, 0, 0x0037))
 
 
 def _close_window(handle: int) -> None:

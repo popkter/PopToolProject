@@ -66,6 +66,58 @@ def test_scrcpy_tool_uses_global_android_device(tmp_path: Path) -> None:
     assert tool.presentation.output_mode == "embedded"
 
 
+def test_projection_window_starts_offscreen_until_it_is_embedded() -> None:
+    arguments = scrcpy_module._projection_arguments(  # noqa: SLF001
+        "device-serial", "projection-window"
+    )
+
+    assert "--window-x=-32000" in arguments
+    assert "--window-y=-32000" in arguments
+    assert "--window-width=1" in arguments
+    assert "--window-height=1" in arguments
+
+
+def test_projection_window_is_hidden_before_native_embedding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = scrcpy_module.ScrcpyController()
+
+    class FakeProcess:
+        process_id = 321
+
+    class FakeHostWindow:
+        @staticmethod
+        def winId() -> int:
+            return 654
+
+    calls: list[tuple[object, ...]] = []
+    controller._process = FakeProcess()  # type: ignore[assignment]  # noqa: SLF001
+    controller._host_window = FakeHostWindow()  # type: ignore[assignment]  # noqa: SLF001
+    controller._window_title = "projection-window"  # noqa: SLF001
+    monkeypatch.setattr(scrcpy_module, "_find_process_window", lambda *_args: 123)
+    monkeypatch.setattr(
+        scrcpy_module,
+        "_show_window",
+        lambda handle, visible: calls.append(("show", handle, visible)),
+    )
+    monkeypatch.setattr(
+        scrcpy_module,
+        "_embed_window",
+        lambda child, parent: calls.append(("embed", child, parent)) or True,
+    )
+    monkeypatch.setattr(
+        controller, "_sync_embedded_window", lambda: calls.append(("sync",))
+    )
+
+    controller._try_embed_window()  # noqa: SLF001
+
+    assert calls[:3] == [
+        ("show", 123, False),
+        ("embed", 123, 654),
+        ("sync",),
+    ]
+
+
 def test_packaging_collects_bundled_scrcpy_directory() -> None:
     project_root = Path(__file__).parents[2]
     spec = (project_root / "packaging" / "poptools.spec").read_text(encoding="utf-8")
@@ -73,6 +125,8 @@ def test_packaging_collects_bundled_scrcpy_directory() -> None:
 
     assert '"resources" / "vendor"' in spec
     assert '"resources/vendor/*"' in pyproject
+    assert '"resources" / "python"' in spec
+    assert '"resources/python/*.py"' in pyproject
 
 
 class FakeWinFunction:
@@ -87,13 +141,61 @@ class FakeWinFunction:
         return self.result
 
 
+class CallbackWinFunction(FakeWinFunction):
+    def __init__(self, callback) -> None:
+        super().__init__()
+        self.callback = callback
+
+    def __call__(self, *args: object) -> int:
+        self.calls.append(args)
+        return int(self.callback(*args))
+
+
 class FakeUser32:
     def __init__(self) -> None:
         self.GetWindowLongPtrW = FakeWinFunction(0x80000000)
         self.SetWindowLongPtrW = FakeWinFunction()
+        self.SetWindowPos = FakeWinFunction(1)
+        self.ShowWindow = FakeWinFunction(1)
         # A top-level window has no previous parent, so successful SetParent
         # legitimately returns NULL and must be distinguished from an error.
         self.SetParent = FakeWinFunction()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows native hosting only")
+def test_hidden_projection_window_can_be_found_before_its_first_show(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    title = "projection-window"
+
+    class FindWindowUser32:
+        def __init__(self) -> None:
+            self.EnumWindows = CallbackWinFunction(
+                lambda callback, context: callback(123, context)
+            )
+            self.GetWindowThreadProcessId = CallbackWinFunction(
+                self._write_process_id
+            )
+            self.GetWindowTextLengthW = CallbackWinFunction(lambda _handle: len(title))
+            self.GetWindowTextW = CallbackWinFunction(self._write_title)
+
+        @staticmethod
+        def _write_process_id(_handle, process_id) -> int:
+            process_id._obj.value = 321
+            return 1
+
+        @staticmethod
+        def _write_title(_handle, buffer, _length) -> int:
+            buffer.value = title
+            return len(title)
+
+    user32 = FindWindowUser32()
+    monkeypatch.setattr(scrcpy_module, "_user32", lambda: user32)
+
+    handle = scrcpy_module._find_process_window(321, title)  # noqa: SLF001
+
+    assert handle == 123
+    assert not hasattr(user32, "IsWindowVisible")
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows native hosting only")
@@ -110,3 +212,21 @@ def test_native_window_embedding_accepts_null_previous_parent(
     _child, _index, style = user32.SetWindowLongPtrW.calls[0]
     assert int(style) & 0x40000000
     assert not int(style) & 0x80000000
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows taskbar integration only")
+def test_recording_window_is_hidden_and_marked_as_tool_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user32 = FakeUser32()
+    user32.GetWindowLongPtrW.result = 0x00040000
+    monkeypatch.setattr(scrcpy_module, "_user32", lambda: user32)
+
+    hidden = scrcpy_module._hide_window_from_taskbar(0x123456789)  # noqa: SLF001
+
+    assert hidden is True
+    assert user32.ShowWindow.calls == [(0x123456789, 0)]
+    _window, index, style = user32.SetWindowLongPtrW.calls[0]
+    assert index == -20
+    assert int(style) & 0x00000080
+    assert not int(style) & 0x00040000

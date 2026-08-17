@@ -1,6 +1,10 @@
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
-from poptools.infrastructure.python_doctor import PythonDoctor
+from poptools.infrastructure.python_doctor import PythonDoctor, pip_package_names
 
 
 def test_doctor_reports_only_unavailable_third_party_imports() -> None:
@@ -38,3 +42,44 @@ def test_doctor_still_reports_an_unavailable_interpreter_without_imports() -> No
     result = PythonDoctor().check("print('hello')")
 
     assert result.environment_error == "Python 解释器不可用"
+
+
+def test_import_names_are_translated_to_pip_distribution_names() -> None:
+    assert pip_package_names(
+        (
+            "arrow",
+            "dateutil",
+            "humanize",
+            "lunar_python",
+            "PIL",
+            "pkg_resources",
+            "dateutil",
+        )
+    ) == (
+        "arrow",
+        "python-dateutil",
+        "humanize",
+        "lunar-python",
+        "Pillow",
+        "setuptools<82",
+    )
+
+
+def test_probe_detects_a_missing_transitive_import(tmp_path: Path) -> None:
+    (tmp_path / "broken_dependency.py").write_text(
+        "import missing_transitive_dependency\n", encoding="utf-8"
+    )
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(tmp_path)
+
+    completed = subprocess.run(
+        [sys.executable, "-c", PythonDoctor.probe_source(), "broken_dependency"],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=environment,
+    )
+
+    assert completed.returncode == 0
+    assert json.loads(completed.stdout) == ["missing_transitive_dependency"]

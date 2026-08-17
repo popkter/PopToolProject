@@ -39,6 +39,8 @@ def test_tray_menu_can_restore_window_and_exit() -> None:
 
     assert [action.text() for action in controller._menu.actions()] == [  # noqa: SLF001
         "显示主界面",
+        "预置功能",
+        "最近使用",
         "",
         "退出",
     ]
@@ -55,7 +57,7 @@ def test_close_button_is_routed_to_tray_when_available() -> None:
         encoding="utf-8"
     )
 
-    assert "onClosing: function(close)" in source
+    assert "onClosing: function (close)" in source
     assert "trayController.available && !trayController.quitting" in source
     assert "close.accepted = false" in source
     assert "trayController.notify_hidden()" in source

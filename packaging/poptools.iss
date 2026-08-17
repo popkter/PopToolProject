@@ -1,5 +1,10 @@
 #define MyAppName "泡泡工具箱"
-#define MyAppVersion "0.1.0"
+#ifndef MyAppVersion
+#define MyAppVersion "0.0.0"
+#endif
+#ifndef MyAppVersionInfoVersion
+#define MyAppVersionInfoVersion "0.0.0.0"
+#endif
 #define MyAppPublisher "PopTools"
 #define MyAppExeName "泡泡工具箱.exe"
 #define MyAppUserModelId "PopTools.ZhangPaopaoToolbox"
@@ -27,7 +32,7 @@ RestartApplications=no
 SetupLogging=yes
 UsePreviousAppDir=yes
 ChangesEnvironment=no
-VersionInfoVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppVersionInfoVersion}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} 安装程序
 VersionInfoProductName={#MyAppName}

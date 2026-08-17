@@ -11,7 +11,6 @@ from PySide6.QtCore import (
     QProcess,
     QStandardPaths,
     Qt,
-    QTimer,
     QUrl,
     Signal,
     Slot,
@@ -19,21 +18,21 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import QFileDialog
 
-from poptools.infrastructure.background_process import BackgroundProcess
 from poptools.infrastructure.config_store import ConfigStore
 from poptools.infrastructure.python_environment import PythonEnvironment
+from poptools.runners import ExecutionCoordinator
 
 
 class SettingsController(QObject):
     """Expose settings and configuration transfer without coupling them to tools."""
 
     configurationStatusChanged = Signal()
-    startupWindowSizeChanged = Signal()
     middlePanelColorChanged = Signal()
-    pythonEnvironmentChanged = Signal()
-    pythonValidationChanged = Signal()
-    pythonEnvironmentSaveFinished = Signal(bool)
+    meritCountChanged = Signal()
+    customScriptConcurrencyChanged = Signal()
     themeChanged = Signal()
+    terminalEnabledChanged = Signal()
+    userGuideSeenChanged = Signal()
     scriptsImported = Signal()
     consoleMessage = Signal(str)
 
@@ -41,20 +40,20 @@ class SettingsController(QObject):
         self,
         config_store: ConfigStore,
         python_environment: PythonEnvironment,
+        execution_coordinator: ExecutionCoordinator | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self.config_store = config_store
         self.python_environment = python_environment
+        self.execution_coordinator = execution_coordinator
         self._configuration_status = ""
-        self._startup_window_width, self._startup_window_height = config_store.window_size()
-        self._startup_window_centered = config_store.window_centered()
         self._middle_panel_color = config_store.middle_panel_color()
+        self._merit_count = config_store.merit_count()
+        self._custom_script_concurrency = config_store.custom_script_concurrency()
         self._theme_mode = config_store.theme_mode()
+        self._terminal_enabled = config_store.terminal_enabled()
         self._system_dark_theme = False
-        self._python_validation: BackgroundProcess | None = None
-        self._python_validation_output = bytearray()
-        self._pending_python: tuple[str, str] | None = None
 
         application = cast(QGuiApplication | None, QGuiApplication.instance())
         if application is not None:
@@ -70,45 +69,37 @@ class SettingsController(QObject):
     def configurationStatus(self) -> str:
         return self._configuration_status
 
-    @Property(str, notify=pythonEnvironmentChanged)
-    def pythonProvider(self) -> str:
-        return self.python_environment.state().provider
-
-    @Property(str, notify=pythonEnvironmentChanged)
-    def customPythonExecutable(self) -> str:
-        return self.config_store.custom_python_executable()
-
-    @Property(str, notify=pythonEnvironmentChanged)
+    @Property(str)
     def pythonExecutable(self) -> str:
         return self.python_environment.state().executable
 
-    @Property(str, notify=pythonEnvironmentChanged)
+    @Property(str)
     def pythonEnvironmentStatus(self) -> str:
         return self.python_environment.state().status
-
-    @Property(bool, notify=pythonValidationChanged)
-    def pythonValidationRunning(self) -> bool:
-        return self._python_validation is not None
-
-    @Property(int, notify=startupWindowSizeChanged)
-    def startupWindowWidth(self) -> int:
-        return self._startup_window_width
-
-    @Property(int, notify=startupWindowSizeChanged)
-    def startupWindowHeight(self) -> int:
-        return self._startup_window_height
-
-    @Property(bool, notify=startupWindowSizeChanged)
-    def startupWindowCentered(self) -> bool:
-        return self._startup_window_centered
 
     @Property(str, notify=middlePanelColorChanged)
     def middlePanelColor(self) -> str:
         return self._middle_panel_color
 
+    @Property(int, notify=meritCountChanged)
+    def meritCount(self) -> int:
+        return self._merit_count
+
+    @Property(int, notify=customScriptConcurrencyChanged)
+    def customScriptConcurrency(self) -> int:
+        return self._custom_script_concurrency
+
     @Property(str, notify=themeChanged)
     def themeMode(self) -> str:
         return self._theme_mode
+
+    @Property(bool, notify=terminalEnabledChanged)
+    def terminalEnabled(self) -> bool:
+        return self._terminal_enabled
+
+    @Property(bool, notify=userGuideSeenChanged)
+    def userGuideSeen(self) -> bool:
+        return self.config_store.user_guide_seen()
 
     @Property(bool, notify=themeChanged)
     def darkTheme(self) -> bool:
@@ -117,6 +108,16 @@ class SettingsController(QObject):
         if self._theme_mode == "light":
             return False
         return self._system_dark_theme
+
+    @Property(str, constant=True)
+    def appVersion(self) -> str:
+        from poptools import __version__
+
+        return __version__
+
+    @Property(str, constant=True)
+    def appInfoUrl(self) -> str:
+        return "https://github.com/popkter/PopToolProject"
 
     @Slot(result=bool)
     def openConfigurationDirectory(self) -> bool:
@@ -139,7 +140,7 @@ class SettingsController(QObject):
         try:
             self.config_store.import_user_configuration(Path(source))
             self.setStatus("本地脚本导入成功，已应用到默认目录")
-            self.consoleMessage.emit("客制功能脚本导入成功。\n")
+            self.consoleMessage.emit("客制脚本导入成功。\n")
             self.scriptsImported.emit()
             return True
         except (OSError, ValueError) as exc:
@@ -152,52 +153,11 @@ class SettingsController(QObject):
             destination = self.config_store.export_user_configuration(self._documents_directory())
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(destination)))
             self.setStatus(f"本地脚本已导出到：{destination}")
-            self.consoleMessage.emit(f"客制功能脚本已导出到：{destination}\n")
+            self.consoleMessage.emit(f"客制脚本已导出到：{destination}\n")
             return True
         except (OSError, ValueError) as exc:
             self.setStatus(f"本地脚本导出失败：{exc}")
             return False
-
-    @Slot(str, str, result=bool)
-    def savePythonEnvironment(self, provider: str, custom_executable: str) -> bool:
-        if self._python_validation is not None:
-            return False
-        custom = custom_executable.strip().strip('"')
-        if provider == "managed":
-            try:
-                self.config_store.set_python_environment(provider, custom)
-            except (OSError, ValueError) as exc:
-                self.setStatus(f"Python 环境保存失败：{exc}")
-                return False
-            self.pythonEnvironmentChanged.emit()
-            self.setStatus(self.python_environment.state().status)
-            QTimer.singleShot(0, lambda: self.pythonEnvironmentSaveFinished.emit(True))
-            return True
-        if provider != "custom" or not custom:
-            self.setStatus("Python 环境保存失败：请选择 Python 解释器")
-            return False
-
-        process = BackgroundProcess(self)
-        process.stdoutReady.connect(self._python_validation_output.extend)
-        process.errorOccurred.connect(lambda message: self.setStatus(f"Python 验证失败：{message}"))
-        process.finished.connect(self._on_python_validation_finished)
-        self._python_validation = process
-        self._pending_python = (provider, custom)
-        self._python_validation_output.clear()
-        self.pythonValidationChanged.emit()
-        self.setStatus("正在验证 Python 解释器…")
-        source = "import sys; print(sys.version_info.major, sys.version_info.minor)"
-        return process.start(custom, ["-c", source])
-
-    @Slot(result=str)
-    def choosePythonExecutable(self) -> str:
-        selected, _ = QFileDialog.getOpenFileName(
-            None,
-            "选择 Python 3.11+ 解释器",
-            self.customPythonExecutable or self.pythonExecutable,
-            "Python 解释器 (python.exe);;所有文件 (*)",
-        )
-        return selected
 
     @Slot(result=bool)
     def restartApplication(self) -> bool:
@@ -211,20 +171,29 @@ class SettingsController(QObject):
         QCoreApplication.quit()
         return True
 
-    @Slot(int, int, bool, result=bool)
-    def saveStartupWindowSize(self, width: int, height: int, centered: bool) -> bool:
+    @Slot()
+    def markUserGuideSeen(self) -> None:
+        self.config_store.set_user_guide_seen(True)
+        self.userGuideSeenChanged.emit()
+
+    @Slot(result=int)
+    def addMerit(self) -> int:
+        self._merit_count = self.config_store.increment_merit_count()
+        self.meritCountChanged.emit()
+        return self._merit_count
+
+    @Slot(int, result=bool)
+    def saveCustomScriptConcurrency(self, value: int) -> bool:
         try:
-            self.config_store.set_window_size(width, height)
-            self.config_store.set_window_centered(centered)
+            self.config_store.set_custom_script_concurrency(value)
         except (OSError, ValueError) as exc:
-            self.setStatus(f"窗口尺寸保存失败：{exc}")
+            self.setStatus(f"运行配额保存失败：{exc}")
             return False
-        self._startup_window_width = width
-        self._startup_window_height = height
-        self._startup_window_centered = centered
-        self.startupWindowSizeChanged.emit()
-        position = "屏幕居中" if centered else "系统默认位置"
-        self.setStatus(f"冷启动窗口已保存：{width} × {height}，{position}")
+        self._custom_script_concurrency = value
+        if self.execution_coordinator is not None:
+            self.execution_coordinator.set_ordinary_limit(value)
+        self.customScriptConcurrencyChanged.emit()
+        self.setStatus(f"客制脚本同时运行数已设置为 {value}")
         return True
 
     @Slot(str, result=bool)
@@ -250,6 +219,19 @@ class SettingsController(QObject):
             self.themeChanged.emit()
         return True
 
+    @Slot(bool, result=bool)
+    def saveTerminalEnabled(self, enabled: bool) -> bool:
+        try:
+            self.config_store.set_terminal_enabled(enabled)
+        except OSError as exc:
+            self.setStatus(f"终端功能设置保存失败：{exc}")
+            return False
+        if enabled != self._terminal_enabled:
+            self._terminal_enabled = enabled
+            self.terminalEnabledChanged.emit()
+        self.setStatus("终端功能已开启" if enabled else "终端功能已关闭")
+        return True
+
     def setStatus(self, status: str) -> None:
         if status == self._configuration_status:
             return
@@ -264,37 +246,6 @@ class SettingsController(QObject):
         self._system_dark_theme = dark
         if self._theme_mode == "system":
             self.themeChanged.emit()
-
-    def _on_python_validation_finished(self, exit_code: int) -> None:
-        process = self._python_validation
-        pending = self._pending_python
-        self._python_validation = None
-        self._pending_python = None
-        self.pythonValidationChanged.emit()
-        if process is not None:
-            process.deleteLater()
-        if pending is None:
-            self.pythonEnvironmentSaveFinished.emit(False)
-            return
-        try:
-            version = tuple(int(item) for item in self._python_validation_output.decode().split())
-        except ValueError:
-            version = ()
-        if exit_code != 0 or version < (3, 11):
-            self.setStatus("Python 环境保存失败：所选文件不是可用的 Python 3.11+ 解释器")
-            self.pythonEnvironmentSaveFinished.emit(False)
-            return
-        provider, custom = pending
-        try:
-            self.config_store.set_python_environment(provider, custom)
-        except (OSError, ValueError) as exc:
-            self.setStatus(f"Python 环境保存失败：{exc}")
-            self.pythonEnvironmentSaveFinished.emit(False)
-            return
-        self.pythonEnvironmentChanged.emit()
-        self.setStatus("正在使用自定义 Python 解释器")
-        self.consoleMessage.emit(f"Python 环境已更新：{custom}\n")
-        self.pythonEnvironmentSaveFinished.emit(True)
 
     def _documents_directory(self) -> Path:
         value = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)

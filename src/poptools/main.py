@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import runpy
 import sys
@@ -9,27 +10,20 @@ from typing import cast
 from PySide6.QtCore import QCoreApplication, QUrl
 from PySide6.QtGui import QFont, QFontDatabase, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication
 
-from poptools.infrastructure.config_store import ConfigStore
-from poptools.infrastructure.json_tool_repository import JsonToolRepository
-from poptools.infrastructure.python_environment import PythonEnvironment, prepare_managed_python
+from poptools.application import build_components
+from poptools.infrastructure.app_logging import configure_application_logging
+from poptools.infrastructure.python_environment import prepare_managed_python
 from poptools.infrastructure.single_instance import SingleInstanceLock
 from poptools.infrastructure.system_tray import SystemTrayController
-from poptools.infrastructure.tool_registry import ToolRegistry
 from poptools.infrastructure.windows_integration import (
     apply_windows_window_effects,
     apply_windows_window_icon,
     configure_windows_app_identity,
 )
 from poptools.paths import AppPaths, package_root, prepare_bundled_android_tools, resource_path
-from poptools.runners import ExecutionCoordinator, ExecutionManager
-from poptools.viewmodels import (
-    AndroidController,
-    AppController,
-    PresetController,
-    SettingsController,
-)
 
 
 def _run_worker(arguments: list[str]) -> int:
@@ -79,14 +73,21 @@ def main() -> int:
     QCoreApplication.setOrganizationName("PopTools")
     QCoreApplication.setApplicationName("泡泡工具箱")
     paths = AppPaths.from_environment()
+    logging_session = configure_application_logging(paths)
+    logger = logging.getLogger(__name__)
+    logger.info("应用正在启动")
     instance_lock = SingleInstanceLock(paths.data_dir / "poptools.lock")
     if not instance_lock.try_acquire():
+        logger.info("已有实例运行，转为激活现有窗口")
         instance_lock.activate_running_instance()
+        logging_session.close()
         return 0
 
     try:
+        QtWebEngineQuick.initialize()
         app = QApplication(sys.argv)
         if not instance_lock.start_activation_server():
+            logger.error("无法启动单实例激活服务")
             return 1
         app.setFont(QFont("Microsoft YaHei UI", 10))
 
@@ -98,34 +99,21 @@ def main() -> int:
         app.setWindowIcon(tray_controller.icon)
 
         prepare_bundled_android_tools(paths)
-        config_store = ConfigStore(paths)
-        config_store.load_config()
         python_setup_error = ""
-        python_provider, _ = config_store.python_environment()
-        if getattr(sys, "frozen", False) and python_provider == "managed":
+        if getattr(sys, "frozen", False):
             try:
                 prepare_managed_python(paths)
             except (OSError, RuntimeError, ValueError) as exc:
                 python_setup_error = str(exc)
-        python_environment = PythonEnvironment(paths, config_store)
-        tool_repository = JsonToolRepository(paths)
-        registry = ToolRegistry(resource_path("tools"), tool_repository)
-        execution = ExecutionManager(paths, python_environment)
-        execution_coordinator = ExecutionCoordinator(
-            execution,
-            config_store.max_parallel(),
-        )
-        android_controller = AndroidController(config_store)
-        controller = AppController(
-            registry,
-            execution_coordinator,
-            config_store,
-            android_controller,
-        )
-        settings_controller = SettingsController(config_store, python_environment)
-        preset_controller = PresetController()
-        settings_controller.scriptsImported.connect(controller.reloadImportedScripts)
-        settings_controller.consoleMessage.connect(controller.appendConsoleMessage)
+                logger.exception("Python 环境初始化失败")
+        components = build_components(paths)
+        controller = components.app_controller
+        android_controller = components.android_controller
+        settings_controller = components.settings_controller
+        preset_controller = components.preset_controller
+        developer_console_controller = components.developer_console_controller
+        app.aboutToQuit.connect(developer_console_controller.shutdown)
+        tray_controller.set_app_controller(controller)
         if python_setup_error:
             settings_controller.setStatus(f"Python 环境初始化失败：{python_setup_error}")
 
@@ -133,11 +121,15 @@ def main() -> int:
         engine.rootContext().setContextProperty("appController", controller)
         engine.rootContext().setContextProperty("settingsController", settings_controller)
         engine.rootContext().setContextProperty("presetController", preset_controller)
+        engine.rootContext().setContextProperty(
+            "developerConsoleController", developer_console_controller
+        )
         engine.rootContext().setContextProperty("androidController", android_controller)
         engine.rootContext().setContextProperty("trayController", tray_controller)
         qml_file = package_root() / "ui" / "qml" / "Main.qml"
         engine.load(QUrl.fromLocalFile(str(qml_file)))
         if not engine.rootObjects():
+            logger.error("QML 主窗口加载失败：%s", qml_file)
             return 1
         window = cast(QWindow, engine.rootObjects()[0])
         window.setIcon(tray_controller.icon)
@@ -148,9 +140,12 @@ def main() -> int:
         tray_controller.attach_window(window)
         instance_lock.set_activation_handler(tray_controller.show_window)
         controller.attach_window(window)
-        return app.exec()
+        exit_code = app.exec()
+        logger.info("应用正常退出，退出码：%s", exit_code)
+        return exit_code
     finally:
         instance_lock.release()
+        logging_session.close()
 
 
 if __name__ == "__main__":

@@ -5,9 +5,10 @@ import sys
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import QObject, QTimer, QUrl
+from PySide6.QtCore import QMetaObject, QObject, QTimer, QUrl
 from PySide6.QtGui import QFont, QFontDatabase, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication
 
 from poptools.infrastructure.config_store import ConfigStore
@@ -20,6 +21,7 @@ from poptools.runners import ExecutionCoordinator, ExecutionManager
 from poptools.viewmodels import (
     AndroidController,
     AppController,
+    DeveloperConsoleController,
     PresetController,
     SettingsController,
 )
@@ -28,6 +30,7 @@ from poptools.viewmodels import (
 def main() -> int:
     output_path = Path(sys.argv[1] if len(sys.argv) > 1 else "implementation.png").resolve()
     os.environ.setdefault("QT_QUICK_BACKEND", "software")
+    QtWebEngineQuick.initialize()
     app = QApplication(sys.argv)
     system_font = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "msyh.ttc"
     if system_font.exists():
@@ -47,15 +50,22 @@ def main() -> int:
     coordinator = ExecutionCoordinator(execution, config_store.max_parallel())
     android_controller = AndroidController(config_store)
     controller = AppController(registry, coordinator, config_store, android_controller)
-    settings_controller = SettingsController(config_store, python_environment)
+    settings_controller = SettingsController(
+        config_store, python_environment, coordinator
+    )
     preset_controller = PresetController()
+    developer_console_controller = DeveloperConsoleController(
+        python_environment, paths.data_dir
+    )
+    if len(sys.argv) > 2 and sys.argv[2] in {"developer", "powershell-plugin"}:
+        settings_controller.markUserGuideSeen()
     capture_theme = os.environ.get("POPTOOLS_CAPTURE_THEME", "").strip()
     if capture_theme:
         settings_controller.saveThemeMode(capture_theme)
     settings_controller.scriptsImported.connect(controller.reloadImportedScripts)
     settings_controller.consoleMessage.connect(controller.appendConsoleMessage)
     tray_controller = SystemTrayController(app)
-    if len(sys.argv) > 2:
+    if len(sys.argv) > 2 and sys.argv[2] not in {"developer", "powershell-plugin"}:
         controller.navigate(sys.argv[2])
     if len(sys.argv) > 3:
         if sys.argv[3] == "__dynamic__":
@@ -76,6 +86,9 @@ def main() -> int:
     engine.rootContext().setContextProperty("appController", controller)
     engine.rootContext().setContextProperty("settingsController", settings_controller)
     engine.rootContext().setContextProperty("presetController", preset_controller)
+    engine.rootContext().setContextProperty(
+        "developerConsoleController", developer_console_controller
+    )
     engine.rootContext().setContextProperty("androidController", android_controller)
     engine.rootContext().setContextProperty("trayController", tray_controller)
     engine.load(QUrl.fromLocalFile(str(package_root() / "ui" / "qml" / "Main.qml")))
@@ -83,6 +96,10 @@ def main() -> int:
         print("\n".join(qml_warnings), file=sys.stderr)
         return 1
     window = cast(QWindow, engine.rootObjects()[0])
+    if len(sys.argv) > 2 and sys.argv[2] == "developer":
+        window.setProperty("developerSelected", True)
+    elif len(sys.argv) > 2 and sys.argv[2] == "powershell-plugin":
+        QTimer.singleShot(100, developer_console_controller.requestTerminalAccess)
     tray_controller.attach_window(window)
     controller.attach_window(window)
     capture_size = os.environ.get("POPTOOLS_CAPTURE_SIZE", "")
@@ -90,10 +107,16 @@ def main() -> int:
         capture_width, capture_height = capture_size.lower().split("x", maxsplit=1)
         window.setWidth(int(capture_width))
         window.setHeight(int(capture_height))
-    if os.environ.get("POPTOOLS_CAPTURE_DIALOG") == "settings":
-        settings_dialog = window.findChild(QObject, "settingsDialog")
-        if settings_dialog is not None:
-            QTimer.singleShot(100, settings_dialog.open)
+    capture_dialog = os.environ.get("POPTOOLS_CAPTURE_DIALOG")
+    if capture_dialog in {"settings", "middle-panel-color"}:
+        window.openSettingsDialog()
+    if capture_dialog == "middle-panel-color":
+        def open_middle_panel_color_dialog() -> None:
+            settings_dialog = window.findChild(QObject, "settingsDialog")
+            if settings_dialog is not None:
+                QMetaObject.invokeMethod(settings_dialog, "openMiddlePanelColorDialog")
+
+        QTimer.singleShot(250, open_middle_panel_color_dialog)
 
     def capture() -> None:
         screen = window.screen() or app.primaryScreen()

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import shlex
+from pathlib import Path
 from typing import Any
 
 from pypinyin import lazy_pinyin
@@ -22,15 +24,19 @@ from poptools.domain.models import (
 )
 from poptools.infrastructure.background_process import BackgroundProcess
 from poptools.infrastructure.config_store import ConfigStore
-from poptools.infrastructure.python_doctor import PythonDoctor, PythonDoctorResult
+from poptools.infrastructure.python_doctor import (
+    PythonDoctor,
+    PythonDoctorResult,
+    pip_package_names,
+)
 from poptools.infrastructure.tool_registry import ToolRegistry
 from poptools.runners import ExecutionCoordinator
 from poptools.viewmodels.android_controller import AndroidController
 from poptools.viewmodels.tool_list_model import ToolListModel
 
 SECTION_TITLES = {
-    ToolSection.PRESET: "预设功能",
-    ToolSection.CUSTOM: "客制功能",
+    ToolSection.PRESET: "预设",
+    ToolSection.CUSTOM: "客制",
 }
 
 CONSOLE_REFRESH_INTERVAL_MS = 50
@@ -46,8 +52,11 @@ class AppController(QObject):
     runningChanged = Signal()
     statusTextChanged = Signal()
     pythonDoctorWarning = Signal(str)
+    pythonDoctorInstallSuggestion = Signal(str)
+    pythonDependencyInstallFinished = Signal(bool, str)
     executionCapacityRequested = Signal(str, str)
     toolSortModeChanged = Signal()
+    recentToolDialogRequested = Signal(str)
 
     def __init__(
         self,
@@ -75,6 +84,9 @@ class AppController(QObject):
         self._tools_model = ToolListModel()
         self.android_controller = android_controller
         self._python_doctor = python_doctor or PythonDoctor()
+        self._python_doctor_command = ""
+        self._python_doctor_process: BackgroundProcess | None = None
+        self._python_package_install: BackgroundProcess | None = None
         self.execution_coordinator.output.connect(self._queue_console)
         self.execution_coordinator.started.connect(self._on_execution_started)
         self.execution_coordinator.runningChanged.connect(self._on_execution_running_changed)
@@ -128,6 +140,14 @@ class AppController(QObject):
     def statusText(self) -> str:
         return self._status_text
 
+    @Property(str, constant=True)
+    def pythonEnvironmentDirectory(self) -> str:
+        executable = self.execution.python_environment.executable()
+        if not executable:
+            return ""
+        path = Path(executable)
+        return str(path.parent.parent if path.parent.name.casefold() == "scripts" else path.parent)
+
     @Property(str, notify=toolSortModeChanged)
     def toolSortMode(self) -> str:
         return self._tool_sort_mode
@@ -140,6 +160,63 @@ class AppController(QObject):
             "usage": "按使用频率",
             "custom": "自定义排序",
         }[self._tool_sort_mode]
+
+    @Property("QVariantList", constant=True)
+    def recentTools(self) -> list[dict[str, str]]:
+        return self._recent_tool_items()
+
+    def getRecentTools(self) -> list[dict[str, str]]:
+        """Return recent tools list for use by SystemTrayController (non-QML)."""
+        return self._recent_tool_items()
+
+    def _recent_tool_items(self) -> list[dict[str, str]]:
+        result: list[dict[str, str]] = []
+        for tool_id in self.config_store.recent_tools():
+            tool = self.registry.get(tool_id)
+            if tool is not None and tool.section == ToolSection.CUSTOM:
+                result.append({
+                    "toolId": tool.id,
+                    "title": tool.title,
+                    "iconName": tool.presentation.icon or "extension",
+                })
+        return result
+
+    @Slot(str)
+    def openRecentToolFromTray(self, tool_id: str) -> None:
+        self.selectTool(tool_id)
+        if self._selected is None or self._selected.id != tool_id:
+            return
+
+        parameters = self._selected.parameters
+        if not parameters:
+            self.runSelected({})
+            return
+
+        self.recentToolDialogRequested.emit(tool_id)
+
+    def getPresetTools(self) -> list[dict[str, str]]:
+        """Return tray-accessible preset tools, excluding screen mirroring."""
+        return [
+            {
+                "toolId": tool.id,
+                "title": tool.title,
+                "iconName": tool.presentation.icon or "extension",
+            }
+            for tool in self.registry.for_section(ToolSection.PRESET)
+            if not self.execution_coordinator.is_scrcpy(tool)
+        ]
+
+    @Slot(str)
+    def openPresetToolFromTray(self, tool_id: str) -> None:
+        tool = self.registry.get(tool_id)
+        if (
+            tool is None
+            or tool.section != ToolSection.PRESET
+            or self.execution_coordinator.is_scrcpy(tool)
+        ):
+            return
+        self.selectTool(tool_id)
+        self.recentToolDialogRequested.emit(tool_id)
 
     @Slot(str)
     def navigate(self, section: str) -> None:
@@ -222,11 +299,20 @@ class AppController(QObject):
         if selected_device and self._tool_uses_adb(self._selected):
             run_values["device"] = selected_device
             run_values["__android_device__"] = selected_device
+        started = self._start_execution(run_values, selected_device)
+        if not started:
+            self._status_text = "就绪"
+            self.statusTextChanged.emit()
+        return started
+
+    def _start_execution(self, values: dict[str, Any], selected_device: str) -> bool:
+        if self._selected is None:
+            return False
         self._status_text = "正在启动"
         self.statusTextChanged.emit()
         started = self.execution_coordinator.start(
             self._selected,
-            run_values,
+            values,
             selected_device,
         )
         if not started:
@@ -291,6 +377,8 @@ class AppController(QObject):
             selected_id = self._selected.id
             self._refresh(select_id=selected_id)
             self._append_console("工具修改已保存到本地配置。\n")
+            if kind == ExecutorKind.PYTHON.value:
+                self._run_python_doctor(command)
             return True
         except Exception as exc:
             self._append_console(f"保存失败：{exc}\n")
@@ -319,7 +407,7 @@ class AppController(QObject):
                 self.sectionChanged.emit()
                 self.sectionTitleChanged.emit()
             self._refresh(select_id=tool.id)
-            self._append_console("自定义命令已保存到客制功能。\n")
+            self._append_console("自定义命令已保存到客制。\n")
             if tool.executor.kind == ExecutorKind.PYTHON:
                 self._run_python_doctor(command)
             return True
@@ -327,11 +415,21 @@ class AppController(QObject):
             self._append_console(f"新建失败：{exc}\n")
             return False
 
-    def _run_python_doctor(self, command: str) -> None:
+    @Slot(result=bool)
+    def checkSelectedPythonDependencies(self) -> bool:
+        if self._selected is None or self._selected.executor.kind != ExecutorKind.PYTHON:
+            return False
+        return self._run_python_doctor(self._selected.executor.command)
+
+    def _run_python_doctor(self, command: str) -> bool:
+        if self._python_doctor_process is not None:
+            self._append_console("Python Doctor：正在检查依赖，请稍候。\n")
+            return False
+        self._python_doctor_command = command
         plan = self._python_doctor.prepare(command)
         if plan.immediate_result is not None:
             self._report_python_doctor_result(plan.immediate_result)
-            return
+            return True
         executable = self.execution.python_environment.executable()
         if not executable:
             self._report_python_doctor_result(
@@ -340,15 +438,16 @@ class AppController(QObject):
                     environment_error="Python 解释器不可用",
                 )
             )
-            return
+            return True
         if not plan.modules_to_check:
             self._report_python_doctor_result(
                 PythonDoctorResult(checked_modules=plan.checked_modules),
                 executable,
             )
-            return
+            return True
 
         process = BackgroundProcess(self)
+        self._python_doctor_process = process
         stdout = bytearray()
         stderr = bytearray()
         errors: list[str] = []
@@ -361,6 +460,7 @@ class AppController(QObject):
             process.kill()
 
         def finish(exit_code: int) -> None:
+            self._python_doctor_process = None
             timeout.stop()
             if timed_out[0]:
                 result = PythonDoctorResult(
@@ -386,11 +486,12 @@ class AppController(QObject):
         process.finished.connect(finish)
         timeout.timeout.connect(stop_on_timeout)
         self._append_console("Python Doctor：正在异步检查依赖…\n")
-        process.start(
+        started = process.start(
             executable,
             ["-c", self._python_doctor.probe_source(), *plan.modules_to_check],
         )
         timeout.start(20_000)
+        return started
 
     def _report_python_doctor_result(
         self,
@@ -402,19 +503,20 @@ class AppController(QObject):
             message = f"Python Doctor 无法检查所选环境：{result.environment_error}"
             self._append_console(f"{message}\n")
             self.pythonDoctorWarning.emit(
-                f"脚本已创建，但 Python 环境不可用。\n\n{result.environment_error}\n\n"
-                "请在设置中配置 Python 解释器。"
+                f"Python 环境无法完成检查。\n\n{result.environment_error}\n\n"
+                "请确认应用专属 Python 环境已准备完成。"
             )
         elif result.missing_modules:
             modules = "、".join(result.missing_modules)
-            package_names = " ".join(result.missing_modules)
+            package_names = " ".join(pip_package_names(result.missing_modules))
             install_command = f'"{executable}" -m pip install {package_names}'
             message = f"Python Doctor 发现缺失依赖：{modules}"
-            self._append_console(f"{message}\n")
+            self._append_console(f"{message}\n> {install_command}\n")
             self.pythonDoctorWarning.emit(
-                f"脚本已创建，但当前 Python 环境缺少以下模块：\n\n{modules}\n\n"
-                f"可使用以下命令安装后再运行：\n\n{install_command}"
+                f"当前 Python 环境缺少以下依赖模块：{modules}\n\n"
+                "是否确认使用应用内 Python 环境安装？"
             )
+            self.pythonDoctorInstallSuggestion.emit(package_names)
         elif result.syntax_error:
             message = f"Python Doctor 无法完成检查，脚本存在语法错误：{result.syntax_error}"
             self._append_console(f"{message}\n")
@@ -423,6 +525,74 @@ class AppController(QObject):
             )
         else:
             self._append_console("Python Doctor：未发现缺失依赖。\n")
+
+    @Slot(str, result=bool)
+    def installPythonDependencies(self, package_text: str) -> bool:
+        """Install packages into the interpreter currently used by user scripts."""
+        if self._python_package_install is not None:
+            return False
+        executable = self.execution.python_environment.executable()
+        if not executable:
+            message = "Python 环境不可用，请先在设置中配置 Python 解释器。"
+            self._append_console(f"Python 依赖安装失败：{message}\n")
+            self.pythonDependencyInstallFinished.emit(False, message)
+            return False
+        try:
+            packages = shlex.split(package_text.strip(), posix=False)
+        except ValueError as exc:
+            message = f"包名格式无效：{exc}"
+            self._append_console(f"Python 依赖安装失败：{message}\n")
+            self.pythonDependencyInstallFinished.emit(False, message)
+            return False
+        packages = [package.strip().strip('"') for package in packages if package.strip()]
+        if not packages or any(package.startswith("-") for package in packages):
+            message = "请填写有效的 pip 包名，不要填写命令选项。"
+            self._append_console(f"Python 依赖安装失败：{message}\n")
+            self.pythonDependencyInstallFinished.emit(False, message)
+            return False
+
+        pip_ready, pip_error = self.execution.python_environment.ensure_pip()
+        if not pip_ready:
+            message = f"应用内 pip 不可用：{pip_error}"
+            self._append_console(f"Python 依赖安装失败：{message}\n")
+            self.pythonDependencyInstallFinished.emit(False, message)
+            return False
+
+        process = BackgroundProcess(self)
+        errors: list[str] = []
+        self._python_package_install = process
+
+        def append_output(payload: bytes) -> None:
+            text = payload.decode("utf-8", "replace")
+            if text:
+                self._append_console(text)
+
+        def finish(exit_code: int) -> None:
+            self._python_package_install = None
+            process.deleteLater()
+            if exit_code == 0:
+                message = "依赖安装完成，正在重新检查 Python 脚本依赖…"
+                self._append_console(f"{message}\n")
+                self.pythonDependencyInstallFinished.emit(True, message)
+                if self._python_doctor_command:
+                    self._run_python_doctor(self._python_doctor_command)
+            else:
+                detail = "\n".join(errors).strip() or f"退出码 {exit_code}"
+                message = f"安装失败：{detail}"
+                self._append_console(f"Python 依赖安装失败：{message}\n")
+                self.pythonDependencyInstallFinished.emit(False, message)
+
+        process.stdoutReady.connect(append_output)
+        process.stderrReady.connect(append_output)
+        process.errorOccurred.connect(errors.append)
+        process.finished.connect(finish)
+        self._append_console(f"> {executable} -m pip install {' '.join(packages)}\n")
+        started = process.start(executable, ["-m", "pip", "install", *packages])
+        if not started:
+            self._python_package_install = None
+            process.deleteLater()
+            return False
+        return True
 
     @Slot(result=bool)
     def deleteSelected(self) -> bool:
@@ -438,13 +608,16 @@ class AppController(QObject):
 
     def _refresh(self, *, select_first: bool = False, select_id: str = "") -> None:
         tools = self._sorted_tools(self.registry.for_section(self._section))
+        running_ids = {tool.id for tool in tools if self.execution_coordinator.running(tool.id)}
+        if self._section == ToolSection.CUSTOM and running_ids:
+            tools = sorted(tools, key=lambda tool: tool.id not in running_ids)
         target_id = select_id
         if not target_id and self._selected and self._selected.section == self._section:
             target_id = self._selected.id
         if select_first and tools:
             target_id = tools[0].id
         self._selected = self.registry.get(target_id) if target_id else None
-        self._tools_model.set_tools(tools, target_id)
+        self._tools_model.set_tools(tools, target_id, running_ids)
         self.selectedToolChanged.emit()
         self.consoleTextChanged.emit()
         self.runningChanged.emit()
@@ -514,16 +687,21 @@ class AppController(QObject):
     def _record_tool_usage(self, tool: ToolDefinition) -> None:
         if tool.section != ToolSection.CUSTOM:
             return
+        self.config_store.record_tool_recent(tool.id)
         self.config_store.increment_tool_usage(tool.id)
         if self._tool_sort_mode == "usage":
             self._refresh(select_id=tool.id)
 
     def _on_execution_running_changed(self, tool_id: str, running: bool) -> None:
-        if self._selected is None or self._selected.id != tool_id:
+        tool = self.registry.get(tool_id)
+        if tool is not None and tool.section == ToolSection.CUSTOM:
+            selected_id = self._selected.id if self._selected is not None else ""
+            self._refresh(select_id=selected_id)
             return
-        self.runningChanged.emit()
-        self._status_text = "运行中" if running else "就绪"
-        self.statusTextChanged.emit()
+        if self._selected is not None and self._selected.id == tool_id:
+            self.runningChanged.emit()
+            self._status_text = "运行中" if running else "就绪"
+            self.statusTextChanged.emit()
 
     def _on_execution_finished(self, tool_id: str, exit_code: int) -> None:
         self._flush_console()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import os
 import re
 import shlex
@@ -39,11 +40,14 @@ class ExecutionManager(QObject):
         self.python_environment = python_environment or PythonEnvironment(paths, ConfigStore(paths))
         self._process: BackgroundProcess | None = None
         self._encoding = "utf-8"
+        self._stdout_decoder: codecs.IncrementalDecoder | None = None
+        self._stderr_decoder: codecs.IncrementalDecoder | None = None
         self._timeout_timer = QTimer(self)
         self._timeout_timer.setSingleShot(True)
         self._timeout_timer.timeout.connect(self._on_timeout)
         self._timed_out = False
         self._timeout_milliseconds: int | None = None
+        self._output_dir: Path | None = None
 
     @property
     def running(self) -> bool:
@@ -81,8 +85,10 @@ class ExecutionManager(QObject):
             return True
 
         output_dir = self.paths.outputs_dir / uuid.uuid4().hex
+        self._output_dir = output_dir
         launch = self._build_launch(tool, values, output_dir)
         if launch is None:
+            self._cleanup_empty_output_dir()
             return False
         program, arguments = launch
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -96,6 +102,8 @@ class ExecutionManager(QObject):
         process.finished.connect(self._on_finished)
         self._process = process
         self._encoding = tool.executor.encoding
+        self._stdout_decoder = codecs.getincrementaldecoder(self._encoding)(errors="replace")
+        self._stderr_decoder = codecs.getincrementaldecoder(self._encoding)(errors="replace")
         self._timed_out = False
         self._timeout_milliseconds = (
             tool.executor.timeout_seconds * 1000
@@ -121,6 +129,7 @@ class ExecutionManager(QObject):
         if not started:
             self._process = None
             self.runningChanged.emit(False)
+            self._cleanup_empty_output_dir()
             self.finished.emit(-1)
             return False
         return True
@@ -159,7 +168,7 @@ class ExecutionManager(QObject):
             if not command_parts:
                 self.output.emit("命令内容不能为空\n")
                 return None
-            program = self.python_environment.executable()
+            program = self.python_environment.execution_executable()
             if not program:
                 self.output.emit("Python 环境不可用，请在设置中配置 Python 解释器。\n")
                 return None
@@ -171,7 +180,17 @@ class ExecutionManager(QObject):
                 arguments = ["-c", rendered_command, *arguments]
         elif executor.kind == ExecutorKind.POWERSHELL:
             program = shutil.which("pwsh") or shutil.which("powershell")
-            arguments = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", rendered_command]
+            utf8_setup = (
+                "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
+                "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+            )
+            arguments = [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                utf8_setup + rendered_command,
+            ]
         elif executor.kind == ExecutorKind.BASH:
             program = self._find_bash()
             arguments = ["-lc", rendered_command]
@@ -217,16 +236,36 @@ class ExecutionManager(QObject):
             environment.insert("PATH", f"{Path(adb).parent}{os.pathsep}{current_path}")
         for key, value in tool.executor.env.items():
             environment.insert(key, self._render(value, values))
+        if tool.executor.kind == ExecutorKind.PYTHON:
+            self._configure_managed_python_environment(environment)
         selected_device = str(values.get("__android_device__", "")).strip()
         if selected_device:
             environment.insert("ANDROID_SERIAL", selected_device)
         return environment
+
+    def _configure_managed_python_environment(
+        self, environment: QProcessEnvironment
+    ) -> None:
+        values = {key: environment.value(key) for key in environment.keys()}  # noqa: SIM118
+        for key, value in self.python_environment.execution_environment(values).items():
+            environment.insert(key, value)
 
     def _resolve_program(self, command: str) -> str | None:
         if command.lower() == "adb":
             bundled = bundled_adb_path()
             if bundled.exists():
                 return str(bundled)
+            prepared = sorted(
+                (
+                    candidate
+                    for candidate in self.paths.runtime_dir.glob("scrcpy-*/adb.exe")
+                    if candidate.is_file()
+                ),
+                key=lambda candidate: candidate.stat().st_mtime,
+                reverse=True,
+            )
+            if prepared:
+                return str(prepared[0])
         path = Path(command)
         if path.is_absolute() and path.exists():
             return str(path)
@@ -274,13 +313,20 @@ class ExecutionManager(QObject):
         return list(lexer)
 
     def _read_stdout(self, payload: bytes) -> None:
-        self.output.emit(self._clean_output(payload))
+        self.output.emit(self._clean_output(payload, self._stdout_decoder))
 
     def _read_stderr(self, payload: bytes) -> None:
-        self.output.emit(self._clean_output(payload))
+        self.output.emit(self._clean_output(payload, self._stderr_decoder))
 
-    def _clean_output(self, payload: bytes) -> str:
-        text = payload.decode(self._encoding, "replace")
+    def _clean_output(
+        self,
+        payload: bytes,
+        decoder: codecs.IncrementalDecoder | None = None,
+    ) -> str:
+        if decoder is None:
+            text = payload.decode(self._encoding, "replace")
+        else:
+            text = decoder.decode(payload, final=False)
         return ANSI_ESCAPE_PATTERN.sub("", text)
 
     def _on_error(self, message: str) -> None:
@@ -297,15 +343,38 @@ class ExecutionManager(QObject):
         if process is None:
             return
         self._timeout_timer.stop()
+        self._flush_decoder(self._stdout_decoder)
+        self._flush_decoder(self._stderr_decoder)
         if self._timed_out:
             self.output.emit(f"\n任务因超时结束，退出码：{exit_code}\n")
         else:
             self.output.emit(f"\n任务结束，退出码：{exit_code}\n")
         self._process = None
+        self._stdout_decoder = None
+        self._stderr_decoder = None
         self._timeout_milliseconds = None
+        self._cleanup_empty_output_dir()
         process.deleteLater()
         self.runningChanged.emit(False)
         self.finished.emit(exit_code)
+
+    def _cleanup_empty_output_dir(self) -> None:
+        output_dir = self._output_dir
+        self._output_dir = None
+        if output_dir is None:
+            return
+        try:
+            output_dir.rmdir()
+        except OSError:
+            # Preserve files intentionally written by the executed tool.
+            pass
+
+    def _flush_decoder(self, decoder: codecs.IncrementalDecoder | None) -> None:
+        if decoder is None:
+            return
+        text = decoder.decode(b"", final=True)
+        if text:
+            self.output.emit(ANSI_ESCAPE_PATTERN.sub("", text))
 
     def _on_timeout(self) -> None:
         if not self.running:

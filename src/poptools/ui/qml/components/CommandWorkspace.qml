@@ -11,12 +11,27 @@ ColumnLayout {
     required property var parameterValues
     property bool scrcpySelected: false
     property bool overlaysVisible: false
-    readonly property real parameterContentHeight: parameterFlow.height
+    readonly property int parameterCount:
+        (root.controller.selectedTool.parameters || []).length
+    readonly property bool hasParameters: parameterCount > 0
+    readonly property real parameterLabelHeight: 20
+    readonly property real parameterInputHeight: 54
+    readonly property real parameterLabelSpacing: 6
+    readonly property real parameterItemSpacing: 13
+    readonly property real parameterItemHeight:
+        parameterLabelHeight + parameterLabelSpacing + parameterInputHeight
+    readonly property real parameterContentHeight: parameterCount > 0
+        ? parameterCount * parameterItemHeight
+            + (parameterCount - 1) * parameterItemSpacing
+        : 0
 
     spacing: 16
 
     Rectangle {
         id: scrcpyHost
+        property bool geometryReady: false
+        property int stableGeometryFrames: 0
+        property string lastGeometryKey: ""
         visible: root.scrcpySelected
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -25,12 +40,43 @@ ColumnLayout {
         color: Theme.consoleBackground
         clip: true
 
-        function syncGeometry() {
+        function geometrySnapshot() {
             const point = mapToItem(null, 0, 0)
-            const canShow = visible && root.parentWindow.visible && !root.overlaysVisible
+            return {
+                x: Math.round(point.x),
+                y: Math.round(point.y),
+                width: Math.round(width),
+                height: Math.round(height)
+            }
+        }
+
+        function hideUntilLayoutSettles() {
+            geometryReady = false
+            stableGeometryFrames = 0
+            lastGeometryKey = ""
+            root.controller.updateScrcpyGeometry(0, 0, 0, 0, false)
+        }
+
+        function syncGeometry() {
+            const geometry = geometrySnapshot()
+            const geometryKey = geometry.x + ":" + geometry.y + ":"
+                              + geometry.width + ":" + geometry.height
+            const validGeometry = geometry.width > 1 && geometry.height > 1
+
+            if (!geometryReady) {
+                if (validGeometry && geometryKey === lastGeometryKey)
+                    stableGeometryFrames += 1
+                else
+                    stableGeometryFrames = 0
+                lastGeometryKey = geometryKey
+                geometryReady = validGeometry && stableGeometryFrames >= 2
+            }
+
+            const canShow = geometryReady && visible
+                         && root.parentWindow.visible && !root.overlaysVisible
             root.controller.updateScrcpyGeometry(
-                        Math.round(point.x), Math.round(point.y),
-                        Math.round(width), Math.round(height), canShow)
+                        geometry.x, geometry.y,
+                        geometry.width, geometry.height, canShow)
         }
 
         Column {
@@ -53,13 +99,18 @@ ColumnLayout {
         }
 
         Timer {
-            interval: 100
+            interval: scrcpyHost.geometryReady ? 100 : 16
             repeat: true
             running: scrcpyHost.visible
             onTriggered: scrcpyHost.syncGeometry()
         }
-        onVisibleChanged: syncGeometry()
-        Component.onCompleted: syncGeometry()
+        onVisibleChanged: {
+            if (visible)
+                hideUntilLayoutSettles()
+            else
+                root.controller.updateScrcpyGeometry(0, 0, 0, 0, false)
+        }
+        Component.onCompleted: hideUntilLayoutSettles()
     }
 
     ScrollView {
@@ -74,17 +125,20 @@ ColumnLayout {
         Flow {
             id: parameterFlow
             width: commandParameterScroll.availableWidth
-            height: childrenRect.height
-            spacing: 13
+            height: root.parameterContentHeight
+            spacing: root.parameterItemSpacing
 
             Repeater {
                 model: root.controller.selectedTool.parameters || []
                 delegate: Column {
                     required property var modelData
                     width: parameterFlow.width
-                    spacing: 6
+                    height: root.parameterItemHeight
+                    spacing: root.parameterLabelSpacing
 
                     Text {
+                        width: parent.width
+                        height: root.parameterLabelHeight
                         text: modelData.label + (modelData.required ? " *" : "")
                         color: Theme.textPrimary
                         font.pixelSize: 14
@@ -93,8 +147,9 @@ ColumnLayout {
 
                     Loader {
                         id: parameterInputLoader
-                        property int singleLineHeight: 54
+                        readonly property real singleLineHeight: root.parameterInputHeight
                         width: parent.width
+                        height: singleLineHeight
                         sourceComponent: modelData.kind === "multiline" ? multilineField
                                          : modelData.kind === "choice" ? choiceField
                                          : modelData.kind === "boolean" ? booleanField : normalField
@@ -124,8 +179,7 @@ ColumnLayout {
                         Component {
                             id: multilineField
                             TextArea {
-                                implicitHeight: Math.max(parameterInputLoader.singleLineHeight,
-                                                         contentHeight + topPadding + bottomPadding)
+                                implicitHeight: parameterInputLoader.singleLineHeight
                                 text: String(modelData.default || "")
                                 placeholderText: modelData.placeholder || ""
                                 color: Theme.textPrimary

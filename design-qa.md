@@ -64,12 +64,12 @@
 - Native Windows title-bar appearance is excluded from the offscreen capture and is supplied by Windows when the packaged application starts normally.
 - The local implementation screenshot selects a currently integrated Android tool instead of reproducing the ASR sample content literally; component hierarchy and visual treatment remain the same.
 
-## 客制功能“新建命令”入口迁移（2026-07-29）
+## 客制“新建命令”入口迁移（2026-07-29）
 
 - Source visual truth: `docs/assets/poptools-create-command-reference.png`（1500 × 1000，用户标注明确指向标题栏右侧）
 - Implementation screenshot: `docs/assets/poptools-create-command-moved.png`（1875 × 1250 物理像素；1500 × 1000 逻辑窗口；125% Windows 显示密度）
 - Normalized comparison: `docs/assets/poptools-create-command-comparison.png`（左右并排；实现截图归一化为 1500 × 1000）
-- State: 客制功能 / Android 工具列表，未悬停
+- State: 客制 / Android 工具列表，未悬停
 - Full-view evidence: 底部“新建命令”大按钮已消失，命令列表获得完整可用高度；标题栏右侧出现加号入口，三栏布局、搜索框和内容区均未漂移。
 - Focused-region evidence: 标题区与原底部区域均属于本次变更核心，因此使用同一张并排对比图检查；加号采用项目内置 Material Icons Round 字体，颜色、尺寸和标题基线符合现有 Material 3 令牌。
 - Typography: 现有标题、列表和提示文字的字体、字号、字重与换行均保持不变。
@@ -77,7 +77,7 @@
 - Colors/tokens: 默认透明、悬停使用 `Theme.primaryContainerHover`，图标使用 `Theme.primary`，与现有主题一致。
 - Image/icon fidelity: 使用已打包的 Material 图标字体中的 `add`，没有新增位图或近似绘制资产。
 - Copy/content: 可见按钮文字被移除；悬停提示保留“新建命令”，入口含义没有丢失。
-- Interaction: 点击仍调用 `commandEditorDialog.openForCreate()`；入口仅在 `local`（客制功能）分区显示。
+- Interaction: 点击仍调用 `commandEditorDialog.openForCreate()`；入口仅在 `local`（客制）分区显示。
 - Findings: 未发现 P0/P1/P2 问题。
 - Comparison history: 首次实现即满足标注位置；无需视觉修复迭代。
 
@@ -86,7 +86,7 @@
 - Source visual truth: `docs/assets/poptools-command-editor-height-reference.png`（1920 × 1020，红框标注功能说明输入区）
 - Implementation screenshot: `docs/assets/poptools-command-editor-equal-description-height.png`（1920 × 1020 物理像素；1536 × 816 逻辑窗口；125% Windows 显示密度）
 - Normalized comparison: `docs/assets/poptools-command-editor-height-comparison.png`（同尺寸左右并排，无密度缩放）
-- State: 客制功能 / 新建本地命令弹窗；编辑弹窗复用同一组件和尺寸属性。
+- State: 客制 / 新建本地命令弹窗；编辑弹窗复用同一组件和尺寸属性。
 - Full-view evidence: 功能说明输入框已从 70 高缩至 50 高，与命令名称输入框一致；脚本内容区域、提示条和底部操作区均未重叠或裁切。
 - Focused-region evidence: 并排对比图清晰覆盖命令名称、运行方式和功能说明区域；实现中两处输入框外框高度相同，标签间距和圆角保持一致。
 - Typography: 标签、占位文字、字重和基线保持原样，无截断。

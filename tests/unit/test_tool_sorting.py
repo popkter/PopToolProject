@@ -93,6 +93,33 @@ def test_controller_sorts_by_name_usage_and_dragged_custom_order(tmp_path: Path)
     assert visible_ids(reloaded)[0] == alpha.id
 
 
+def test_running_custom_tools_are_temporarily_pinned_without_changing_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller, store, registry = make_controller(tmp_path)
+    first = registry.create_custom(
+        title="First", description="", kind="powershell", command="Write-Output first"
+    )
+    second = registry.create_custom(
+        title="Second", description="", kind="powershell", command="Write-Output second"
+    )
+    controller.setToolSortMode("custom")
+    store.set_tool_order([first.id, second.id])
+    controller._refresh(select_id=first.id)  # noqa: SLF001
+    original = visible_ids(controller)
+
+    monkeypatch.setattr(
+        controller.execution_coordinator, "running", lambda tool_id: tool_id == second.id
+    )
+    controller._refresh(select_id=first.id)  # noqa: SLF001
+    assert visible_ids(controller)[0] == second.id
+
+    monkeypatch.setattr(controller.execution_coordinator, "running", lambda _tool_id: False)
+    controller._refresh(select_id=first.id)  # noqa: SLF001
+    assert visible_ids(controller) == original
+    assert store.tool_order() == [first.id, second.id]
+
+
 def test_name_sort_uses_full_pinyin_for_chinese_and_latin_names() -> None:
     names = ["发送ASR", "法国", "Fable", "飞行", "发报机"]
 
@@ -106,6 +133,40 @@ def test_name_sort_uses_full_pinyin_for_chinese_and_latin_names() -> None:
     assert AppController._name_sort_key("发送ASR") == "fasongasr"  # noqa: SLF001
 
 
+def test_tray_keeps_preset_tools_separate_from_recent_custom_tools(tmp_path: Path) -> None:
+    controller, store, registry = make_controller(tmp_path)
+    custom = registry.create_custom(
+        title="Custom tool",
+        description="",
+        kind="powershell",
+        command="Write-Output custom",
+    )
+    controller._refresh(select_id=custom.id)  # noqa: SLF001
+    store.record_tool_recent("preset.json")
+    store.record_tool_recent(custom.id)
+
+    assert [item["toolId"] for item in controller.getRecentTools()] == [custom.id]
+
+    preset_ids = {item["toolId"] for item in controller.getPresetTools()}
+    assert "preset.json" in preset_ids
+    assert "preset.timestamp" in preset_ids
+    assert "preset.colors" in preset_ids
+    assert "preset.android.recording" in preset_ids
+    assert "preset.android.scrcpy" not in preset_ids
+
+
+def test_tray_preset_opens_dialog_but_scrcpy_is_rejected(tmp_path: Path) -> None:
+    controller, _, _ = make_controller(tmp_path)
+    requested: list[str] = []
+    controller.recentToolDialogRequested.connect(requested.append)
+
+    controller.openPresetToolFromTray("preset.json")
+    controller.openPresetToolFromTray("preset.android.scrcpy")
+
+    assert requested == ["preset.json"]
+    assert controller.selectedTool["id"] == "preset.json"
+
+
 def test_sort_popup_and_long_press_drag_are_wired_in_qml() -> None:
     qml_root = Path(__file__).parents[2] / "src" / "poptools" / "ui" / "qml"
     main = (qml_root / "Main.qml").read_text(encoding="utf-8")
@@ -115,6 +176,10 @@ def test_sort_popup_and_long_press_drag_are_wired_in_qml() -> None:
     assert "ToolSortButton {" in main
     assert "appController.moveTool(parent.toolId, targetIndex)" in main
     assert "onPressAndHold" in item
+    assert "property bool running: false" in item
+    assert "visible: root.running" in item
+    assert "color: Theme.success" in item
+    assert "running: parent.running" in main
     assert 'background: AppPopupSurface { }' in button
     for mode in ("added_time", "name", "usage", "custom"):
         assert f'"value": "{mode}"' in button

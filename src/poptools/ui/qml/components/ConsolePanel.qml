@@ -6,33 +6,66 @@ import "../theme"
 Item {
     id: root
     required property var controller
+    required property int minimumVisibleLineCount
+    required property real preferredExpandedHeight
+    required property real maximumExpandedHeight
+    required property bool resizable
     property color panelColor: Theme.middlePanel
     property bool expanded: true
-    property real defaultExpandedHeight: 292
     property real expandedHeight: minimumExpandedHeight
     property bool userResized: false
-    property real minimumExpandedHeight: 128
-    property real maximumExpandedHeight: Math.max(minimumExpandedHeight,
-                                                   Math.min(640, parent ? parent.height - 100 : 640))
     property real resizeStartSceneY: 0
     property real resizeStartHeight: 0
+    property real panelMargin: 0
+    readonly property real separatorHeight: 20
+    readonly property real headerHeight: 62
+    readonly property real outputOuterMargin: 16
+    readonly property real outputViewportMargin: 14
+    readonly property real outputTextVerticalPadding: 12
+    readonly property real minimumExpandedHeight:
+        separatorHeight + headerHeight + outputOuterMargin
+            + outputViewportMargin * 2 + outputTextVerticalPadding
+            + Math.ceil(consoleFontMetrics.lineSpacing * minimumVisibleLineCount)
+    readonly property real dragMinimumExpandedHeight: root.resizable
+        ? Math.max(minimumExpandedHeight,
+                   Math.min(maximumExpandedHeight, preferredExpandedHeight))
+        : minimumExpandedHeight
+    readonly property real collapsedHeight: separatorHeight + headerHeight
+
+    FontMetrics {
+        id: consoleFontMetrics
+        font.family: "Cascadia Mono"
+        font.pixelSize: 13
+    }
 
     clip: true
 
-    implicitHeight: root.expanded ? root.expandedHeight : 82
+    implicitHeight: !root.resizable
+        ? root.clampedHeight(root.preferredExpandedHeight)
+        : (root.expanded ? root.expandedHeight : root.collapsedHeight)
 
     function clampedHeight(value) {
-        return Math.max(minimumExpandedHeight, Math.min(maximumExpandedHeight, value))
+        return Math.max(dragMinimumExpandedHeight,
+                        Math.min(maximumExpandedHeight, value))
     }
 
     function applyDefaultHeight() {
-        expandedHeight = clampedHeight(defaultExpandedHeight)
+        expandedHeight = clampedHeight(preferredExpandedHeight)
     }
 
     Component.onCompleted: applyDefaultHeight()
-    onDefaultExpandedHeightChanged: {
+    onResizableChanged: {
+        userResized = false
+        expanded = true
+        applyDefaultHeight()
+    }
+    onPreferredExpandedHeightChanged: {
         if (!userResized)
             applyDefaultHeight()
+    }
+    onDragMinimumExpandedHeightChanged: {
+        if (userResized)
+            expandedHeight = clampedHeight(expandedHeight)
     }
     onMaximumExpandedHeightChanged: {
         if (userResized)
@@ -56,7 +89,7 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 20
+        height: root.separatorHeight
         color: root.panelColor
 
         MouseArea {
@@ -64,9 +97,10 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            height: 20
+            height: 16
+            enabled: root.resizable
             hoverEnabled: true
-            cursorShape: Qt.SizeVerCursor
+            cursorShape: root.resizable ? Qt.SizeVerCursor : Qt.ArrowCursor
             onPressed: function(mouse) {
                 if (!root.expanded)
                     root.expanded = true
@@ -81,27 +115,26 @@ Item {
                 const scenePoint = resizeMouse.mapToItem(null, mouse.x, mouse.y)
                 const requestedHeight = root.resizeStartHeight
                                       + root.resizeStartSceneY - scenePoint.y
-                root.expandedHeight = Math.max(root.minimumExpandedHeight,
-                                               Math.min(root.maximumExpandedHeight, requestedHeight))
+                root.expandedHeight = root.clampedHeight(requestedHeight)
             }
         }
     }
+
     ColumnLayout {
         anchors.fill: parent
-        // Normal mode keeps the original anchors.topMargin: 20 spacing.
-        anchors.topMargin: 20
+        anchors.topMargin: root.separatorHeight
 
         spacing: 0
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 62
+            Layout.preferredHeight: root.headerHeight
             Layout.leftMargin: 18
             Layout.rightMargin: 14
             spacing: 10
 
             Text {
-                text: "运行数据"
+                text: "控制台输出"
                 color: Theme.textPrimary
                 font.pixelSize: 17
                 font.weight: Font.DemiBold
@@ -133,6 +166,7 @@ Item {
                 }
             }
             Rectangle {
+                visible: root.resizable
                 Layout.preferredWidth: 36
                 Layout.preferredHeight: 36
                 radius: 18
@@ -158,14 +192,16 @@ Item {
             visible: root.expanded
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.margins: 12
+            Layout.leftMargin: root.outputOuterMargin
+            Layout.rightMargin: root.outputOuterMargin
+            Layout.bottomMargin: root.outputOuterMargin
             Layout.topMargin: 0
             radius: 14
             color: Theme.consoleBackground
 
             ScrollView {
                 anchors.fill: parent
-                anchors.margins: 14
+                anchors.margins: root.outputViewportMargin
                 clip: true
                 TextArea {
                     text: root.controller.consoleText
@@ -177,6 +213,8 @@ Item {
                     selectedTextColor: "white"
                     font.family: "Cascadia Mono"
                     font.pixelSize: 13
+                    topPadding: root.outputTextVerticalPadding / 2
+                    bottomPadding: root.outputTextVerticalPadding / 2
                     background: null
                     onTextChanged: cursorPosition = length
                 }
@@ -184,11 +222,6 @@ Item {
         }
     }
 }
-
-
-
-
-
 
 
 

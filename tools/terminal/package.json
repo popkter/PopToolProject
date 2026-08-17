@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "copy /Y ..\\..\\src\\poptools\\ui\\terminal\\terminal-source.js terminal-source.js && esbuild terminal-source.js --bundle --minify --outfile=terminal.js && copy /Y terminal.js ..\\..\\src\\poptools\\ui\\terminal\\terminal.js && copy /Y node_modules\\@xterm\\xterm\\css\\xterm.css ..\\..\\src\\poptools\\ui\\terminal\\xterm.css"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "0.10.0",
+    "@xterm/xterm": "5.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.9"
+  }
+}

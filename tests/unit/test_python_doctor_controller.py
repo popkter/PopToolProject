@@ -48,6 +48,34 @@ def test_new_python_command_runs_doctor_and_warns_about_missing_modules(
     assert "Python Doctor 发现缺失依赖：missing_sdk" in controller.consoleText
 
 
+def test_python_dependency_check_can_be_triggered_explicitly(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    paths = AppPaths(tmp_path)
+    checked: list[str] = []
+
+    def find_module(module: str) -> object | None:
+        checked.append(module)
+        return None
+
+    controller = build_controller(paths, PythonDoctor(find_module))
+    assert controller.createCommand("需要依赖", "", "python", "import missing_sdk") is True
+    checked_after_save = len(checked)
+    controller.selectTool(controller._selected.id)  # noqa: SLF001
+
+    started: list[str] = []
+    monkeypatch.setattr(
+        controller.execution,
+        "start",
+        lambda tool, _values: started.append(tool.id) or True,
+    )
+
+    assert controller.checkSelectedPythonDependencies() is True
+    assert len(checked) > checked_after_save
+    assert started == []
+
+
 def test_new_non_python_command_does_not_run_doctor(tmp_path: Path) -> None:
     paths = AppPaths(tmp_path)
 
@@ -79,3 +107,11 @@ def test_default_python_doctor_reports_missing_modules_asynchronously(
 
     qtbot.waitUntil(lambda: bool(warnings), timeout=5_000)
     assert "poptools_module_that_does_not_exist" in warnings[0]
+
+
+def test_python_dependency_install_rejects_pip_options(tmp_path: Path) -> None:
+    paths = AppPaths(tmp_path)
+    controller = build_controller(paths)
+
+    assert controller.installPythonDependencies("--index-url https://example.invalid") is False
+    assert "不要填写命令选项" in controller.consoleText

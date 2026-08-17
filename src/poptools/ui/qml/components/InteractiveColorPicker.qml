@@ -1,18 +1,20 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Dialogs as QtDialogs
 import QtQuick.Layouts
+import QtQuick.Window
 import "../theme"
 
 ScrollView {
     id: picker
     clip: true
 
+    required property var utilities
     property real selectedHue: 0.67
     property real selectedSaturation: 0.66
     property real selectedValue: 0.78
     property int selectedAlpha: 255
     property bool syncingColor: false
+    property bool screenPicking: false
 
     function hexByte(value) {
         let hex = Math.round(Math.max(0, Math.min(255, value))).toString(16)
@@ -95,12 +97,29 @@ ScrollView {
                 border.color: Theme.outline
 
                 Canvas {
+                    id: colorPreviewCanvas
                     anchors.fill: parent
                     anchors.margins: 3
                     onPaint: {
                         const ctx = getContext("2d")
+                        const cornerRadius = 9
                         const tile = 7
                         ctx.clearRect(0, 0, width, height)
+
+                        ctx.save()
+                        ctx.beginPath()
+                        ctx.moveTo(cornerRadius, 0)
+                        ctx.lineTo(width - cornerRadius, 0)
+                        ctx.quadraticCurveTo(width, 0, width, cornerRadius)
+                        ctx.lineTo(width, height - cornerRadius)
+                        ctx.quadraticCurveTo(width, height, width - cornerRadius, height)
+                        ctx.lineTo(cornerRadius, height)
+                        ctx.quadraticCurveTo(0, height, 0, height - cornerRadius)
+                        ctx.lineTo(0, cornerRadius)
+                        ctx.quadraticCurveTo(0, 0, cornerRadius, 0)
+                        ctx.closePath()
+                        ctx.clip()
+
                         for (let y = 0; y < height; y += tile) {
                             for (let x = 0; x < width; x += tile) {
                                 const even = (Math.floor(x / tile) + Math.floor(y / tile)) % 2 === 0
@@ -108,28 +127,30 @@ ScrollView {
                                 ctx.fillRect(x, y, tile, tile)
                             }
                         }
-                    }
-                }
 
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.margins: 3
-                    radius: 9
-                    color: colorInput.acceptableInput ? colorInput.text : "transparent"
+                        if (colorInput.acceptableInput) {
+                            ctx.fillStyle = colorInput.text
+                            ctx.fillRect(0, 0, width, height)
+                        }
+                        ctx.restore()
+                    }
                 }
             }
 
             TextField {
                 id: colorInput
+                objectName: "colorValueInput"
                 Layout.fillWidth: true
                 Layout.preferredHeight: 48
                 text: "#4543C7"
-                color: Theme.textPrimary
                 font.pixelSize: 16
                 validator: RegularExpressionValidator {
                     regularExpression: /#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})/
                 }
-                onTextChanged: picker.syncPickerFromText()
+                onTextChanged: {
+                    picker.syncPickerFromText()
+                    colorPreviewCanvas.requestPaint()
+                }
                 background: Rectangle {
                     radius: 14
                     color: Theme.surface
@@ -138,15 +159,15 @@ ScrollView {
             }
 
             PrimaryButton {
+                objectName: "systemColorPickerButton"
                 implicitWidth: 130
                 implicitHeight: 48
-                text: "系统取色"
+                text: picker.screenPicking ? "点击屏幕取色" : "系统取色"
                 iconName: "colorize"
                 tonal: true
                 onClicked: {
-                    if (colorInput.acceptableInput)
-                        colorDialog.selectedColor = colorInput.text
-                    colorDialog.open()
+                    picker.screenPicking = picker.utilities.startScreenColorPicking(
+                        picker.Window.window)
                 }
             }
         }
@@ -313,13 +334,20 @@ ScrollView {
         Item { Layout.preferredHeight: 2 }
     }
 
-    QtDialogs.ColorDialog {
-        id: colorDialog
-        title: "选择颜色"
-        onAccepted: {
-            colorInput.text = selectedColor.toString().toUpperCase()
+    Connections {
+        target: picker.utilities
+
+        function onScreenColorPicked(color) {
+            if (!picker.screenPicking)
+                return
+            picker.screenPicking = false
+            colorInput.text = color
             picker.syncPickerFromText()
             picker.updateColorText()
+        }
+
+        function onScreenColorPickingCancelled() {
+            picker.screenPicking = false
         }
     }
 

@@ -153,6 +153,14 @@ class AppPaths:
     def python_venv_dir(self) -> Path:
         return self.python_dir / "venv"
 
+    @property
+    def plugins_dir(self) -> Path:
+        return self.data_dir / "plugins"
+
+    @property
+    def powershell_plugin_dir(self) -> Path:
+        return self.plugins_dir / "powershell"
+
     def ensure(self) -> None:
         for path in (
             self.data_dir,
@@ -163,5 +171,6 @@ class AppPaths:
             self.backups_dir,
             self.logs_dir,
             self.runtime_dir,
+            self.plugins_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)

@@ -14,13 +14,15 @@ def test_parameter_form_supports_choices_and_booleans() -> None:
     assert "onToggled: root.parameterValues[modelData.id] = checked" in main
 
 
-def test_multiline_parameter_starts_at_single_line_height_and_grows_with_content() -> None:
+def test_all_parameter_inputs_use_the_fixed_model_height() -> None:
     main = (QML_ROOT / "components" / "CommandWorkspace.qml").read_text(encoding="utf-8")
 
-    assert "property int singleLineHeight: 54" in main
+    assert "readonly property real parameterInputHeight: 54" in main
+    assert "readonly property real singleLineHeight: root.parameterInputHeight" in main
+    assert "height: singleLineHeight" in main
     assert "implicitHeight: 122" not in main
-    assert "contentHeight + topPadding + bottomPadding" in main
-    assert main.count("implicitHeight: parameterInputLoader.singleLineHeight") == 3
+    assert "contentHeight + topPadding + bottomPadding" not in main
+    assert main.count("implicitHeight: parameterInputLoader.singleLineHeight") == 4
 
 
 def test_parameter_flow_uses_the_available_content_width() -> None:

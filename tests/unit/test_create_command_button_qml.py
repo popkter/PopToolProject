@@ -12,7 +12,7 @@ def test_create_command_button_is_an_icon_action_in_the_tool_list_header() -> No
     assert 'visible: appController.section === "custom"' in header
     assert 'icon: "add"' in header
     assert 'ToolTip.text: "新建命令"' in header
-    assert "onClicked: commandEditorDialog.openForCreate()" in header
+    assert "onClicked: window.openCommandEditorForCreate()" in header
     assert 'iconName: "add_circle"' not in source
     assert 'icon: "filter_list"' not in source
 

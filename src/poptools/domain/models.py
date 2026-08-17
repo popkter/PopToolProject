@@ -121,9 +121,9 @@ class ToolDefinition(BaseModel):
         elif section == "local":
             origin = value.get("origin", ToolOrigin.BUILTIN.value)
             migrated = (
-                ToolSection.CUSTOM
-                if origin == ToolOrigin.CUSTOM.value
-                else ToolSection.PRESET
+                ToolSection.PRESET
+                if origin == ToolOrigin.BUILTIN.value
+                else ToolSection.CUSTOM
             )
             value = {**value, "section": migrated.value}
         return value

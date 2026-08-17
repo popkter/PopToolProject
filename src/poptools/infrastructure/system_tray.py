@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import Property, QObject, Signal, Slot
 from PySide6.QtGui import QIcon, QWindow
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from poptools.paths import resource_path
+
+if TYPE_CHECKING:
+    from poptools.viewmodels.app_controller import AppController
 
 
 def create_app_icon() -> QIcon:
@@ -17,9 +22,13 @@ def create_app_icon() -> QIcon:
 class SystemTrayController(QObject):
     quittingChanged = Signal()
 
-    def __init__(self, app: QApplication) -> None:
+    def __init__(
+        self,
+        app: QApplication,
+    ) -> None:
         super().__init__(app)
         self._app = app
+        self._app_controller: AppController | None = None
         self._window: QWindow | None = None
         self._quitting = False
         self._notified = False
@@ -30,6 +39,12 @@ class SystemTrayController(QObject):
         self._menu = QMenu()
         self._show_action = self._menu.addAction("显示主界面")
         self._show_action.triggered.connect(self.show_window)
+        self._preset_menu = QMenu("预置功能")
+        self._preset_menu.aboutToShow.connect(self._build_preset_menu)
+        self._menu.addMenu(self._preset_menu)
+        self._recent_menu = QMenu("最近使用")
+        self._recent_menu.aboutToShow.connect(self._build_recent_menu)
+        self._menu.addMenu(self._recent_menu)
         self._menu.addSeparator()
         self._exit_action = self._menu.addAction("退出")
         self._exit_action.triggered.connect(self.quit_application)
@@ -50,6 +65,9 @@ class SystemTrayController(QObject):
     def attach_window(self, window: QWindow) -> None:
         self._window = window
 
+    def set_app_controller(self, app_controller: AppController) -> None:
+        self._app_controller = app_controller
+
     @Slot()
     def notify_hidden(self) -> None:
         if not self._available or self._notified:
@@ -57,7 +75,7 @@ class SystemTrayController(QObject):
         self._notified = True
         self._tray.showMessage(
             "泡泡工具箱 已最小化到托盘",
-            "右键托盘图标可以显示主界面或退出。",
+            "右键托盘图标可直接使用预置功能，也可显示主界面或退出。",
             QSystemTrayIcon.MessageIcon.Information,
             3000,
         )
@@ -88,3 +106,37 @@ class SystemTrayController(QObject):
             QSystemTrayIcon.ActivationReason.DoubleClick,
         }:
             self.show_window()
+
+    def _build_recent_menu(self) -> None:
+        self._recent_menu.clear()
+        if self._app_controller is None:
+            self._recent_menu.addAction("(暂无最近使用)").setEnabled(False)
+            return
+        recent = self._app_controller.getRecentTools()
+        if not recent:
+            self._recent_menu.addAction("(暂无最近使用)").setEnabled(False)
+            return
+        for item in recent:
+            tool_id = item["toolId"]
+            title = item["title"]
+            action = self._recent_menu.addAction(title)
+            action.triggered.connect(
+                lambda checked=False, tid=tool_id: self._app_controller.openRecentToolFromTray(tid)
+            )
+
+    def _build_preset_menu(self) -> None:
+        self._preset_menu.clear()
+        if self._app_controller is None:
+            self._preset_menu.addAction("(暂无预置功能)").setEnabled(False)
+            return
+        presets = self._app_controller.getPresetTools()
+        if not presets:
+            self._preset_menu.addAction("(暂无预置功能)").setEnabled(False)
+            return
+        for item in presets:
+            tool_id = item["toolId"]
+            title = item["title"]
+            action = self._preset_menu.addAction(title)
+            action.triggered.connect(
+                lambda checked=False, tid=tool_id: self._app_controller.openPresetToolFromTray(tid)
+            )

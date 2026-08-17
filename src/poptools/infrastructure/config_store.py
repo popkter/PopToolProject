@@ -18,9 +18,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "language": "zh-CN",
         "last_section": "custom",
         "console_expanded": True,
-        "window_width": 800,
-        "window_height": 600,
-        "window_centered": True,
+        "terminal_enabled": False,
+        "user_guide_seen": False,
+        "merit_count": 0,
     },
     "execution": {
         "max_parallel": 3,
@@ -35,6 +35,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "order": [],
         "added_at": {},
         "usage_count": {},
+        "recent_tools": [],
     },
 }
 
@@ -60,10 +61,20 @@ class ConfigStore:
             self.save_config(DEFAULT_CONFIG)
             return self._copy_default()
         try:
-            return cast(
+            config = cast(
                 dict[str, Any],
                 json.loads(self.paths.config_file.read_text(encoding="utf-8")),
             )
+            app = config.get("app")
+            if isinstance(app, dict):
+                changed = False
+                for key in ("window_width", "window_height", "window_centered"):
+                    if key in app:
+                        app.pop(key)
+                        changed = True
+                if changed:
+                    self.save_config(config)
+            return config
         except (OSError, json.JSONDecodeError):
             self.files.backup(self.paths.config_file, suffix="corrupt")
             self.save_config(DEFAULT_CONFIG)
@@ -98,60 +109,91 @@ class ConfigStore:
         android["preferred_device"] = serial or None
         self.save_config(config)
 
-    def window_size(self) -> tuple[int, int]:
+    def user_guide_seen(self) -> bool:
         config = self.load_config()
         app = config.get("app")
-        if not isinstance(app, dict):
-            app = {}
-            config["app"] = app
-        width = app.get("window_width", 800)
-        height = app.get("window_height", 600)
-        if not isinstance(width, int) or isinstance(width, bool):
-            width = 1200
-        if not isinstance(height, int) or isinstance(height, bool):
-            height = 600
-        width = max(720, min(width, 7680))
-        height = max(448, min(height, 4320))
-        if app.get("window_width") != width or app.get("window_height") != height:
-            app["window_width"] = width
-            app["window_height"] = height
-            self.save_config(config)
-        return width, height
+        return bool(app.get("user_guide_seen", False)) if isinstance(app, dict) else False
 
-    def set_window_size(self, width: int, height: int) -> None:
-        if not 720 <= width <= 7680 or not 448 <= height <= 4320:
-            raise ValueError("窗口宽度需为 720–7680，高度需为 448–4320")
+    def set_user_guide_seen(self, seen: bool = True) -> None:
         config = self.load_config()
         app = config.get("app")
         if not isinstance(app, dict):
             app = {}
             config["app"] = app
-        app["window_width"] = width
-        app["window_height"] = height
+        app["user_guide_seen"] = bool(seen)
         self.save_config(config)
 
-    def window_centered(self) -> bool:
+    def terminal_enabled(self) -> bool:
         config = self.load_config()
         app = config.get("app")
-        if not isinstance(app, dict):
-            app = {}
-            config["app"] = app
-        centered = app.get("window_centered", True)
-        if not isinstance(centered, bool):
-            centered = True
-        if app.get("window_centered") is not centered:
-            app["window_centered"] = centered
-            self.save_config(config)
-        return centered
+        return bool(app.get("terminal_enabled", False)) if isinstance(app, dict) else False
 
-    def set_window_centered(self, centered: bool) -> None:
+    def set_terminal_enabled(self, enabled: bool) -> None:
         config = self.load_config()
         app = config.get("app")
         if not isinstance(app, dict):
             app = {}
             config["app"] = app
-        app["window_centered"] = centered
+        app["terminal_enabled"] = bool(enabled)
         self.save_config(config)
+
+    def merit_count(self) -> int:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+        value = app.get("merit_count", 0)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            value = 0
+        if app.get("merit_count") != value:
+            app["merit_count"] = value
+            self.save_config(config)
+        return value
+
+    def custom_script_concurrency(self) -> int:
+        config = self.load_config()
+        execution = config.get("execution")
+        if not isinstance(execution, dict):
+            execution = {}
+            config["execution"] = execution
+        value = execution.get("custom_script_concurrency")
+        if not isinstance(value, int) or isinstance(value, bool):
+            legacy_total = execution.get("max_parallel", 3)
+            if not isinstance(legacy_total, int) or isinstance(legacy_total, bool):
+                legacy_total = 3
+            value = legacy_total - 1
+        value = max(1, min(value, 5))
+        if execution.get("custom_script_concurrency") != value:
+            execution["custom_script_concurrency"] = value
+            self.save_config(config)
+        return value
+
+    def set_custom_script_concurrency(self, value: int) -> None:
+        if not 1 <= value <= 5:
+            raise ValueError("客制脚本同时运行数需为 1–5")
+        config = self.load_config()
+        execution = config.get("execution")
+        if not isinstance(execution, dict):
+            execution = {}
+            config["execution"] = execution
+        execution["custom_script_concurrency"] = value
+        execution["max_parallel"] = value + 1
+        self.save_config(config)
+
+    def increment_merit_count(self) -> int:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+        current = app.get("merit_count", 0)
+        if not isinstance(current, int) or isinstance(current, bool) or current < 0:
+            current = 0
+        value = current + 1
+        app["merit_count"] = value
+        self.save_config(config)
+        return value
 
     def theme_mode(self) -> str:
         config = self.load_config()
@@ -285,6 +327,24 @@ class ConfigStore:
         self.save_config(config)
         return current + 1
 
+    def record_tool_recent(self, tool_id: str) -> None:
+        config, settings = self._custom_tool_settings()
+        raw = settings.get("recent_tools")
+        items = list(raw) if isinstance(raw, list) else []
+        items = [item for item in items if isinstance(item, str)]
+        if tool_id in items:
+            items.remove(tool_id)
+        items.insert(0, tool_id)
+        items = items[:10]
+        settings["recent_tools"] = items
+        self.save_config(config)
+
+    def recent_tools(self) -> list[str]:
+        config, settings = self._custom_tool_settings()
+        raw = settings.get("recent_tools")
+        items = [item for item in raw if isinstance(item, str)] if isinstance(raw, list) else []
+        return items[:10]
+
     def _custom_tool_settings(self) -> tuple[dict[str, Any], dict[str, Any]]:
         config = self.load_config()
         settings = config.get("custom_tools")
@@ -309,33 +369,14 @@ class ConfigStore:
         if not isinstance(python, dict):
             python = {}
             config["python"] = python
-        provider = python.get("provider", "managed")
-        if provider not in ("managed", "custom"):
-            provider = "managed"
-        custom = python.get("custom_executable")
-        custom_value = str(custom) if custom else ""
-        if python.get("provider") != provider or python.get("custom_executable") != (
-            custom_value or None
-        ):
-            python["provider"] = provider
-            python["custom_executable"] = custom_value or None
+        # Python scripts always use the application-managed environment.
+        # Normalize legacy custom-provider settings during read so upgrades
+        # cannot continue pointing scripts at a removed interpreter.
+        if python.get("provider") != "managed" or python.get("custom_executable") is not None:
+            python["provider"] = "managed"
+            python["custom_executable"] = None
             self.save_config(config)
-        return provider, custom_value
-
-    def custom_python_executable(self) -> str:
-        return self.python_environment()[1]
-
-    def set_python_environment(self, provider: str, custom_executable: str = "") -> None:
-        if provider not in ("managed", "custom"):
-            raise ValueError("未知的 Python 环境类型")
-        config = self.load_config()
-        python = config.setdefault("python", {})
-        python["provider"] = provider
-        if provider == "custom":
-            python["custom_executable"] = custom_executable or None
-        else:
-            python.setdefault("custom_executable", None)
-        self.save_config(config)
+        return "managed", ""
 
     @staticmethod
     def _copy_default() -> dict[str, Any]:

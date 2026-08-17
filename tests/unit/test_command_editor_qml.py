@@ -96,6 +96,19 @@ def test_command_editor_footer_preserves_bottom_rounding() -> None:
     assert "height: 1" in footer
 
 
+def test_command_editor_shrinks_script_area_and_keeps_form_scrollable() -> None:
+    source = (QML_COMPONENTS / "CommandEditorDialog.qml").read_text(encoding="utf-8")
+    form_scroll = source[
+        source.index("id: formScroll") : source.index("Layout.preferredHeight: 76")
+    ]
+
+    assert "ColumnLayout {" in form_scroll
+    assert "width: formScroll.availableWidth" in form_scroll
+    assert "Layout.minimumHeight: 140" in form_scroll
+    assert "Layout.preferredHeight: Math.max(140, Math.min(292, root.height - 428))" in form_scroll
+    assert "ScrollBar.vertical.policy: ScrollBar.AsNeeded" in form_scroll
+
+
 def test_device_popup_switches_to_icons_when_narrow() -> None:
     source = (QML_COMPONENTS / "DeviceSelector.qml").read_text(encoding="utf-8")
 

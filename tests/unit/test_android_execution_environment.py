@@ -39,3 +39,30 @@ def test_selected_android_device_is_exposed_to_every_runner(
     assert environment.value("PATH").split(os.pathsep)[0] == str(adb_path.parent)
     assert environment.value("POPTOOLS_RESOURCE_ROOT").endswith("resources")
     assert environment.value("POPTOOLS_FROZEN") in {"0", "1"}
+
+
+def test_bundled_adb_is_found_from_the_prepared_application_runtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("POPTOOLS_ANDROID_TOOLS_DIR", raising=False)
+    paths = AppPaths(tmp_path)
+    adb_path = paths.runtime_dir / "scrcpy-4.0-test" / "adb.exe"
+    adb_path.parent.mkdir(parents=True)
+    adb_path.touch()
+    manager = ExecutionManager(paths)
+    tool = ToolDefinition(
+        id="custom.python-adb",
+        section=ToolSection.CUSTOM,
+        title="Python ADB",
+        executor=ExecutorDefinition(kind=ExecutorKind.PYTHON, command="import wexpect"),
+    )
+
+    environment = manager._build_environment(  # noqa: SLF001
+        tool,
+        {},
+        tmp_path / "output",
+    )
+
+    assert manager._resolve_program("adb") == str(adb_path)  # noqa: SLF001
+    assert environment.value("POPTOOLS_ADB") == str(adb_path)
+    assert str(adb_path.parent) in environment.value("PATH").split(os.pathsep)

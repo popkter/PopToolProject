@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from poptools.domain.models import (
     ToolDefinition,
     ToolSection,
 )
-from poptools.paths import AppPaths
+from poptools.paths import AppPaths, resource_path
 from poptools.runners.execution_manager import ExecutionManager
 
 
@@ -44,7 +45,15 @@ def test_powershell_command_template_is_rendered(tmp_path: Path, monkeypatch) ->
 
     assert launch == (
         "powershell.exe",
-        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "adb shell adbd1234"],
+        [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+            "adb shell adbd1234",
+        ],
     )
 
 
@@ -77,6 +86,8 @@ def test_declared_parameter_line_is_not_executed(tmp_path: Path, monkeypatch) ->
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
+            "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
             "adb shell setprop persist.sys.vin VIN999\n"
             "adb shell setprop persist.sys.ihuid VIN999",
         ],
@@ -212,6 +223,38 @@ def test_python_kind_executes_inline_source_without_splitting(tmp_path: Path) ->
     launch = manager._build_launch(tool, {})  # noqa: SLF001
 
     assert launch == (sys.executable, ["-c", source])
+
+
+def test_managed_python_execution_uses_runtime_with_venv_dependencies(tmp_path: Path) -> None:
+    paths = AppPaths(tmp_path)
+    runtime = paths.python_runtime_dir / "python.exe"
+    venv_python = paths.python_venv_dir / "Scripts" / "python.exe"
+    site_packages = paths.python_venv_dir / "Lib" / "site-packages"
+    runtime.parent.mkdir(parents=True)
+    venv_python.parent.mkdir(parents=True)
+    site_packages.mkdir(parents=True)
+    runtime.touch()
+    venv_python.touch()
+    manager = ExecutionManager(paths)
+    source = "print('managed')"
+    tool = ToolDefinition(
+        id="custom.managed-python",
+        section=ToolSection.CUSTOM,
+        title="Managed Python",
+        executor=ExecutorDefinition(kind=ExecutorKind.PYTHON, command=source),
+    )
+
+    launch = manager._build_launch(tool, {})  # noqa: SLF001
+    environment = manager._build_environment(tool, {}, tmp_path / "output")  # noqa: SLF001
+
+    assert launch == (str(runtime.resolve()), ["-c", source])
+    assert environment.value("POPTOOLS_PYTHON_SITE_PACKAGES") == str(
+        site_packages.resolve()
+    )
+    assert environment.value("VIRTUAL_ENV") == str(paths.python_venv_dir)
+    assert environment.value("PYTHONPATH").split(os.pathsep)[0] == str(
+        resource_path("python")
+    )
 
 
 def test_secret_parameter_is_redacted_from_launch_log(tmp_path: Path) -> None:

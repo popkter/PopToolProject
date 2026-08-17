@@ -18,8 +18,6 @@ class JsonFileStorage:
 
     def write(self, target: Path, value: dict[str, Any]) -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists():
-            shutil.copy2(target, target.with_suffix(target.suffix + ".bak"))
         handle, temp_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
         try:
             with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as stream:

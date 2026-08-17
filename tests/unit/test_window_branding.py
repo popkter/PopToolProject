@@ -11,6 +11,7 @@ def test_main_window_uses_custom_title_bar_and_cat_brand_icon() -> None:
     assert "Qt.FramelessWindowHint" in qml
     assert "Qt.CustomizeWindowHint" not in qml
     assert "id: customTitleBar" in qml
+    assert "id: middlePanelBackground" in qml
     assert "window.startSystemMove()" in qml
     assert "window.startSystemResize(resizeEdges)" in qml
     assert "Qt.BottomEdge | Qt.RightEdge" in qml
@@ -20,7 +21,7 @@ def test_main_window_uses_custom_title_bar_and_cat_brand_icon() -> None:
     assert "window.showMaximized()" in qml
     assert "window.showNormal()" in qml
     assert "window.close()" in qml
-    assert 'source: Qt.resolvedUrl("../../resources/icons/app-icon.png")' in qml
+    assert 'source: Qt.resolvedUrl("../../resources/icons/app-icon-ui.png")' in qml
     assert 'icon: "build"' not in qml
 
 

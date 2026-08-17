@@ -16,3 +16,5 @@ dist/
 design-qa-*.png
 .capture-*
 src/poptools/resources/vendor/python/*.nupkg
+src/poptools/_build_version.py
+.tmp*

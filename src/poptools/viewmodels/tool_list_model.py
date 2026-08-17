@@ -16,11 +16,13 @@ class ToolListModel(QAbstractListModel):
     IconRole = Qt.UserRole + 4
     SelectedRole = Qt.UserRole + 5
     KindRole = Qt.UserRole + 6
+    RunningRole = Qt.UserRole + 7
 
     def __init__(self) -> None:
         super().__init__()
         self._tools: list[ToolDefinition] = []
         self._selected_id = ""
+        self._running_ids: set[str] = set()
 
     def roleNames(self) -> dict[int, bytes]:
         return {
@@ -30,6 +32,7 @@ class ToolListModel(QAbstractListModel):
             self.IconRole: b"iconName",
             self.SelectedRole: b"selected",
             self.KindRole: b"executorKind",
+            self.RunningRole: b"running",
         }
 
     def rowCount(self, parent: QModelIndex = _EMPTY_INDEX) -> int:
@@ -46,13 +49,20 @@ class ToolListModel(QAbstractListModel):
             self.IconRole: tool.presentation.icon,
             self.SelectedRole: tool.id == self._selected_id,
             self.KindRole: tool.executor.kind.value,
+            self.RunningRole: tool.id in self._running_ids,
         }
         return values.get(role)
 
-    def set_tools(self, tools: list[ToolDefinition], selected_id: str = "") -> None:
+    def set_tools(
+        self,
+        tools: list[ToolDefinition],
+        selected_id: str = "",
+        running_ids: set[str] | None = None,
+    ) -> None:
         self.beginResetModel()
         self._tools = list(tools)
         self._selected_id = selected_id
+        self._running_ids = set(running_ids or ())
         self.endResetModel()
 
     def select(self, tool_id: str) -> None:

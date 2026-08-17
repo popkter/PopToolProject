@@ -4,15 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "poptools"
-version = "0.1.0"
+version = "0.1.0-beta"
 description = "A self-contained Material 3 desktop toolbox for Android development and log analysis."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+  "PySide6-Addons==6.11.1",
   "PySide6-Essentials==6.11.1",
   "platformdirs>=4.4,<5",
   "pydantic>=2.12,<3",
   "pypinyin>=0.55,<1",
+  "psutil>=7,<8",
+  "pywinpty>=3,<4",
   "wexpect>=4,<5",
 ]
 
@@ -39,10 +42,11 @@ where = ["src"]
 [tool.setuptools.package-data]
 poptools = [
   "ui/qml/**/*.qml",
+  "ui/terminal/*",
   "resources/vendor/*",
   "ui/qml/**/qmldir",
   "resources/tools/*.json",
-  "resources/scripts/*",
+  "resources/python/*.py",
   "resources/fonts/*",
   "resources/icons/*",
 ]
@@ -64,4 +68,3 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 python_version = "3.11"
 strict = true
 packages = ["poptools"]
-
