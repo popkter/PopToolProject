@@ -149,6 +149,9 @@ try {
         }
         $BuildDate = $Matches[1]
         $EffectiveBaseVersion = $Matches[2]
+        if ($EffectiveBaseVersion -ne $BaseVersion) {
+            throw "VersionOverride semantic version $EffectiveBaseVersion does not match pyproject.toml version $BaseVersion"
+        }
         try {
             [datetime]::ParseExact(
                 $BuildDate,

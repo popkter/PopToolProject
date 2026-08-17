@@ -51,11 +51,12 @@
 版本先比较 `x.x.x`，基础版本相同时再比较日期，因此 `2026-08-18_0.2.0` 会被识别为
 比 `2026-08-17_0.2.0` 更新。
 
-在 GitHub 仓库的 `Actions` 页面选择 `Build and Release`，点击 `Run workflow`，输入完整
-版本号（例如 `2026-08-17_0.2.0`）。工作流会把该版本直接写入应用，无需同步修改
-`pyproject.toml`，并在 Windows Runner 上执行测试和打包、验证 SHA-256，最后创建带有
-两个 OTA 文件的公开 Release。本地直接运行构建脚本时，仍会使用“当天日期 +
-`pyproject.toml` 版本”生成版本号；也可通过 `-VersionOverride 2026-08-17_0.2.0` 指定。
+代码中的语义版本以 `pyproject.toml` 为唯一来源。发版前先修改其中的 `version`（例如
+`0.2.0`），然后在 GitHub 仓库的 `Actions` 页面选择 `Build and Release` 并点击
+`Run workflow`，无需再次输入版本。工作流会按香港时区读取构建日期并生成完整版本
+`YYYY-MM-DD_x.x.x`，随后执行测试和打包、验证 SHA-256，最后创建带有两个 OTA 文件的
+公开 Release。本地直接运行构建脚本时也会使用“当天日期 + `pyproject.toml` 版本”生成
+版本号；`-VersionOverride` 仅能覆盖日期，末尾语义版本仍须与 `pyproject.toml` 一致。
 
 ## 关键文档
 

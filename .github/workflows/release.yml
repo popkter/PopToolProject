@@ -1,13 +1,8 @@
 name: Build and Release
-run-name: Release ${{ inputs.version }}
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Release version, for example 2026-08-17_0.2.0
-        required: true
-        type: string
       prerelease:
         description: Publish as a GitHub pre-release
         required: true
@@ -18,7 +13,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ inputs.version }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -41,27 +36,23 @@ jobs:
           enable-cache: true
 
       - name: Validate release version
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          $requestedVersion = $env:INPUT_VERSION.Trim().TrimStart("v")
-          if ($requestedVersion -notmatch '^(\d{4}-\d{2}-\d{2})_(\d+\.\d+\.\d+)$') {
-              throw "Invalid release version '$requestedVersion'. Expected YYYY-MM-DD_x.x.x, for example 2026-08-17_0.2.0"
+          $pyproject = Get-Content -LiteralPath "pyproject.toml" -Raw
+          if ($pyproject -notmatch '(?m)^version\s*=\s*"([^"\r\n]+)"\s*$') {
+              throw "Could not read the project version from pyproject.toml"
           }
-          $releaseDate = $Matches[1]
-          try {
-              [datetime]::ParseExact(
-                  $releaseDate,
-                  "yyyy-MM-dd",
-                  [System.Globalization.CultureInfo]::InvariantCulture
-              ) | Out-Null
-          }
-          catch {
-              throw "Invalid calendar date in release version '$requestedVersion'"
+          $projectVersion = $Matches[1]
+          if ($projectVersion -notmatch '^\d+\.\d+\.\d+$') {
+              throw "Invalid pyproject.toml version '$projectVersion'. Expected x.x.x, for example 0.2.0"
           }
 
-          "RELEASE_VERSION=$requestedVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "RELEASE_TAG=v$requestedVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $buildTime = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId(
+              [DateTime]::UtcNow,
+              "China Standard Time"
+          )
+          $releaseVersion = "$($buildTime.ToString('yyyy-MM-dd'))_$projectVersion"
+          "RELEASE_VERSION=$releaseVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_TAG=v$releaseVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Create project virtual environment
         run: uv venv --python 3.11 .venv
@@ -77,8 +68,12 @@ jobs:
           path: build/test-results/pytest.xml
           if-no-files-found: warn
 
-      - name: Verify OTA artifacts
+      - name: Verify application version and OTA artifacts
         run: |
+          $codeVersion = (& .\.venv\Scripts\python.exe -c "from poptools import __version__; print(__version__)" | Select-Object -Last 1).Trim()
+          if ($codeVersion -ne $env:RELEASE_VERSION) {
+              throw "Application code version $codeVersion does not match requested release version $env:RELEASE_VERSION"
+          }
           $exe = "dist\泡泡工具箱.exe"
           $checksumFile = "dist\泡泡工具箱.exe.sha256"
           if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {

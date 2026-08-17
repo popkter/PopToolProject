@@ -13,6 +13,7 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication
 
+from poptools import __version__
 from poptools.application import build_components
 from poptools.infrastructure.app_logging import configure_application_logging
 from poptools.infrastructure.python_environment import prepare_managed_python
@@ -72,6 +73,7 @@ def main() -> int:
     configure_windows_app_identity()
     QCoreApplication.setOrganizationName("PopTools")
     QCoreApplication.setApplicationName("泡泡工具箱")
+    QCoreApplication.setApplicationVersion(__version__)
     paths = AppPaths.from_environment()
     logging_session = configure_application_logging(paths)
     logger = logging.getLogger(__name__)
