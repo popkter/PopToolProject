@@ -66,7 +66,8 @@ Item {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: "原生 PowerShell 7 输入体验，python 与 pip 使用应用专属环境"
+                    text: "原生 " + developerConsoleController.terminalName
+                          + " 输入体验，python 与 pip 使用应用专属环境"
                     color: Theme.textSecondary
                     font.pixelSize: 14
                     elide: Text.ElideRight

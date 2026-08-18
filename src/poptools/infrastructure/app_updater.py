@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import re
 import sys
 import urllib.request
@@ -16,7 +17,24 @@ from PySide6.QtCore import QProcess
 GITHUB_RELEASES_URL = "https://api.github.com/repos/popkter/PopToolProject/releases?per_page=20"
 # GitHub normalizes non-ASCII release asset filenames. Keep the actual OTA
 # filename ASCII-only and use a Chinese display label in the release workflow.
-UPDATE_ASSET_NAME = "PopTools.exe"
+
+
+def update_asset_name(
+    system: str | None = None, machine: str | None = None
+) -> str:
+    host = (system or sys.platform).lower()
+    if host in {"win32", "windows"}:
+        return "PopTools.exe"
+    if host in {"darwin", "macos"}:
+        architecture = "arm64" if (machine or platform.machine()).lower() in {
+            "arm64",
+            "aarch64",
+        } else "x64"
+        return f"PopTools-macos-{architecture}.zip"
+    raise RuntimeError(f"不支持自动更新的平台：{host}")
+
+
+UPDATE_ASSET_NAME = update_asset_name()
 NETWORK_TIMEOUT_SECONDS = 30
 DOWNLOAD_TIMEOUT_SECONDS = 180
 
@@ -115,9 +133,13 @@ class GitHubReleaseClient:
         )
 
     @staticmethod
-    def select_latest_release(payload: Any) -> UpdateRelease | None:
+    def select_latest_release(
+        payload: Any, asset_name: str | None = None
+    ) -> UpdateRelease | None:
         if not isinstance(payload, list):
             raise ValueError("GitHub Release 返回格式不正确")
+
+        expected_asset = asset_name or UPDATE_ASSET_NAME
 
         releases: list[UpdateRelease] = []
         for item in payload:
@@ -131,7 +153,7 @@ class GitHubReleaseClient:
                     value
                     for value in assets
                     if isinstance(value, dict)
-                    and str(value.get("name", "")).lower() == UPDATE_ASSET_NAME.lower()
+                    and str(value.get("name", "")).lower() == expected_asset.lower()
                 ),
                 None,
             )
@@ -143,7 +165,7 @@ class GitHubReleaseClient:
                     for value in assets
                     if isinstance(value, dict)
                     and str(value.get("name", "")).lower()
-                    == f"{UPDATE_ASSET_NAME}.sha256".lower()
+                    == f"{expected_asset}.sha256".lower()
                 ),
                 None,
             )
@@ -163,7 +185,7 @@ class GitHubReleaseClient:
                     notes=str(item.get("body") or "本次发行未提供更新说明。"),
                     page_url=str(item.get("html_url") or ""),
                     asset_url=url,
-                    asset_name=str(asset.get("name") or UPDATE_ASSET_NAME),
+                    asset_name=str(asset.get("name") or expected_asset),
                     asset_size=max(0, int(asset.get("size") or 0)),
                     sha256=checksum,
                     checksum_url=_https_url(
@@ -220,7 +242,7 @@ class GitHubReleaseClient:
 
 
 class UpdateInstaller:
-    """Replace the running portable EXE after it exits, then restart it."""
+    """Replace the running Windows executable or macOS app, then restart it."""
 
     @staticmethod
     def launch(downloaded: Path, current_executable: Path | None = None) -> bool:
@@ -228,6 +250,16 @@ class UpdateInstaller:
         target = (current_executable or Path(sys.executable)).resolve()
         if not source.is_file() or not getattr(sys, "frozen", False):
             return False
+
+        if sys.platform == "darwin":
+            return UpdateInstaller._launch_macos(source, target)
+        if sys.platform != "win32":
+            return False
+
+        return UpdateInstaller._launch_windows(source, target)
+
+    @staticmethod
+    def _launch_windows(source: Path, target: Path) -> bool:
 
         script = source.parent / "apply-poptools-update.ps1"
         script.write_text(
@@ -283,6 +315,54 @@ Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
                 str(target),
             ],
             str(target.parent),
+        )
+        return result[0] if isinstance(result, tuple) else bool(result)
+
+    @staticmethod
+    def _launch_macos(source: Path, executable: Path) -> bool:
+        try:
+            app_bundle = next(
+                parent for parent in executable.parents if parent.suffix == ".app"
+            )
+        except StopIteration:
+            return False
+        script = source.parent / "apply-poptools-update.sh"
+        script.write_text(
+            """#!/bin/sh
+set -eu
+process_id="$1"
+source_archive="$2"
+target_app="$3"
+for _attempt in $(seq 1 90); do
+    if ! kill -0 "$process_id" 2>/dev/null; then break; fi
+    sleep 1
+done
+staging="${source_archive}.staging.$$"
+backup="${target_app}/.Contents.backup.$$"
+rm -rf "$staging" "$backup"
+mkdir -p "$staging"
+ditto -x -k "$source_archive" "$staging"
+new_app=$(find "$staging" -maxdepth 1 -type d -name '*.app' -print -quit)
+if [ -z "$new_app" ]; then rm -rf "$staging"; exit 1; fi
+mv "$target_app/Contents" "$backup"
+if mv "$new_app/Contents" "$target_app/Contents"; then
+    rm -rf "$backup" "$staging" "$source_archive"
+    export PYINSTALLER_RESET_ENVIRONMENT=1
+    open "$target_app"
+    rm -f "$0"
+else
+    mv "$backup" "$target_app/Contents"
+    rm -rf "$staging"
+    exit 1
+fi
+""",
+            encoding="utf-8",
+        )
+        script.chmod(0o700)
+        result = QProcess.startDetached(
+            "/bin/sh",
+            [str(script), str(os.getpid()), str(source), str(app_bundle)],
+            str(app_bundle.parent),
         )
         return result[0] if isinstance(result, tuple) else bool(result)
 

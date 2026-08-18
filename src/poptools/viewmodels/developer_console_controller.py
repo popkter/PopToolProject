@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 import urllib.error
 from pathlib import Path
 
@@ -46,7 +48,7 @@ class PowerShellPluginInstallThread(QThread):
 
 
 class DeveloperConsoleController(QObject):
-    """Native PowerShell terminal backed by Windows ConPTY."""
+    """Native terminal backed by Windows ConPTY or a macOS POSIX PTY."""
 
     OUTPUT_HISTORY_LIMIT = 131_072
 
@@ -75,7 +77,9 @@ class DeveloperConsoleController(QObject):
         self._exit_code = 0
         self._restart_pending = False
         self._shutdown_pending = False
-        self._plugin = powershell_plugin or PowerShellPlugin(python_environment.paths)
+        self._plugin = powershell_plugin
+        if self._plugin is None and sys.platform == "win32":
+            self._plugin = PowerShellPlugin(python_environment.paths)
         self._plugin_install_thread: PowerShellPluginInstallThread | None = None
         self._plugin_install_progress = 0
         self._plugin_install_status = ""
@@ -98,7 +102,7 @@ class DeveloperConsoleController(QObject):
 
     @Property(bool, notify=pluginStateChanged)
     def pluginInstalled(self) -> bool:
-        return self._plugin.is_installed()
+        return self._plugin is None or self._plugin.is_installed()
 
     @Property(bool, notify=pluginStateChanged)
     def pluginInstalling(self) -> bool:
@@ -114,14 +118,21 @@ class DeveloperConsoleController(QObject):
 
     @Property(str, constant=True)
     def pluginVersion(self) -> str:
-        return self._plugin.package.version
+        return self._plugin.package.version if self._plugin is not None else "macOS Shell"
 
     @Property(str, constant=True)
     def pluginDirectory(self) -> str:
-        return str(self._plugin.install_directory)
+        return str(self._plugin.install_directory) if self._plugin is not None else ""
+
+    @Property(str, constant=True)
+    def terminalName(self) -> str:
+        return "PowerShell 7" if sys.platform == "win32" else "macOS Shell"
 
     @Slot(result=bool)
     def requestTerminalAccess(self) -> bool:
+        if self._plugin is None:
+            self.terminalAccessGranted.emit()
+            return True
         if self.pluginInstalled:
             self.terminalAccessGranted.emit()
             return True
@@ -133,6 +144,9 @@ class DeveloperConsoleController(QObject):
 
     @Slot(result=bool)
     def installPowerShellPlugin(self) -> bool:
+        if self._plugin is None:
+            self.terminalAccessGranted.emit()
+            return True
         if self.pluginInstalled:
             self.pluginInstallFinished.emit(True, "PowerShell 7 插件已安装。")
             self.terminalAccessGranted.emit()
@@ -169,20 +183,36 @@ class DeveloperConsoleController(QObject):
             return False
         python_executable = self.python_environment.execution_executable()
         pip_executable = self.python_environment.executable()
-        shell = self._plugin.executable
+        if self._plugin is None:
+            shell = Path(os.environ.get("SHELL") or "/bin/zsh")
+            arguments = ["-i"]
+        else:
+            shell = self._plugin.executable
+            if not python_executable or not pip_executable:
+                self._append("Python 环境不可用，请重新启动应用完成初始化。\n")
+                return False
+            quoted_python = python_executable.replace("'", "''")
+            quoted_pip = pip_executable.replace("'", "''")
+            bootstrap = (
+                "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
+                "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+                f"function global:python {{ & '{quoted_python}' @args }}; "
+                f"function global:pip {{ & '{quoted_pip}' -m pip @args }}; "
+                "Import-Module PSReadLine; "
+                "Set-PSReadLineOption -PredictionSource History -PredictionViewStyle InlineView"
+            )
+            arguments = [
+                "-NoLogo",
+                "-NoProfile",
+                "-NoExit",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                bootstrap,
+            ]
         if not python_executable or not pip_executable:
             self._append("Python 环境不可用，请重新启动应用完成初始化。\n")
             return False
-        quoted_python = python_executable.replace("'", "''")
-        quoted_pip = pip_executable.replace("'", "''")
-        bootstrap = (
-            "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
-            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-            f"function global:python {{ & '{quoted_python}' @args }}; "
-            f"function global:pip {{ & '{quoted_pip}' -m pip @args }}; "
-            "Import-Module PSReadLine; "
-            "Set-PSReadLineOption -PredictionSource History -PredictionViewStyle InlineView"
-        )
         environment = self.python_environment.execution_environment()
         environment.update(
             {
@@ -200,15 +230,7 @@ class DeveloperConsoleController(QObject):
         try:
             session.start_process(
                 shell,
-                [
-                    "-NoLogo",
-                    "-NoProfile",
-                    "-NoExit",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-Command",
-                    bootstrap,
-                ],
+                arguments,
                 self.working_directory,
                 environment,
             )

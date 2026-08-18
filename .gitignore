@@ -1,4 +1,5 @@
 .venv/
+.DS_Store
 .idea/
 .scaffold-backup/
 __pycache__/
@@ -16,5 +17,7 @@ dist/
 design-qa-*.png
 .capture-*
 src/poptools/resources/vendor/python/*.nupkg
+src/poptools/resources/vendor/python/*.tar.gz
+src/poptools/resources/vendor/scrcpy-macos-*.tar.gz
 src/poptools/_build_version.py
 .tmp*

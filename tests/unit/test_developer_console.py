@@ -1,4 +1,5 @@
 import shutil
+import sys
 import weakref
 from pathlib import Path
 
@@ -242,6 +243,7 @@ def test_unexpected_terminal_exit_does_not_auto_restart() -> None:
     assert "if not self._restart_pending and not self._shutdown_pending:" in source
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell plugin is Windows-only")
 def test_developer_console_requires_the_application_powershell_plugin(tmp_path: Path) -> None:
     paths = AppPaths(tmp_path)
     paths.ensure()

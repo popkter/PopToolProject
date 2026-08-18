@@ -54,7 +54,7 @@ def test_commands_run_and_stop_independently(tmp_path: Path, qtbot) -> None:
 
     controller.selectTool(first.id)
     assert controller.runSelected({}) is True
-    qtbot.waitUntil(lambda: controller.running)
+    qtbot.waitUntil(lambda: controller.statusText == "运行中")
     assert controller.statusText == "运行中"
 
     controller.selectTool(second.id)
@@ -255,5 +255,4 @@ def test_accepted_process_reports_starting_until_manager_emits_started(
 
     manager.started.emit()
     assert controller.statusText == "运行中"
-
 

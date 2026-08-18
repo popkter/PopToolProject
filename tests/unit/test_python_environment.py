@@ -21,7 +21,9 @@ def test_managed_environment_uses_project_python_during_development(tmp_path: Pa
 
 def test_managed_environment_runs_with_runtime_and_loads_venv_packages(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    monkeypatch.setattr("poptools.infrastructure.python_environment.sys.platform", "win32")
     paths = AppPaths(tmp_path)
     paths.python_runtime_dir.mkdir(parents=True)
     paths.python_venv_dir.joinpath("Scripts").mkdir(parents=True)
@@ -40,7 +42,9 @@ def test_managed_environment_runs_with_runtime_and_loads_venv_packages(
 
 def test_managed_environment_preserves_windows_path_case_insensitively(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
+    monkeypatch.setattr("poptools.infrastructure.python_environment.sys.platform", "win32")
     paths = AppPaths(tmp_path)
     paths.python_venv_dir.joinpath("Scripts").mkdir(parents=True)
     paths.python_venv_dir.joinpath("Lib", "site-packages").mkdir(parents=True)

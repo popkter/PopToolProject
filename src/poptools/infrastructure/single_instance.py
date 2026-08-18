@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import sys
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -16,7 +17,10 @@ class SingleInstanceLock:
         lock_file.parent.mkdir(parents=True, exist_ok=True)
         self._lock = QLockFile(str(lock_file))
         identity = str(lock_file.resolve()).casefold().encode("utf-8")
-        self._server_name = f"PopTools-{hashlib.sha256(identity).hexdigest()[:24]}"
+        server_id = f"PopTools-{hashlib.sha256(identity).hexdigest()[:24]}"
+        self._server_name = (
+            f"/tmp/{server_id}.socket" if sys.platform == "darwin" else server_id
+        )
         self._server: QLocalServer | None = None
         self._activation_handler: Callable[[], None] | None = None
         self._activation_pending = False

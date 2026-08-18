@@ -1,6 +1,6 @@
 # 泡泡工具箱
 
-泡泡工具箱是一款面向 Android 开发与测试的 Windows 桌面工具箱，用来集中运行常用工具和个人脚本。
+泡泡工具箱是一款面向 Android 开发与测试的 Windows/macOS 桌面工具箱，用来集中运行常用工具和个人脚本。
 
 项目只有本地功能，不区分 online 与 local：
 
@@ -8,13 +8,13 @@
 - **客制功能**由用户创建，支持 PowerShell、Bash、BAT 和 Python 脚本；
 - 脚本、参数与执行结果均在本机处理，不会作为工具内容上传。
 
-应用仅在下载安装可选 PowerShell 7 插件或检查软件更新时访问网络。
+应用仅在 Windows 下载安装可选 PowerShell 7 插件或检查软件更新时访问网络。
 
 > 本文适用于当前 `0.2.0_beta` 代码版本。
 
 ## 快速开始
 
-1. 在 Windows 10/11 中运行安装版或便携版程序。
+1. 在 Windows 10/11 中运行安装版或便携版程序，或在 macOS 12 及以上版本解压并运行 `.app`。
 2. 首次启动后阅读应用内引导。
 3. 使用左侧的“客制”或“预设”进入工具列表。
 4. 如果要使用 Android 功能，请先在设备上开启 USB 调试并授权电脑，然后从左下角设备选择器选择目标设备。
@@ -146,9 +146,9 @@ C:\Users\Public\Scripts\device_report.py
 
 ## 开启内置终端
 
-终端默认关闭。在“设置”中开启终端功能后，如果应用专用 PowerShell 7 插件尚未安装，应用会请求确认并下载微软官方 ZIP 包，校验 SHA-256 后安装到当前用户的数据目录。拒绝或取消安装不会开启终端，也不会修改系统 PowerShell。
+终端默认关闭。Windows 首次开启时会请求下载并校验应用专用 PowerShell 7；macOS 直接使用用户的系统 Shell（通常为 zsh）。两端的终端都与客制 Python 共用应用专属环境。
 
-安装成功后，主界面会显示“终端”。它是基于 Windows ConPTY 的交互式 PowerShell 7，支持历史记录、Tab 补全、方向键、`Ctrl+R` 搜索和原生光标编辑。可以直接执行：
+开启后主界面会显示“终端”。Windows 使用 ConPTY/PowerShell 7，macOS 使用原生 PTY/系统 Shell，均支持常见的历史记录、补全和光标编辑。可以直接执行：
 
 ```text
 python --version
@@ -174,7 +174,8 @@ pip install -r requirements.txt
 默认用户数据目录为：
 
 ```text
-%LOCALAPPDATA%\PopTools
+Windows: %LOCALAPPDATA%\PopTools
+macOS:   ~/Library/Application Support/PopTools
 ```
 
 其中保存配置、客制工具、脚本、备份、输出、日志、运行时、插件和更新缓存。卸载或切换版本前，如果要保留客制脚本，建议先从设置页导出。
@@ -184,13 +185,24 @@ pip install -r requirements.txt
 ## 常见问题
 
 - **找不到 Android 设备**：确认 USB 调试已开启并授权，尝试重新连接后刷新设备列表。
-- **Bash 无法运行**：Windows 需要存在可用的 Bash 环境，例如 Git Bash。
+- **Bash 无法运行**：Windows 需要存在可用的 Bash 环境，例如 Git Bash；macOS 使用系统 `/bin/bash`。
 - **Python 提示缺少依赖**：优先使用 Python Doctor 安装；需要自定义包名或版本时，在内置终端中执行 `pip install`。
 - **依赖安装失败**：检查网络、代理和 pip 源配置。
-- **终端入口不显示**：在设置中重新开启终端，并确认 PowerShell 7 插件安装完成。
+- **终端入口不显示**：在设置中重新开启终端；Windows 还需确认 PowerShell 7 插件安装完成。
 - **关闭窗口后程序仍在运行**：这是系统托盘行为，请从托盘菜单完全退出。
 - **同时运行的任务达到上限**：应用会提示停止最早启动的普通任务；Android 投屏保留独立运行名额。
 
 ## 开发者文档
 
 项目结构、架构边界、构建发布和重构说明统一见 [软件设计文档](docs/Software-Design.md)。第三方组件及许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+### macOS 开发构建
+
+在 Apple Silicon 或 Intel Mac 上分别构建对应架构产物：
+
+```bash
+uv venv --python 3.11 .venv
+./packaging/build.sh
+```
+
+脚本会校验测试和平台资源，生成 `dist/泡泡工具箱.app`、`dist/泡泡工具箱-macos-arm64.zip`（或 `x64`）及 SHA-256。开发阶段不需要 Developer ID；首次启动未签名版本时，可在 Finder 中按住 Control 点击应用并选择“打开”。

@@ -13,6 +13,7 @@ from poptools.infrastructure.app_updater import (
     UpdateInstaller,
     UpdateRelease,
     is_newer_version,
+    update_asset_name,
 )
 
 
@@ -55,7 +56,7 @@ def test_release_selection_includes_prereleases_and_requires_the_expected_exe() 
         },
     ]
 
-    release = GitHubReleaseClient.select_latest_release(payload)
+    release = GitHubReleaseClient.select_latest_release(payload, "PopTools.exe")
 
     assert release is not None
     assert release.version == "0.2.0-beta.1"
@@ -144,6 +145,9 @@ def test_update_restart_resets_the_pyinstaller_environment(
     current = tmp_path / "current.exe"
     downloaded.write_bytes(b"new executable")
     current.write_bytes(b"old executable")
+    powershell = tmp_path / "Windows" / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+    powershell.parent.mkdir(parents=True)
+    powershell.touch()
     launches: list[tuple[str, list[str], str]] = []
 
     class FakeProcess:
@@ -152,12 +156,43 @@ def test_update_restart_resets_the_pyinstaller_environment(
             launches.append((program, arguments, directory))
             return True, 123
 
-    monkeypatch.setattr(updater_module.sys, "frozen", True, raising=False)
     monkeypatch.setattr(updater_module, "QProcess", FakeProcess)
+    monkeypatch.setenv("SYSTEMROOT", str(tmp_path / "Windows"))
 
-    assert UpdateInstaller.launch(downloaded, current) is True
+    assert UpdateInstaller._launch_windows(downloaded, current) is True  # noqa: SLF001
     script = (tmp_path / "apply-poptools-update.ps1").read_text(encoding="utf-8-sig")
     reset = "$env:PYINSTALLER_RESET_ENVIRONMENT = '1'"
     assert reset in script
     assert script.index(reset) < script.index("Start-Process -FilePath $Target")
     assert launches
+
+
+def test_update_asset_names_are_platform_and_architecture_specific() -> None:
+    assert update_asset_name("win32", "amd64") == "PopTools.exe"
+    assert update_asset_name("darwin", "arm64") == "PopTools-macos-arm64.zip"
+    assert update_asset_name("darwin", "x86_64") == "PopTools-macos-x64.zip"
+
+
+def test_macos_update_replaces_the_application_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = tmp_path / "update.zip"
+    executable = tmp_path / "泡泡工具箱.app" / "Contents" / "MacOS" / "泡泡工具箱"
+    archive.write_bytes(b"zip")
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"old")
+    launches: list[tuple[str, list[str], str]] = []
+
+    class FakeProcess:
+        @staticmethod
+        def startDetached(program: str, arguments: list[str], directory: str):
+            launches.append((program, arguments, directory))
+            return True, 123
+
+    monkeypatch.setattr(updater_module, "QProcess", FakeProcess)
+
+    assert UpdateInstaller._launch_macos(archive, executable) is True  # noqa: SLF001
+    script = (tmp_path / "apply-poptools-update.sh").read_text(encoding="utf-8")
+    assert "ditto -x -k" in script
+    assert "open \"$target_app\"" in script
+    assert launches[0][0] == "/bin/sh"

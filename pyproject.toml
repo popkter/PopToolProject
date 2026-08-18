@@ -15,14 +15,15 @@ dependencies = [
   "pydantic>=2.12,<3",
   "pypinyin>=0.55,<1",
   "psutil>=7,<8",
-  "pywinpty>=3,<4",
+  "pywinpty>=3,<4; sys_platform == 'win32'",
   "setuptools>=65,<70",
-  "wexpect>=4,<5",
+  "wexpect>=4,<5; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
 dev = [
   "mypy>=1.18",
+  "Pillow>=12,<13",
   "pyinstaller>=6.16",
   "pytest>=9,<10",
   "pytest-cov>=7,<8",

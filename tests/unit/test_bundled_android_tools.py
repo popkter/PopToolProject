@@ -23,6 +23,8 @@ def test_official_scrcpy_distribution_is_bundled_and_materialized(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("POPTOOLS_ANDROID_TOOLS_DIR", raising=False)
+    monkeypatch.setattr("poptools.paths.sys.platform", "win32")
+    monkeypatch.setattr("poptools.paths.platform.machine", lambda: "x86_64")
     vendor = resource_path("vendor")
     manifest = json.loads((vendor / "scrcpy-manifest.json").read_text(encoding="utf-8"))
     assert manifest["version"] == "4.0"
@@ -68,13 +70,22 @@ def test_scrcpy_tool_uses_global_android_device(tmp_path: Path) -> None:
 
 def test_projection_window_starts_offscreen_until_it_is_embedded() -> None:
     arguments = scrcpy_module._projection_arguments(  # noqa: SLF001
-        "device-serial", "projection-window"
+        "device-serial", "projection-window", embed=True
     )
 
     assert "--window-x=-32000" in arguments
     assert "--window-y=-32000" in arguments
     assert "--window-width=1" in arguments
     assert "--window-height=1" in arguments
+
+
+def test_macos_projection_uses_a_normal_top_level_window() -> None:
+    arguments = scrcpy_module._projection_arguments(  # noqa: SLF001
+        "device-serial", "projection-window", embed=False
+    )
+
+    assert "--no-audio" in arguments
+    assert not any(argument.startswith("--window-x=") for argument in arguments)
 
 
 def test_projection_window_is_hidden_before_native_embedding(

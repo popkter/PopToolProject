@@ -171,7 +171,8 @@ class UpdateController(QObject):
         if release is None or self._download_thread is not None:
             return False
         safe_version = re_safe_filename(release.version)
-        destination = self.config_store.paths.updates_dir / f"PopTools-{safe_version}.exe"
+        suffix = Path(release.asset_name).suffix or ".bin"
+        destination = self.config_store.paths.updates_dir / f"PopTools-{safe_version}{suffix}"
         self._progress = 0
         self._received_bytes = 0
         self._total_bytes = release.asset_size

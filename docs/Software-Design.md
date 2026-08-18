@@ -6,8 +6,8 @@
 | --- | --- |
 | 适用代码 | `0.2.0_beta` |
 | 基线日期 | 2026-08-17 |
-| 目标平台 | Windows 10/11 |
-| 技术栈 | Python 3.11、PySide6、Qt Quick/QML、Windows ConPTY |
+| 目标平台 | Windows 10/11、macOS 12+（Apple Silicon 与 Intel） |
+| 技术栈 | Python 3.11、PySide6、Qt Quick/QML、Windows ConPTY / macOS PTY |
 | 文档角色 | 当前实现、架构约束、重构决策、构建发布和后续优化的唯一设计说明 |
 
 本文以当前仓库代码为准，合并原软件架构设计与“应用组合根”重构说明。历史界面基线、设计验收记录和独立 ADR 不再作为现行设计依据。
@@ -30,7 +30,7 @@ PopTools 是单机、单用户的 Android 开发与测试工具箱。所有工�
 
 - 用户数据与只读发布资源分离，升级应用不覆盖客制内容。
 - QML 只承担显示和交互，业务状态通过 ViewModel 暴露。
-- 外部进程、文件、网络和 Windows API 收敛在基础设施或运行子系统。
+- 外部进程、文件、网络和平台 API 收敛在基础设施或运行子系统。
 - 所有具体对象只在组合根装配，入口文件只管理桌面生命周期。
 - 用实际重复和替换需求驱动抽象，避免为假设场景增加空接口或空泛 Service 层。
 - 长任务不得阻塞 UI；进程、线程、原生窗口和 WebEngine 资源必须可确定回收。
@@ -125,7 +125,7 @@ src/poptools/ui/qml/
 
 ### 6.3 配置与用户数据
 
-`AppPaths` 统一解析数据目录，默认根目录为 `%LOCALAPPDATA%\PopTools`：
+`AppPaths` 统一解析数据目录；Windows 默认根目录为 `%LOCALAPPDATA%\PopTools`，macOS 为 `~/Library/Application Support/PopTools`：
 
 ```text
 PopTools/
@@ -211,7 +211,7 @@ Python Doctor 在新建、编辑和运行时分析 `import`：
 
 终端由持久化设置 `app.terminal_enabled` 控制，默认关闭。首次开启时按清单下载固定版本的微软官方 PowerShell 7 ZIP，校验 SHA-256、检查解压路径并原子安装；失败、拒绝或取消均不保存开启状态。运行时不回退到系统 `pwsh.exe` 或 Windows PowerShell。
 
-`DeveloperConsole` 使用 Qt WebEngine 加载离线 xterm.js，逐键把输入发送给 `ConPtySession`。后者通过 pywinpty 底层 PTY 驱动 Windows ConPTY，并使用 Windows Job Object 管理整个进程树。
+`DeveloperConsole` 使用 Qt WebEngine 加载离线 xterm.js，逐键把输入发送给终端会话。Windows 后端通过 pywinpty 驱动 ConPTY 并使用 Job Object 管理进程树；macOS 后端使用原生 PTY 与用户系统 Shell。PowerShell 插件和 pywinpty 不进入 macOS 包。
 
 生命周期约束：
 
@@ -291,9 +291,15 @@ Python Doctor 在新建、编辑和运行时分析 `import`：
 .\packaging\build.ps1
 ```
 
-构建始终生成 `dist\泡泡工具箱.exe` 和 SHA-256 文件。本机存在 Inno Setup 6 时还会生成安装包；使用 `-SkipInstaller` 可只构建便携版。产物包含 Qt/QML、受管理 Python、ADB、scrcpy 和运行资源，用户 venv 仍创建在用户数据目录。
+macOS 使用对应脚本，并在当前机器架构上生成 `.app` 与 OTA ZIP：
 
-版本以 `pyproject.toml` 为唯一语义版本来源。发布标签使用 `vYYYY-MM-DD_x.x.x`；工作流按香港时区生成日期，运行测试和打包、验证 SHA-256，再创建公开 Release。GitHub 资产使用 ASCII 文件名 `PopTools.exe`、`PopTools.exe.sha256` 和 `PopTools-Setup.exe`，供应用内更新读取。
+```bash
+./packaging/build.sh
+```
+
+Windows 构建生成 EXE、SHA-256 和可选 Inno Setup 安装包。macOS 构建生成 `.app`、按 `arm64`/`x64` 命名的 ZIP 与 SHA-256；开发构建不要求 Developer ID 签名。每个平台只包含本平台的 Python、ADB、scrcpy、图标和终端依赖，不携带另一平台的二进制资源。
+
+版本以 `pyproject.toml` 为唯一语义版本来源。发布标签使用 `vYYYY-MM-DD_x.x.x`；工作流按香港时区生成日期，并行构建 Windows x64、macOS arm64 和 macOS x64，验证 SHA-256 后创建 Release。更新器按当前平台选择 `PopTools.exe`、`PopTools-macos-arm64.zip` 或 `PopTools-macos-x64.zip`。
 
 ## 16. 变更规则
 

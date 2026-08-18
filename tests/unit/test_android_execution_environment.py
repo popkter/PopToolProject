@@ -9,7 +9,7 @@ from poptools.domain.models import (
     ToolDefinition,
     ToolSection,
 )
-from poptools.paths import AppPaths
+from poptools.paths import AppPaths, bundled_adb_path
 from poptools.runners.execution_manager import ExecutionManager
 
 
@@ -46,7 +46,7 @@ def test_bundled_adb_is_found_from_the_prepared_application_runtime(
 ) -> None:
     monkeypatch.delenv("POPTOOLS_ANDROID_TOOLS_DIR", raising=False)
     paths = AppPaths(tmp_path)
-    adb_path = paths.runtime_dir / "scrcpy-4.0-test" / "adb.exe"
+    adb_path = paths.runtime_dir / "scrcpy-4.0-test" / bundled_adb_path().name
     adb_path.parent.mkdir(parents=True)
     adb_path.touch()
     manager = ExecutionManager(paths)

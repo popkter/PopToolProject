@@ -3,8 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import shutil
+import stat
 import sys
+import tarfile
 import uuid
 import zipfile
 from dataclasses import dataclass
@@ -13,7 +16,20 @@ from pathlib import Path
 from platformdirs import user_data_path
 
 ANDROID_TOOLS_DIR_ENV = "POPTOOLS_ANDROID_TOOLS_DIR"
-REQUIRED_ANDROID_TOOL_FILES = ("adb.exe", "scrcpy.exe", "scrcpy-server", "SDL3.dll")
+
+
+def platform_key() -> str:
+    machine = platform.machine().lower()
+    architecture = "arm64" if machine in {"arm64", "aarch64"} else "x64"
+    if sys.platform == "win32":
+        return f"windows-{architecture}"
+    if sys.platform == "darwin":
+        return f"macos-{architecture}"
+    raise RuntimeError(f"不支持的平台：{sys.platform}/{machine}")
+
+
+def _android_tool_name(name: str) -> str:
+    return f"{name}.exe" if sys.platform == "win32" else name
 
 
 def package_root() -> Path:
@@ -32,18 +48,23 @@ def bundled_android_tools_dir() -> Path:
 
 
 def bundled_adb_path() -> Path:
-    return bundled_android_tools_dir() / "adb.exe"
+    return bundled_android_tools_dir() / _android_tool_name("adb")
 
 
 def bundled_scrcpy_path() -> Path:
-    return bundled_android_tools_dir() / "scrcpy.exe"
+    return bundled_android_tools_dir() / _android_tool_name("scrcpy")
 
 
 def prepare_bundled_android_tools(paths: AppPaths) -> Path:
     """Extract the verified official archive to a persistent versioned directory."""
 
     vendor_dir = resource_path("vendor")
-    manifest_file = vendor_dir / "scrcpy-manifest.json"
+    manifest_name = (
+        "scrcpy-manifest.json"
+        if sys.platform == "win32"
+        else f"scrcpy-manifest-{platform_key()}.json"
+    )
+    manifest_file = vendor_dir / manifest_name
     if not manifest_file.is_file():
         raise FileNotFoundError("内置 scrcpy 清单不存在")
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
@@ -56,7 +77,7 @@ def prepare_bundled_android_tools(paths: AppPaths) -> Path:
         raise ValueError("内置 scrcpy 发行包校验失败")
 
     version = str(manifest.get("version", "unknown"))
-    release_name = f"scrcpy-{version}-{expected_checksum[:12]}"
+    release_name = f"scrcpy-{version}-{platform_key()}-{expected_checksum[:12]}"
     target = paths.runtime_dir / release_name
     if _android_tools_are_ready(target, manifest):
         os.environ[ANDROID_TOOLS_DIR_ENV] = str(target)
@@ -65,11 +86,28 @@ def prepare_bundled_android_tools(paths: AppPaths) -> Path:
     paths.runtime_dir.mkdir(parents=True, exist_ok=True)
     staging = paths.runtime_dir / f".{release_name}.{uuid.uuid4().hex}"
     try:
-        with zipfile.ZipFile(archive) as package:
-            package.extractall(staging)
-        extracted = staging / f"scrcpy-win64-v{version}"
-        if not all((extracted / name).is_file() for name in REQUIRED_ANDROID_TOOL_FILES):
+        if archive.name.endswith(".zip"):
+            with zipfile.ZipFile(archive) as package:
+                package.extractall(staging)
+        elif archive.name.endswith((".tar.gz", ".tgz")):
+            _extract_tar_safely(archive, staging)
+        else:
+            raise ValueError(f"不支持的 scrcpy 归档格式：{archive.name}")
+        extracted = staging / str(
+            manifest.get("directory") or f"scrcpy-win64-v{version}"
+        )
+        required_files = tuple(
+            str(name)
+            for name in manifest.get(
+                "required_files",
+                ("adb.exe", "scrcpy.exe", "scrcpy-server", "SDL3.dll"),
+            )
+        )
+        if not all((extracted / name).is_file() for name in required_files):
             raise ValueError("内置 scrcpy 发行包缺少必要文件")
+        for name in manifest.get("executables", ()):
+            executable = extracted / str(name)
+            executable.chmod(executable.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         shutil.copy2(vendor_dir / "scrcpy-LICENSE.txt", extracted / "LICENSE.txt")
         shutil.copy2(manifest_file, extracted / "manifest.json")
         if target.exists():
@@ -90,13 +128,30 @@ def _sha256(path: Path) -> str:
 
 def _android_tools_are_ready(directory: Path, manifest: dict[str, object]) -> bool:
     manifest_file = directory / "manifest.json"
-    if not all((directory / name).is_file() for name in REQUIRED_ANDROID_TOOL_FILES):
+    required_files = tuple(
+        str(name)
+        for name in manifest.get(
+            "required_files",
+            ("adb.exe", "scrcpy.exe", "scrcpy-server", "SDL3.dll"),
+        )
+    )
+    if not all((directory / name).is_file() for name in required_files):
         return False
     try:
         installed = json.loads(manifest_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
     return bool(installed == manifest)
+
+
+def _extract_tar_safely(archive: Path, destination: Path) -> None:
+    root = destination.resolve()
+    with tarfile.open(archive, "r:gz") as package:
+        for member in package.getmembers():
+            resolved = (destination / member.name).resolve()
+            if os.path.commonpath((root, resolved)) != str(root):
+                raise ValueError("scrcpy 发行包包含不安全路径")
+        package.extractall(destination)
 
 
 @dataclass(frozen=True)

@@ -330,7 +330,8 @@ Dialog {
                                 Layout.fillWidth: true
                                 text: root.controller.terminalEnabled
                                     ? "已开启，主界面显示终端 Tab"
-                                    : "开启后可使用应用专属 PowerShell 7 终端"
+                                    : "开启后可使用应用专属 "
+                                      + developerConsoleController.terminalName + " 终端"
                                 color: Theme.textSecondary
                                 font.pixelSize: 12
                                 wrapMode: Text.WordWrap

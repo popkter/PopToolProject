@@ -9,8 +9,16 @@ def _run() -> int:
     if __package__ in {None, ""}:
         entrypoint = Path(__file__).resolve()
         project_root = entrypoint.parents[2]
-        project_python = project_root / ".venv" / "Scripts" / "python.exe"
-        if project_python.exists() and Path(sys.executable).resolve() != project_python.resolve():
+        project_python = (
+            project_root / ".venv" / "Scripts" / "python.exe"
+            if os.name == "nt"
+            else project_root / ".venv" / "bin" / "python"
+        )
+        if (
+            sys.prefix == sys.base_prefix
+            and project_python.exists()
+            and Path(sys.executable).resolve() != project_python.resolve()
+        ):
             os.execv(
                 str(project_python),
                 [str(project_python), str(entrypoint), *sys.argv[1:]],

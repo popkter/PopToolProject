@@ -18,16 +18,25 @@ from poptools.paths import (
 _SCRCPY_STARTUP_POSITION = -32000
 
 
-def _projection_arguments(serial: str, window_title: str) -> list[str]:
-    """Create the scrcpy window outside the desktop until it is embedded."""
-    return [
+def _projection_arguments(
+    serial: str, window_title: str, embed: bool | None = None
+) -> list[str]:
+    """Create a native projection window appropriate for the host platform."""
+    arguments = [
         "--serial",
         serial,
         "--window-title",
         window_title,
+        "--no-audio",
+    ]
+    if embed is None:
+        embed = os.name == "nt"
+    if not embed:
+        return arguments
+    return [
+        *arguments,
         "--window-borderless",
         "--no-window-aspect-ratio-lock",
-        "--no-audio",
         f"--window-x={_SCRCPY_STARTUP_POSITION}",
         f"--window-y={_SCRCPY_STARTUP_POSITION}",
         "--window-width=1",
@@ -70,9 +79,6 @@ class ScrcpyController(QObject):
 
     def start(self, serial: str) -> bool:
         if self.active:
-            return False
-        if os.name != "nt":
-            self.output.emit("应用内投屏当前仅支持 Windows。\n")
             return False
         scrcpy = bundled_scrcpy_path()
         adb = bundled_adb_path()
@@ -175,7 +181,10 @@ class ScrcpyController(QObject):
 
     def _on_started(self) -> None:
         self._started = True
-        self._embed_timer.start()
+        if os.name == "nt":
+            self._embed_timer.start()
+        else:
+            self.output.emit("投屏已在独立窗口中打开。\n")
         self.started.emit()
         self.runningChanged.emit(True)
 

@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import ctypes
 import os
+import select
+import signal
+import struct
 import subprocess
 import threading
 from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from pathlib import Path
+from typing import Any
 
 import psutil  # type: ignore[import-untyped]
 from PySide6.QtCore import QObject, QThread, Signal
-from winpty import PTY, Backend  # type: ignore[import-untyped]
 
 if os.name == "nt":
+    from winpty import PTY, Backend  # type: ignore[import-untyped]
+
     _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     _kernel32.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
     _kernel32.OpenProcess.restype = ctypes.c_void_p
@@ -37,7 +42,9 @@ class ConPtySession(QThread):
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._pty: PTY | None = None
+        self._pty: Any | None = None
+        self._master_fd = -1
+        self._process: subprocess.Popen[bytes] | None = None
         self._pid = 0
         self._job: int | None = None
         self._console_hosts: set[int] = set()
@@ -52,10 +59,14 @@ class ConPtySession(QThread):
         columns: int = 120,
         rows: int = 30,
     ) -> None:
-        if os.name != "nt":
-            raise RuntimeError("ConPTY 仅支持 Windows")
         if self.isRunning() or self._pty is not None:
             raise RuntimeError("终端会话已经启动")
+
+        if os.name != "nt":
+            self._start_posix_process(
+                program, arguments, working_directory, environment, columns, rows
+            )
+            return
 
         existing_hosts = self._current_console_hosts()
         pty = PTY(max(1, columns), max(1, rows), backend=Backend.ConPTY)
@@ -81,6 +92,9 @@ class ConPtySession(QThread):
         self.start()
 
     def run(self) -> None:
+        if os.name != "nt":
+            self._run_posix()
+            return
         pty = self._pty
         if pty is None:
             return
@@ -117,6 +131,15 @@ class ConPtySession(QThread):
             self.processExited.emit(exit_code)
 
     def write(self, data: bytes) -> bool:
+        if os.name != "nt":
+            if self._master_fd < 0 or self._process is None or self._process.poll() is not None:
+                return False
+            with self._write_lock:
+                try:
+                    os.write(self._master_fd, data)
+                except OSError:
+                    return False
+            return True
         pty = self._pty
         if pty is None or not pty.isalive() or not data:
             return False
@@ -128,6 +151,15 @@ class ConPtySession(QThread):
             return True
 
     def resize(self, columns: int, rows: int) -> None:
+        if os.name != "nt":
+            if self._master_fd >= 0:
+                with suppress(OSError):
+                    import fcntl
+                    import termios
+
+                    size = struct.pack("HHHH", max(1, rows), max(1, columns), 0, 0)
+                    fcntl.ioctl(self._master_fd, termios.TIOCSWINSZ, size)
+            return
         pty = self._pty
         if pty is not None and pty.isalive():
             with suppress(Exception):
@@ -135,6 +167,9 @@ class ConPtySession(QThread):
 
     def stop_process(self) -> None:
         self.requestInterruption()
+        if os.name != "nt":
+            self._terminate_posix_process(signal.SIGTERM)
+            return
         pty = self._pty
         if pty is not None:
             with suppress(Exception):
@@ -142,6 +177,16 @@ class ConPtySession(QThread):
         self._terminate_process()
 
     def dispose(self) -> None:
+        if os.name != "nt":
+            self._terminate_posix_process(signal.SIGKILL)
+            if self._master_fd >= 0:
+                with suppress(OSError):
+                    os.close(self._master_fd)
+            self._master_fd = -1
+            self._process = None
+            self._pty = None
+            self._pid = 0
+            return
         pty = self._pty
         self._pty = None
         self._terminate_process()
@@ -209,3 +254,68 @@ class ConPtySession(QThread):
     def _emit_pending(self, chunks: list[str]) -> None:
         if chunks:
             self.outputReceived.emit("".join(chunks).encode("utf-8", errors="replace"))
+
+    def _start_posix_process(
+        self,
+        program: Path,
+        arguments: Sequence[str],
+        working_directory: Path,
+        environment: Mapping[str, str],
+        columns: int,
+        rows: int,
+    ) -> None:
+        import pty
+
+        master_fd, slave_fd = pty.openpty()
+        self._master_fd = master_fd
+        self.resize(columns, rows)
+        try:
+            process = subprocess.Popen(
+                [str(program), *arguments],
+                cwd=str(working_directory),
+                env=dict(environment),
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                start_new_session=True,
+                close_fds=True,
+            )
+        except Exception:
+            os.close(master_fd)
+            self._master_fd = -1
+            raise
+        finally:
+            os.close(slave_fd)
+        self._process = process
+        self._pid = process.pid
+        self._pty = process
+        self.start()
+
+    def _run_posix(self) -> None:
+        process = self._process
+        master_fd = self._master_fd
+        if process is None or master_fd < 0:
+            return
+        while not self.isInterruptionRequested():
+            ready, _, _ = select.select([master_fd], [], [], 0.05)
+            if ready:
+                try:
+                    data = os.read(master_fd, 65_536)
+                except OSError:
+                    data = b""
+                if data:
+                    self.outputReceived.emit(data)
+                elif process.poll() is not None:
+                    break
+            elif process.poll() is not None:
+                break
+        with suppress(subprocess.TimeoutExpired):
+            process.wait(timeout=0.5)
+        self.processExited.emit(int(process.returncode or 0))
+
+    def _terminate_posix_process(self, sig: signal.Signals) -> None:
+        process = self._process
+        if process is None or process.poll() is not None:
+            return
+        with suppress(OSError):
+            os.killpg(process.pid, sig)

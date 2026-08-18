@@ -68,9 +68,10 @@ def test_pyinstaller_spec_builds_one_self_contained_executable() -> None:
 
     assert "analysis.binaries" in source
     assert "analysis.datas" in source
-    assert "exclude_binaries=False" in source
-    assert "COLLECT(" not in source
-    assert 'icon=str(PACKAGE / "resources" / "icons" / "app-icon.ico")' in source
+    assert 'exclude_binaries=sys.platform == "darwin"' in source
+    assert "BUNDLE(" in source
+    assert "COLLECT(" in source
+    assert "icon=str(icon_file)" in source
 
 
 def test_app_icon_assets_are_available() -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
@@ -13,7 +14,8 @@ if TYPE_CHECKING:
 
 
 def create_app_icon() -> QIcon:
-    icon = QIcon(str(resource_path("icons", "app-icon.ico")))
+    icon_name = "app-icon.ico" if sys.platform == "win32" else "app-icon.png"
+    icon = QIcon(str(resource_path("icons", icon_name)))
     if icon.isNull():
         raise RuntimeError("应用图标资源无法加载")
     return icon

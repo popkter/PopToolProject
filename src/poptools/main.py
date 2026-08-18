@@ -91,7 +91,7 @@ def main() -> int:
         if not instance_lock.start_activation_server():
             logger.error("无法启动单实例激活服务")
             return 1
-        app.setFont(QFont("Microsoft YaHei UI", 10))
+        app.setFont(QFont("Microsoft YaHei UI" if sys.platform == "win32" else "PingFang SC", 10))
 
         icon_font = resource_path("fonts", "MaterialIconsRound-Regular.otf")
         if icon_font.exists():

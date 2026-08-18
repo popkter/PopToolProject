@@ -37,7 +37,7 @@ def test_windows_identity_matches_installed_shortcuts() -> None:
     assert "window.setIcon(tray_controller.icon)" in main
     assert "apply_windows_window_icon(" in main
     assert "apply_windows_window_effects(int(window.winId()))" in main
-    assert 'app.setFont(QFont("Microsoft YaHei UI", 10))' in main
+    assert '"Microsoft YaHei UI" if sys.platform == "win32" else "PingFang SC"' in main
     assert "_DWMWA_WINDOW_CORNER_PREFERENCE = 33" in integration
     assert "dwmapi.DwmExtendFrameIntoClientArea" in integration
     assert "_WS_THICKFRAME = 0x00040000" in integration

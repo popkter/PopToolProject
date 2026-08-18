@@ -258,7 +258,9 @@ class ExecutionManager(QObject):
             prepared = sorted(
                 (
                     candidate
-                    for candidate in self.paths.runtime_dir.glob("scrcpy-*/adb.exe")
+                    for candidate in self.paths.runtime_dir.glob(
+                        f"scrcpy-*/{bundled_adb_path().name}"
+                    )
                     if candidate.is_file()
                 ),
                 key=lambda candidate: candidate.stat().st_mtime,

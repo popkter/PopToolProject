@@ -225,7 +225,10 @@ def test_python_kind_executes_inline_source_without_splitting(tmp_path: Path) ->
     assert launch == (sys.executable, ["-c", source])
 
 
-def test_managed_python_execution_uses_runtime_with_venv_dependencies(tmp_path: Path) -> None:
+def test_managed_python_execution_uses_runtime_with_venv_dependencies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("poptools.infrastructure.python_environment.sys.platform", "win32")
     paths = AppPaths(tmp_path)
     runtime = paths.python_runtime_dir / "python.exe"
     venv_python = paths.python_venv_dir / "Scripts" / "python.exe"
