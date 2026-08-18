@@ -30,6 +30,11 @@ class InstalledPowerShellPlugin:
         return True
 
 
+def platform_shell_plugin() -> InstalledPowerShellPlugin | None:
+    """Use PowerShell only where it is the application's actual terminal backend."""
+    return InstalledPowerShellPlugin() if sys.platform == "win32" else None
+
+
 def test_developer_console_executes_managed_python_from_embedded_shell(
     tmp_path: Path, qtbot
 ) -> None:
@@ -39,20 +44,24 @@ def test_developer_console_executes_managed_python_from_embedded_shell(
     controller = DeveloperConsoleController(
         environment,
         tmp_path,
-        powershell_plugin=InstalledPowerShellPlugin(),  # type: ignore[arg-type]
+        powershell_plugin=platform_shell_plugin(),  # type: ignore[arg-type]
     )
+    line_ending = "\r" if sys.platform == "win32" else "\n"
 
-    assert controller.ensureStarted() is True
-    assert controller.writeInput('python -c "print(\'embedded-result\', 40 + 2)"\r') is True
+    try:
+        assert controller.ensureStarted() is True
+        command = 'python -c "print(\'embedded-result\', 40 + 2)"' + line_ending
+        assert controller.writeInput(command) is True
 
-    qtbot.waitUntil(lambda: "embedded-result 42" in controller.output, timeout=5_000)
-    assert controller.running is True
-    assert "embedded-result 42" in controller.output
+        qtbot.waitUntil(lambda: "embedded-result 42" in controller.output, timeout=5_000)
+        assert controller.running is True
+        assert "embedded-result 42" in controller.output
 
-    assert controller.writeInput("pip --version\r") is True
-    qtbot.waitUntil(lambda: "site-packages" in controller.output, timeout=5_000)
+        assert controller.writeInput("python -m pip --version" + line_ending) is True
+        qtbot.waitUntil(lambda: "site-packages" in controller.output, timeout=5_000)
+    finally:
+        controller.shutdown()
 
-    controller.stop()
     qtbot.waitUntil(lambda: not controller.running, timeout=5_000)
 
 
@@ -169,7 +178,7 @@ def test_terminal_output_history_is_bounded_and_only_streamed_when_attached(
     controller = DeveloperConsoleController(
         PythonEnvironment(paths, ConfigStore(paths)),
         tmp_path,
-        powershell_plugin=InstalledPowerShellPlugin(),  # type: ignore[arg-type]
+        powershell_plugin=platform_shell_plugin(),  # type: ignore[arg-type]
     )
     streamed: list[str] = []
     controller.terminalData.connect(streamed.append)
@@ -194,19 +203,22 @@ def test_repeated_terminal_sessions_release_qthreads_and_children(
     controller = DeveloperConsoleController(
         PythonEnvironment(paths, ConfigStore(paths)),
         tmp_path,
-        powershell_plugin=InstalledPowerShellPlugin(),  # type: ignore[arg-type]
+        powershell_plugin=platform_shell_plugin(),  # type: ignore[arg-type]
     )
     sessions: list[weakref.ReferenceType[object]] = []
     current_process = psutil.Process()
     existing_children = {child.pid for child in current_process.children(recursive=True)}
 
-    for _ in range(6):
-        assert controller.ensureStarted() is True
-        assert controller._session is not None
-        sessions.append(weakref.ref(controller._session))
-        controller.stop()
-        qtbot.waitUntil(lambda: not controller.running, timeout=5_000)
-        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    try:
+        for _ in range(6):
+            assert controller.ensureStarted() is True
+            assert controller._session is not None
+            sessions.append(weakref.ref(controller._session))
+            controller.stop()
+            qtbot.waitUntil(lambda: not controller.running, timeout=5_000)
+            QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    finally:
+        controller.shutdown()
 
     assert all(reference() is None for reference in sessions)
     assert controller.children() == []

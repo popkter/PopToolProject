@@ -53,7 +53,11 @@ class PythonEnvironment:
         if sys.platform == "win32":
             return self.paths.python_venv_dir / "Lib" / "site-packages"
         candidates = sorted((self.paths.python_venv_dir / "lib").glob("python*/site-packages"))
-        return candidates[-1] if candidates else self.paths.python_venv_dir / "lib" / "site-packages"
+        return (
+            candidates[-1]
+            if candidates
+            else self.paths.python_venv_dir / "lib" / "site-packages"
+        )
 
     def state(self) -> PythonEnvironmentState:
         provider, _ = self.config_store.python_environment()
@@ -98,6 +102,12 @@ class PythonEnvironment:
         self, base: Mapping[str, str] | None = None
     ) -> dict[str, str]:
         environment = dict(os.environ if base is None else base)
+        executable = self.executable()
+        current_path = _pop_environment_value(environment, "PATH")
+        executable_directory = str(Path(executable).parent) if executable else ""
+        environment["PATH"] = os.pathsep.join(
+            part for part in (executable_directory, current_path) if part
+        )
         site_packages = self.execution_site_packages()
         if not site_packages:
             return environment
@@ -108,11 +118,14 @@ class PythonEnvironment:
         )
         environment["POPTOOLS_PYTHON_SITE_PACKAGES"] = site_packages
         environment["VIRTUAL_ENV"] = str(self.paths.python_venv_dir)
-        current_path = _pop_environment_value(environment, "PATH")
         scripts_dir = self.paths.python_venv_dir / (
             "Scripts" if sys.platform == "win32" else "bin"
         )
-        environment["PATH"] = f"{scripts_dir}{os.pathsep}{current_path}"
+        environment["PATH"] = os.pathsep.join(
+            part
+            for part in (str(scripts_dir), environment.get("PATH", ""))
+            if part
+        )
         return environment
 
     def ensure_pip(self) -> tuple[bool, str]:
