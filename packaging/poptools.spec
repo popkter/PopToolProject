@@ -1,10 +1,9 @@
-from pathlib import Path
 import platform
 import re
 import sys
+from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_submodules
-
 
 ROOT = Path(SPECPATH).parent
 SRC = ROOT / "src"
@@ -111,12 +110,14 @@ if sys.platform == "darwin":
     icon_file = PACKAGE / "resources" / "icons" / "app-icon.png"
     runtime_icon_file = icon_file
     hiddenimports = []
+    platform_binaries = []
 else:
     scrcpy_manifest = vendor / "scrcpy-manifest.json"
     python_manifest = python_vendor / "python-runtime.json"
     icon_file = PACKAGE / "resources" / "icons" / "app-icon.ico"
     runtime_icon_file = icon_file
-    hiddenimports = collect_submodules("wexpect") + collect_submodules("winpty")
+    hiddenimports = collect_submodules("wexpect")
+    platform_binaries = []
 
 import json
 
@@ -143,7 +144,7 @@ datas = [
 analysis = Analysis(
     [str(PACKAGE / "main.py")],
     pathex=[str(SRC)],
-    binaries=[],
+    binaries=platform_binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],

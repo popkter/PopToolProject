@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import urllib.error
+from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import (
@@ -17,6 +18,7 @@ from PySide6.QtCore import (
 from poptools.infrastructure.conpty import ConPtySession
 from poptools.infrastructure.powershell_plugin import PowerShellPlugin
 from poptools.infrastructure.python_environment import PythonEnvironment
+from poptools.paths import bundled_adb_path, resource_path
 
 
 class PowerShellPluginInstallThread(QThread):
@@ -47,6 +49,17 @@ class PowerShellPluginInstallThread(QThread):
         self.progressChanged.emit(progress)
 
 
+@dataclass
+class TerminalTabState:
+    tab_id: str
+    title: str
+    session: ConPtySession | None = None
+    output: str = ""
+    exit_code: int = 0
+    restart_pending: bool = False
+    intentional_stop: bool = False
+
+
 class DeveloperConsoleController(QObject):
     """Native terminal backed by Windows ConPTY or a macOS POSIX PTY."""
 
@@ -54,12 +67,16 @@ class DeveloperConsoleController(QObject):
 
     outputChanged = Signal()
     terminalData = Signal(str)
+    terminalSnapshotData = Signal(str)
     terminalResetRequested = Signal()
     runningChanged = Signal()
     pluginStateChanged = Signal()
     pluginInstallPromptRequested = Signal(str, str)
     pluginInstallFinished = Signal(bool, str)
     terminalAccessGranted = Signal()
+    terminalTabsChanged = Signal()
+
+    MAX_TERMINAL_TABS = 7
 
     def __init__(
         self,
@@ -71,11 +88,11 @@ class DeveloperConsoleController(QObject):
         super().__init__(parent)
         self.python_environment = python_environment
         self.working_directory = working_directory
-        self._session: ConPtySession | None = None
-        self._output = ""
+        self._tabs: list[TerminalTabState] = []
+        self._closing_tabs: dict[str, TerminalTabState] = {}
+        self._active_tab_id = ""
+        self._next_tab_number = 1
         self._terminal_ready = False
-        self._exit_code = 0
-        self._restart_pending = False
         self._shutdown_pending = False
         self._plugin = powershell_plugin
         if self._plugin is None and sys.platform == "win32":
@@ -83,14 +100,33 @@ class DeveloperConsoleController(QObject):
         self._plugin_install_thread: PowerShellPluginInstallThread | None = None
         self._plugin_install_progress = 0
         self._plugin_install_status = ""
+        self._create_tab(activate=True)
 
     @Property(str, notify=outputChanged)
     def output(self) -> str:
-        return self._output
+        tab = self._active_tab()
+        return tab.output if tab is not None else ""
 
     @Property(bool, notify=runningChanged)
     def running(self) -> bool:
-        return self._session is not None
+        tab = self._active_tab()
+        return tab is not None and tab.session is not None
+
+    @Property("QVariantList", notify=terminalTabsChanged)
+    def terminalTabs(self) -> list[dict[str, object]]:
+        return [
+            {
+                "tabId": tab.tab_id,
+                "title": tab.title,
+                "active": tab.tab_id == self._active_tab_id,
+                "running": tab.session is not None,
+            }
+            for tab in self._tabs
+        ]
+
+    @Property(bool, notify=terminalTabsChanged)
+    def canCreateTerminalTab(self) -> bool:
+        return len(self._tabs) < self.MAX_TERMINAL_TABS
 
     @Property(str, constant=True)
     def pythonExecutable(self) -> str:
@@ -176,10 +212,18 @@ class DeveloperConsoleController(QObject):
 
     @Slot(result=bool)
     def ensureStarted(self) -> bool:
-        if self._session is not None:
+        tab = self._active_tab()
+        if tab is None:
+            tab = self._create_tab(activate=True)
+        return self._ensure_tab_started(tab)
+
+    def _ensure_tab_started(self, tab: TerminalTabState) -> bool:
+        if tab not in self._tabs or self._shutdown_pending:
+            return False
+        if tab.session is not None:
             return True
         if not self.pluginInstalled:
-            self._append("请先安装应用内 PowerShell 7 插件。\n")
+            self._append_to_tab(tab, "请先安装应用内 PowerShell 7 插件。\n")
             return False
         python_executable = self.python_environment.execution_executable()
         pip_executable = self.python_environment.executable()
@@ -189,44 +233,39 @@ class DeveloperConsoleController(QObject):
         else:
             shell = self._plugin.executable
             if not python_executable or not pip_executable:
-                self._append("Python 环境不可用，请重新启动应用完成初始化。\n")
+                self._append_to_tab(tab, "Python 环境不可用，请重新启动应用完成初始化。\n")
                 return False
-            quoted_python = python_executable.replace("'", "''")
-            quoted_pip = pip_executable.replace("'", "''")
-            bootstrap = (
-                "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
-                "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-                f"function global:python {{ & '{quoted_python}' @args }}; "
-                f"function global:pip {{ & '{quoted_pip}' -m pip @args }}; "
-                "Import-Module PSReadLine; "
-                "Set-PSReadLineOption -PredictionSource History -PredictionViewStyle InlineView"
-            )
             arguments = [
                 "-NoLogo",
                 "-NoProfile",
                 "-NoExit",
                 "-ExecutionPolicy",
                 "Bypass",
-                "-Command",
-                bootstrap,
+                "-File",
+                str(resource_path("tools", "powershell-terminal-profile.ps1")),
             ]
         if not python_executable or not pip_executable:
-            self._append("Python 环境不可用，请重新启动应用完成初始化。\n")
+            self._append_to_tab(tab, "Python 环境不可用，请重新启动应用完成初始化。\n")
             return False
-        environment = self.python_environment.execution_environment()
+        environment = self._terminal_environment()
         environment.update(
             {
+                "POPTOOLS_PYTHON": python_executable,
+                "POPTOOLS_PIP": pip_executable,
                 "PYTHONUTF8": "1",
                 "PYTHONIOENCODING": "utf-8",
                 "PYTHONUNBUFFERED": "1",
                 "TERM": "xterm-256color",
             }
         )
+
         session = ConPtySession(self)
         session.outputReceived.connect(self._on_terminal_output)
         session.processExited.connect(self._on_process_exited)
         session.finished.connect(self._on_session_finished)
-        self._session = session
+        tab.session = session
+        tab.intentional_stop = False
+        tab.exit_code = 0
         try:
             session.start_process(
                 shell,
@@ -235,14 +274,26 @@ class DeveloperConsoleController(QObject):
                 environment,
             )
         except Exception as exc:
-            self._session = None
+            tab.session = None
             session.dispose()
             session.deleteLater()
-            self._append(f"终端启动失败：{exc}\r\n")
+            self._append_to_tab(tab, f"终端启动失败：{exc}\r\n")
+            self.terminalTabsChanged.emit()
             self.runningChanged.emit()
             return False
+        self.terminalTabsChanged.emit()
         self.runningChanged.emit()
         return True
+
+    def _terminal_environment(self) -> dict[str, str]:
+        environment = self.python_environment.execution_environment()
+        adb_executable = bundled_adb_path()
+        if adb_executable.is_file():
+            environment["POPTOOLS_ADB"] = str(adb_executable)
+            environment["PATH"] = os.pathsep.join(
+                (str(adb_executable.parent), environment.get("PATH", ""))
+            )
+        return environment
 
     @Slot(int)
     def _on_plugin_install_progress(self, progress: int) -> None:
@@ -263,20 +314,21 @@ class DeveloperConsoleController(QObject):
 
     @Slot(str, result=bool)
     def writeInput(self, data: str) -> bool:
-        if not self.ensureStarted() or self._session is None:
+        tab = self._active_tab()
+        if tab is None or not self._ensure_tab_started(tab) or tab.session is None:
             return False
-        return self._session.write(data.encode("utf-8"))
+        return tab.session.write(data.encode("utf-8"))
 
     @Slot(int, int)
     def resizeTerminal(self, columns: int, rows: int) -> None:
-        if self._session is not None:
-            self._session.resize(columns, rows)
+        tab = self._active_tab()
+        if tab is not None and tab.session is not None:
+            tab.session.resize(columns, rows)
 
     @Slot()
     def terminalReady(self) -> None:
         self._terminal_ready = True
-        if self._output:
-            self.terminalData.emit(self._output)
+        self._display_active_tab()
         self.ensureStarted()
 
     @Slot()
@@ -289,64 +341,189 @@ class DeveloperConsoleController(QObject):
 
     @Slot()
     def restart(self) -> None:
-        if self._session is None:
+        tab = self._active_tab()
+        if tab is None:
+            return
+        if tab.session is None:
             self.ensureStarted()
             return
-        self._restart_pending = True
-        self._session.stop_process()
+        tab.restart_pending = True
+        tab.intentional_stop = True
+        tab.session.stop_process()
 
     @Slot()
     def stop(self) -> None:
-        self._restart_pending = False
-        if self._session is not None:
-            self._session.stop_process()
+        for tab in (*self._tabs, *self._closing_tabs.values()):
+            tab.restart_pending = False
+            tab.intentional_stop = True
+            if tab.session is not None:
+                tab.session.stop_process()
 
     @Slot()
     def shutdown(self) -> None:
         self._shutdown_pending = True
         self.stop()
-        session = self._session
-        if session is not None:
+        tabs = (*self._tabs, *self._closing_tabs.values())
+        for tab in tabs:
+            session = tab.session
+            if session is None:
+                continue
             if not session.wait(3_000):
                 session.dispose()
                 session.wait(2_000)
-            if self._session is session:
+            if tab.session is session:
                 session.dispose()
-                self._session = None
+                tab.session = None
         thread = self._plugin_install_thread
         if thread is not None and thread.isRunning():
             thread.requestInterruption()
             thread.wait()
 
+    @Slot(result=bool)
+    def createTerminalTab(self) -> bool:
+        if len(self._tabs) >= self.MAX_TERMINAL_TABS:
+            return False
+        tab = self._create_tab(activate=True)
+        if self._terminal_ready:
+            self._display_active_tab()
+            QTimer.singleShot(0, lambda: self._ensure_tab_started(tab))
+        return True
+
+    @Slot(str, result=bool)
+    def activateTerminalTab(self, tab_id: str) -> bool:
+        tab = self._tab_by_id(tab_id)
+        if tab is None:
+            return False
+        if tab.tab_id == self._active_tab_id:
+            return True
+        self._active_tab_id = tab.tab_id
+        self.terminalTabsChanged.emit()
+        self.runningChanged.emit()
+        self.outputChanged.emit()
+        self._display_active_tab()
+        if self._terminal_ready:
+            QTimer.singleShot(0, lambda: self._ensure_tab_started(tab))
+        return True
+
+    @Slot(str, result=bool)
+    def closeTerminalTab(self, tab_id: str) -> bool:
+        tab = self._tab_by_id(tab_id)
+        if tab is None:
+            return False
+        index = self._tabs.index(tab)
+        was_active = tab.tab_id == self._active_tab_id
+        self._tabs.remove(tab)
+        if tab.session is not None:
+            tab.intentional_stop = True
+            tab.restart_pending = False
+            self._closing_tabs[tab.tab_id] = tab
+            tab.session.stop_process()
+        if not self._tabs:
+            self._create_tab(activate=True, emit=False)
+        elif was_active:
+            self._active_tab_id = self._tabs[min(index, len(self._tabs) - 1)].tab_id
+        self.terminalTabsChanged.emit()
+        self.runningChanged.emit()
+        self.outputChanged.emit()
+        if was_active:
+            self._display_active_tab()
+            active = self._active_tab()
+            if self._terminal_ready and active is not None:
+                QTimer.singleShot(0, lambda: self._ensure_tab_started(active))
+        return True
+
     @Slot(bytes)
     def _on_terminal_output(self, payload: bytes) -> None:
-        self._append(payload.decode("utf-8", errors="replace"))
+        tab = self._tab_for_session(self.sender())
+        if tab is not None:
+            self._append_to_tab(tab, payload.decode("utf-8", errors="replace"))
 
     @Slot(int)
     def _on_process_exited(self, exit_code: int) -> None:
-        self._exit_code = exit_code
+        tab = self._tab_for_session(self.sender())
+        if tab is not None:
+            tab.exit_code = exit_code
 
     @Slot()
     def _on_session_finished(self) -> None:
         sender = self.sender()
-        session = sender if isinstance(sender, ConPtySession) else self._session
-        if self._session is session:
-            self._session = None
-        if session is not None:
+        if not isinstance(sender, ConPtySession):
+            return
+        session = sender
+        tab = self._tab_for_session(session)
+        if tab is None:
             session.dispose()
             session.deleteLater()
-        if not self._restart_pending and not self._shutdown_pending:
-            self._append(f"\r\nPowerShell 会话已结束（退出码 {self._exit_code}）。\r\n")
-        self.runningChanged.emit()
-        if self._restart_pending:
-            self._restart_pending = False
-            self._output = ""
-            self.terminalResetRequested.emit()
-            QTimer.singleShot(0, self.ensureStarted)
+            return
+        tab_id = tab.tab_id
+        tab.session = None
+        session.dispose()
+        session.deleteLater()
+        if tab_id in self._closing_tabs:
+            self._closing_tabs.pop(tab_id, None)
+            return
+        restart_pending = tab.restart_pending
+        tab.restart_pending = False
+        if not restart_pending and not tab.intentional_stop and not self._shutdown_pending:
+            self._append_to_tab(
+                tab,
+                f"\r\nPowerShell 会话已结束（退出码 {tab.exit_code}）。\r\n",
+            )
+        tab.intentional_stop = False
+        self.terminalTabsChanged.emit()
+        if tab.tab_id == self._active_tab_id:
+            self.runningChanged.emit()
+        if restart_pending and not self._shutdown_pending:
+            tab.output = ""
+            if tab.tab_id == self._active_tab_id:
+                self.terminalResetRequested.emit()
+                self.outputChanged.emit()
+            QTimer.singleShot(0, lambda: self._ensure_tab_started(tab))
 
     def _append(self, text: str) -> None:
+        tab = self._active_tab()
+        if tab is not None:
+            self._append_to_tab(tab, text)
+
+    def _append_to_tab(self, tab: TerminalTabState, text: str) -> None:
         if not text:
             return
-        self._output = (self._output + text)[-self.OUTPUT_HISTORY_LIMIT :]
-        if self._terminal_ready:
+        tab.output = (tab.output + text)[-self.OUTPUT_HISTORY_LIMIT :]
+        if self._terminal_ready and tab.tab_id == self._active_tab_id:
             self.terminalData.emit(text)
+
+    def _create_tab(self, *, activate: bool, emit: bool = True) -> TerminalTabState:
+        tab_number = self._next_tab_number
+        self._next_tab_number += 1
+        tab = TerminalTabState(
+            tab_id=f"terminal-{tab_number}",
+            title=self.terminalName,
+        )
+        self._tabs.append(tab)
+        if activate:
+            self._active_tab_id = tab.tab_id
+        if emit:
+            self.terminalTabsChanged.emit()
+            self.runningChanged.emit()
+            self.outputChanged.emit()
+        return tab
+
+    def _active_tab(self) -> TerminalTabState | None:
+        return self._tab_by_id(self._active_tab_id)
+
+    def _tab_by_id(self, tab_id: str) -> TerminalTabState | None:
+        return next((tab for tab in self._tabs if tab.tab_id == tab_id), None)
+
+    def _tab_for_session(self, session: object) -> TerminalTabState | None:
+        return next(
+            (tab for tab in (*self._tabs, *self._closing_tabs.values()) if tab.session is session),
+            None,
+        )
+
+    def _display_active_tab(self) -> None:
+        if not self._terminal_ready:
+            return
+        self.terminalResetRequested.emit()
+        tab = self._active_tab()
+        if tab is not None and tab.output:
+            self.terminalSnapshotData.emit(tab.output)

@@ -120,6 +120,34 @@ def test_running_custom_tools_are_temporarily_pinned_without_changing_order(
     assert store.tool_order() == [first.id, second.id]
 
 
+def test_running_refresh_preserves_the_selected_tool_parameter_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    controller, _, registry = make_controller(tmp_path)
+    tool = registry.create_custom(
+        title="Input tool",
+        description="",
+        kind="powershell",
+        command="Write-Output ${value}",
+    )
+    controller.selectTool(tool.id)
+    selection_notifications: list[bool] = []
+    running_notifications: list[bool] = []
+    controller.selectedToolChanged.connect(lambda: selection_notifications.append(True))
+    controller.runningChanged.connect(lambda: running_notifications.append(True))
+    monkeypatch.setattr(
+        controller.execution_coordinator,
+        "running",
+        lambda tool_id: tool_id == tool.id,
+    )
+
+    controller._on_execution_running_changed(tool.id, True)  # noqa: SLF001
+
+    assert controller.selectedTool["id"] == tool.id
+    assert selection_notifications == []
+    assert running_notifications == [True]
+
+
 def test_name_sort_uses_full_pinyin_for_chinese_and_latin_names() -> None:
     names = ["发送ASR", "法国", "Fable", "飞行", "发报机"]
 

@@ -12,11 +12,10 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
-import psutil  # type: ignore[import-untyped]
 from PySide6.QtCore import QObject, QThread, Signal
 
 if os.name == "nt":
-    from winpty import PTY, Backend  # type: ignore[import-untyped]
+    from poptools.infrastructure.native_conpty import NativeConPty
 
     _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     _kernel32.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
@@ -47,7 +46,6 @@ class ConPtySession(QThread):
         self._process: subprocess.Popen[bytes] | None = None
         self._pid = 0
         self._job: int | None = None
-        self._console_hosts: set[int] = set()
         self._write_lock = threading.Lock()
 
     def start_process(
@@ -68,26 +66,15 @@ class ConPtySession(QThread):
             )
             return
 
-        existing_hosts = self._current_console_hosts()
-        pty = PTY(max(1, columns), max(1, rows), backend=Backend.ConPTY)
-        environment_block = "\0".join(
-            f"{key}={value}" for key, value in environment.items()
-        ) + "\0"
-        command_line = " " + subprocess.list2cmdline(list(arguments))
+        pty = NativeConPty(max(1, columns), max(1, rows))
         try:
-            pty.spawn(
-                str(program),
-                cmdline=command_line,
-                cwd=str(working_directory),
-                env=environment_block,
-            )
+            pty.spawn(program, arguments, working_directory, environment)
         except Exception:
             with suppress(Exception):
-                pty.cancel_io()
+                pty.close()
             raise
         self._pty = pty
         self._pid = int(pty.pid)
-        self._console_hosts = self._current_console_hosts() - existing_hosts
         self._assign_job()
         self.start()
 
@@ -127,8 +114,15 @@ class ConPtySession(QThread):
                 self.msleep(16)
         self._emit_pending(pending)
         with suppress(Exception):
-            exit_code = int(pty.get_exitstatus() or 0)
+            exit_code = self._normalize_exit_code(int(pty.get_exitstatus() or 0))
             self.processExited.emit(exit_code)
+
+    @staticmethod
+    def _normalize_exit_code(exit_code: int) -> int:
+        """Convert unsigned Win32 status values to Qt's signed 32-bit int."""
+        if os.name == "nt" and exit_code > 0x7FFFFFFF:
+            return exit_code - 0x1_0000_0000
+        return exit_code
 
     def write(self, data: bytes) -> bool:
         if os.name != "nt":
@@ -192,8 +186,7 @@ class ConPtySession(QThread):
         self._terminate_process()
         if pty is not None:
             with suppress(Exception):
-                pty.cancel_io()
-        self._terminate_console_hosts()
+                pty.close()
         self._close_job()
         self._pid = 0
 
@@ -214,9 +207,7 @@ class ConPtySession(QThread):
         job = _kernel32.CreateJobObjectW(None, None)
         if not job:
             return
-        process = _kernel32.OpenProcess(
-            _PROCESS_TERMINATE | _PROCESS_SET_QUOTA, False, self._pid
-        )
+        process = _kernel32.OpenProcess(_PROCESS_TERMINATE | _PROCESS_SET_QUOTA, False, self._pid)
         if not process:
             _kernel32.CloseHandle(job)
             return
@@ -231,25 +222,6 @@ class ConPtySession(QThread):
         if self._job:
             _kernel32.CloseHandle(self._job)
             self._job = None
-
-    def _current_console_hosts(self) -> set[int]:
-        with suppress(psutil.Error):
-            return {
-                process.pid
-                for process in psutil.Process().children(recursive=False)
-                if process.name().casefold() == "openconsole.exe"
-            }
-        return set()
-
-    def _terminate_console_hosts(self) -> None:
-        hosts = self._console_hosts
-        self._console_hosts = set()
-        for pid in hosts:
-            with suppress(psutil.Error):
-                process = psutil.Process(pid)
-                if process.name().casefold() == "openconsole.exe":
-                    process.terminate()
-                    process.wait(timeout=1.0)
 
     def _emit_pending(self, chunks: list[str]) -> None:
         if chunks:

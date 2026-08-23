@@ -41,8 +41,22 @@ terminal.open(document.getElementById("terminal"));
 
 new QWebChannel(qt.webChannelTransport, (channel) => {
   const bridge = channel.objects.terminalBridge;
-  const inputSubscription = terminal.onData((data) => bridge.writeInput(data));
+  let replayWritesPending = 0;
+  const inputSubscription = terminal.onData((data) => {
+    if (replayWritesPending === 0) {
+      bridge.writeInput(data);
+    }
+  });
   bridge.dataReceived.connect((data) => terminal.write(data));
+  bridge.snapshotReceived.connect((data) => {
+    replayWritesPending += 1;
+    terminal.write(data, () => {
+      replayWritesPending -= 1;
+      if (replayWritesPending === 0) {
+        terminal.focus();
+      }
+    });
+  });
   bridge.resetRequested.connect(() => terminal.reset());
 
   const fit = () => {

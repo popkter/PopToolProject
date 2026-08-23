@@ -27,7 +27,10 @@ SetupIconFile=..\src\poptools\resources\icons\app-icon.ico
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
-CloseApplications=yes
+; Older PopTools builds treated Restart Manager's close request as a request
+; to minimize to the tray. Try a graceful close first, then terminate those
+; legacy builds after the user has confirmed that Setup may close the app.
+CloseApplications=force
 RestartApplications=no
 SetupLogging=yes
 UsePreviousAppDir=yes
@@ -49,3 +52,47 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; AppUserMo
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function GetWindowThreadProcessId(Wnd: HWND; var ProcessId: DWORD): DWORD;
+  external 'GetWindowThreadProcessId@user32.dll stdcall';
+
+function CloseRunningApplication(): Boolean;
+var
+  AppWindow: HWND;
+  ProcessId: DWORD;
+  ResultCode: Integer;
+begin
+  Result := True;
+  AppWindow := FindWindowByWindowName('{#MyAppName}');
+  if AppWindow = 0 then
+    Exit;
+
+  if (not WizardSilent) and
+     (MsgBox(
+       '{#MyAppName} 正在运行。继续安装将关闭当前应用，是否继续？',
+       mbConfirmation, MB_YESNO or MB_DEFBUTTON2) <> idYes) then
+  begin
+    Result := False;
+    Exit;
+  end;
+
+  ProcessId := 0;
+  GetWindowThreadProcessId(AppWindow, ProcessId);
+  if ProcessId <> 0 then
+  begin
+    Log(Format('Closing running {#MyAppName} process %d before installation.', [ProcessId]));
+    Exec(
+      ExpandConstant('{cmd}'),
+      Format('/D /Q /C taskkill /PID %d /T /F', [ProcessId]),
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Sleep(500);
+  end;
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if CurPageID = wpReady then
+    Result := CloseRunningApplication();
+end;

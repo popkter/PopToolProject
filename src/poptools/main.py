@@ -98,6 +98,9 @@ def main() -> int:
             QFontDatabase.addApplicationFont(str(icon_font))
 
         tray_controller = SystemTrayController(app)
+        app.commitDataRequest.connect(
+            lambda _session_manager: tray_controller.quit_application()
+        )
         app.setWindowIcon(tray_controller.icon)
 
         prepare_bundled_android_tools(paths)
