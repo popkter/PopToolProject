@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -15,6 +17,7 @@ Item {
         id: terminalBridge
         WebChannel.id: "terminalBridge"
         signal dataReceived(string data)
+        signal snapshotReceived(string data)
         signal resetRequested()
 
         function writeInput(data) {
@@ -36,6 +39,7 @@ Item {
     Connections {
         target: root.controller
         function onTerminalData(data) { terminalBridge.dataReceived(data) }
+        function onTerminalSnapshotData(data) { terminalBridge.snapshotReceived(data) }
         function onTerminalResetRequested() { terminalBridge.resetRequested() }
     }
 
@@ -66,7 +70,7 @@ Item {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: "原生 " + developerConsoleController.terminalName
+                    text: "原生 " + root.controller.terminalName
                           + " 输入体验，python 与 pip 使用应用专属环境"
                     color: Theme.textSecondary
                     font.pixelSize: 14
@@ -83,8 +87,8 @@ Item {
                     anchors.centerIn: parent
                     spacing: 7
                     Rectangle {
-                        width: 8
-                        height: 8
+                        Layout.preferredWidth: 8
+                        Layout.preferredHeight: 8
                         radius: 4
                         color: root.controller.running ? Theme.success : Theme.errorColor
                     }
@@ -93,6 +97,110 @@ Item {
                         color: root.controller.running ? Theme.success : Theme.errorColor
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
+                    }
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.minimumHeight: 42
+            Layout.preferredHeight: 42
+            Layout.maximumHeight: 42
+            spacing: 8
+
+            Flickable {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                contentWidth: terminalTabRow.implicitWidth
+                contentHeight: height
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+
+                Row {
+                    id: terminalTabRow
+                    height: parent.height
+                    spacing: 6
+
+                    Repeater {
+                        model: root.controller.terminalTabs
+
+                        delegate: Rectangle {
+                            id: terminalTabDelegate
+                            required property var modelData
+                            width: 154
+                            height: 38
+                            radius: 10
+                            color: terminalTabDelegate.modelData.active
+                                   ? Theme.primaryContainer : Theme.surfaceContainerHigh
+                            border.width: terminalTabDelegate.modelData.active ? 1 : 0
+                            border.color: Theme.primary
+
+                            RowLayout {
+                                z: 1
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 7
+                                spacing: 6
+
+                                Rectangle {
+                                    Layout.preferredWidth: 7
+                                    Layout.preferredHeight: 7
+                                    radius: 4
+                                    color: terminalTabDelegate.modelData.running
+                                           ? Theme.success : Theme.textSecondary
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: terminalTabDelegate.modelData.title
+                                    color: terminalTabDelegate.modelData.active
+                                           ? Theme.primary : Theme.textSecondary
+                                    font.pixelSize: 13
+                                    font.weight: terminalTabDelegate.modelData.active
+                                                 ? Font.DemiBold : Font.Normal
+                                    elide: Text.ElideRight
+                                }
+                                MaterialIcon {
+                                    Layout.preferredWidth: 24
+                                    Layout.preferredHeight: 24
+                                    visible: root.controller.terminalTabs.length > 1
+                                    icon: "close"
+                                    iconSize: 16
+                                    color: closeTabMouse.containsMouse ? Theme.errorColor
+                                                                        : Theme.textSecondary
+                                    MouseArea {
+                                        id: closeTabMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onClicked: function(mouse) {
+                                            mouse.accepted = true
+                                            root.controller.closeTerminalTab(
+                                                terminalTabDelegate.modelData.tabId)
+                                        }
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                z: 0
+                                onClicked: root.controller.activateTerminalTab(
+                                    terminalTabDelegate.modelData.tabId)
+                            }
+                        }
+                    }
+
+                    PrimaryButton {
+                        width: 42
+                        height: 38
+                        radius: 10
+                        compact: true
+                        tonal: true
+                        iconName: "add"
+                        text: root.controller.canCreateTerminalTab
+                              ? "新建终端标签" : "最多开启 7 个终端标签"
+                        enabled: root.controller.canCreateTerminalTab
+                        onClicked: root.controller.createTerminalTab()
                     }
                 }
             }

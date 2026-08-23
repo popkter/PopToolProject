@@ -59,6 +59,10 @@ def main() -> int:
     developer_console_controller = DeveloperConsoleController(
         python_environment, paths.data_dir
     )
+    app.aboutToQuit.connect(developer_console_controller.shutdown)
+    capture_terminal_tabs = int(os.environ.get("POPTOOLS_CAPTURE_TERMINAL_TABS", "1"))
+    for _ in range(max(1, min(capture_terminal_tabs, 7)) - 1):
+        developer_console_controller.createTerminalTab()
     update_controller = UpdateController(config_store, auto_check_enabled=False)
     if len(sys.argv) > 2 and sys.argv[2] in {"developer", "powershell-plugin", "update"}:
         settings_controller.markUserGuideSeen()

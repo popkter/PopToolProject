@@ -606,7 +606,13 @@ class AppController(QObject):
         self._append_console(f"已删除本地命令：{title}\n")
         return True
 
-    def _refresh(self, *, select_first: bool = False, select_id: str = "") -> None:
+    def _refresh(
+        self,
+        *,
+        select_first: bool = False,
+        select_id: str = "",
+        notify_selected: bool = True,
+    ) -> None:
         tools = self._sorted_tools(self.registry.for_section(self._section))
         running_ids = {tool.id for tool in tools if self.execution_coordinator.running(tool.id)}
         if self._section == ToolSection.CUSTOM and running_ids:
@@ -618,7 +624,8 @@ class AppController(QObject):
             target_id = tools[0].id
         self._selected = self.registry.get(target_id) if target_id else None
         self._tools_model.set_tools(tools, target_id, running_ids)
-        self.selectedToolChanged.emit()
+        if notify_selected:
+            self.selectedToolChanged.emit()
         self.consoleTextChanged.emit()
         self.runningChanged.emit()
         self._status_text = "运行中" if self.running else "就绪"
@@ -690,13 +697,17 @@ class AppController(QObject):
         self.config_store.record_tool_recent(tool.id)
         self.config_store.increment_tool_usage(tool.id)
         if self._tool_sort_mode == "usage":
-            self._refresh(select_id=tool.id)
+            self._refresh(select_id=tool.id, notify_selected=False)
 
     def _on_execution_running_changed(self, tool_id: str, running: bool) -> None:
         tool = self.registry.get(tool_id)
         if tool is not None and tool.section == ToolSection.CUSTOM:
             selected_id = self._selected.id if self._selected is not None else ""
-            self._refresh(select_id=selected_id)
+            # Running-state changes only reorder/update the tool list. Emitting
+            # selectedToolChanged here makes QML recreate its parameter map while
+            # edited text controls keep their old visual content, so a second run
+            # sees empty/default values instead of the text still on screen.
+            self._refresh(select_id=selected_id, notify_selected=False)
             return
         if self._selected is not None and self._selected.id == tool_id:
             self.runningChanged.emit()
