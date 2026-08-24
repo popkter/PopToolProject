@@ -174,31 +174,23 @@ class FakeUser32:
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows native hosting only")
-def test_hidden_projection_window_can_be_found_before_its_first_show(
+def test_visible_projection_window_is_found_directly_by_its_unique_title(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     title = "projection-window"
 
     class FindWindowUser32:
         def __init__(self) -> None:
-            self.EnumWindows = CallbackWinFunction(
-                lambda callback, context: callback(123, context)
-            )
+            self.FindWindowW = FakeWinFunction(123)
+            self.IsWindowVisible = FakeWinFunction(1)
             self.GetWindowThreadProcessId = CallbackWinFunction(
                 self._write_process_id
             )
-            self.GetWindowTextLengthW = CallbackWinFunction(lambda _handle: len(title))
-            self.GetWindowTextW = CallbackWinFunction(self._write_title)
 
         @staticmethod
         def _write_process_id(_handle, process_id) -> int:
             process_id._obj.value = 321
             return 1
-
-        @staticmethod
-        def _write_title(_handle, buffer, _length) -> int:
-            buffer.value = title
-            return len(title)
 
     user32 = FindWindowUser32()
     monkeypatch.setattr(scrcpy_module, "_user32", lambda: user32)
@@ -206,7 +198,59 @@ def test_hidden_projection_window_can_be_found_before_its_first_show(
     handle = scrcpy_module._find_process_window(321, title)  # noqa: SLF001
 
     assert handle == 123
-    assert not hasattr(user32, "IsWindowVisible")
+    assert user32.FindWindowW.calls == [(None, title)]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows native hosting only")
+def test_hidden_scrcpy_startup_window_is_not_embedded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class HiddenWindowUser32:
+        def __init__(self) -> None:
+            self.FindWindowW = FakeWinFunction(123)
+            self.IsWindowVisible = FakeWinFunction(0)
+
+    monkeypatch.setattr(scrcpy_module, "_user32", HiddenWindowUser32)
+
+    handle = scrcpy_module._find_process_window(321, "projection-window")  # noqa: SLF001
+
+    assert handle == 0
+
+
+def test_destroyed_startup_window_is_replaced_by_the_final_video_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = scrcpy_module.ScrcpyController()
+
+    class FakeProcess:
+        process_id = 321
+
+    class FakeHostWindow:
+        @staticmethod
+        def winId() -> int:
+            return 654
+
+    calls: list[tuple[object, ...]] = []
+    controller._process = FakeProcess()  # type: ignore[assignment]  # noqa: SLF001
+    controller._host_window = FakeHostWindow()  # type: ignore[assignment]  # noqa: SLF001
+    controller._scrcpy_window = 111  # noqa: SLF001
+    controller._window_title = "projection-window"  # noqa: SLF001
+    monkeypatch.setattr(scrcpy_module, "_is_window", lambda _handle: False)
+    monkeypatch.setattr(scrcpy_module, "_find_process_window", lambda *_args: 222)
+    monkeypatch.setattr(scrcpy_module, "_show_window", lambda *_args: None)
+    monkeypatch.setattr(
+        scrcpy_module,
+        "_embed_window",
+        lambda child, parent: calls.append(("embed", child, parent)) or True,
+    )
+    monkeypatch.setattr(
+        controller, "_sync_embedded_window", lambda: calls.append(("sync",))
+    )
+
+    controller._try_embed_window()  # noqa: SLF001
+
+    assert controller._scrcpy_window == 222  # noqa: SLF001
+    assert calls == [("embed", 222, 654), ("sync",)]
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows native hosting only")
