@@ -145,13 +145,21 @@ class ScrcpyController(QObject):
         if process is None:
             self._embed_timer.stop()
             return
+        if self._scrcpy_window:
+            if _is_window(self._scrcpy_window):
+                return
+            # SDL may replace its startup window when the video renderer is
+            # initialized. Resume discovery instead of retaining a dead HWND
+            # and leaving only the QML placeholder visible.
+            self._scrcpy_window = 0
+            self._embed_attempts = 0
+            self._embed_timer.setInterval(10)
         self._embed_attempts += 1
         handle = _find_process_window(process.process_id, self._window_title)
         if handle:
-            self._embed_timer.stop()
-            # scrcpy creates a normal SDL top-level window. Hide it before
-            # changing its style/parent so Windows never composites that
-            # transient black window over the application.
+            # The window starts offscreen. Wait until SDL has shown it so a
+            # short-lived pre-renderer window is not mistaken for the final
+            # video window, then hide and embed it in one event-loop turn.
             _show_window(handle, False)
             self._scrcpy_window = handle
             if self._host_window is None or not _embed_window(
@@ -161,6 +169,7 @@ class ScrcpyController(QObject):
                 self.stop()
                 return
             self._sync_embedded_window()
+            self._embed_timer.setInterval(250)
             self.output.emit("投屏已连接。\n")
         elif self._embed_attempts >= 1000:
             self._embed_timer.stop()
@@ -231,36 +240,38 @@ def _find_process_window(process_id: int, title: str) -> int:
     if os.name != "nt" or not process_id:
         return 0
     user32 = _user32()
-    found = 0
-    callback_type = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-    user32.EnumWindows.argtypes = [callback_type, ctypes.c_void_p]
-    user32.EnumWindows.restype = ctypes.c_bool
+    # The title is a UUID, so looking it up directly avoids running a Python
+    # callback from EnumWindows. Only accept a window SDL has shown: before the
+    # renderer is ready, SDL may create and destroy a hidden window with the
+    # same title.
+    user32.FindWindowW.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p]
+    user32.FindWindowW.restype = ctypes.c_void_p
+    handle = user32.FindWindowW(None, title)
+    if not handle or not _is_window_visible(int(handle)):
+        return 0
     user32.GetWindowThreadProcessId.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
     user32.GetWindowThreadProcessId.restype = ctypes.c_ulong
-    user32.GetWindowTextLengthW.argtypes = [ctypes.c_void_p]
-    user32.GetWindowTextLengthW.restype = ctypes.c_int
-    user32.GetWindowTextW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_int]
-    user32.GetWindowTextW.restype = ctypes.c_int
+    window_pid = ctypes.c_ulong()
+    user32.GetWindowThreadProcessId(handle, ctypes.byref(window_pid))
+    return int(handle) if window_pid.value == process_id else 0
 
-    def visit(handle: int, _context: int) -> bool:
-        nonlocal found
-        window_pid = ctypes.c_ulong()
-        user32.GetWindowThreadProcessId(handle, ctypes.byref(window_pid))
-        # Match the SDL window while it is still hidden so it can become a
-        # child window before scrcpy performs its first top-level show.
-        if window_pid.value != process_id:
-            return True
-        length = user32.GetWindowTextLengthW(handle)
-        buffer = ctypes.create_unicode_buffer(length + 1)
-        user32.GetWindowTextW(handle, buffer, len(buffer))
-        if buffer.value == title:
-            found = int(handle)
-            return False
-        return True
 
-    callback = callback_type(visit)
-    user32.EnumWindows(callback, 0)
-    return found
+def _is_window(handle: int) -> bool:
+    if os.name != "nt" or not handle:
+        return False
+    user32 = _user32()
+    user32.IsWindow.argtypes = [ctypes.c_void_p]
+    user32.IsWindow.restype = ctypes.c_bool
+    return bool(user32.IsWindow(handle))
+
+
+def _is_window_visible(handle: int) -> bool:
+    if os.name != "nt" or not handle:
+        return False
+    user32 = _user32()
+    user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
+    user32.IsWindowVisible.restype = ctypes.c_bool
+    return bool(user32.IsWindowVisible(handle))
 
 
 def _embed_window(child: int, parent: int) -> bool:
