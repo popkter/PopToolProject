@@ -10,14 +10,13 @@ Item {
     required property real preferredExpandedHeight
     required property real maximumExpandedHeight
     required property bool resizable
-    property color panelColor: Theme.middlePanel
     property bool expanded: true
     property real expandedHeight: minimumExpandedHeight
     property bool userResized: false
     property real resizeStartSceneY: 0
     property real resizeStartHeight: 0
     property real panelMargin: 0
-    readonly property real separatorHeight: 20
+    readonly property real separatorHeight: 8
     readonly property real headerHeight: 62
     readonly property real outputOuterMargin: 16
     readonly property real outputViewportMargin: 14
@@ -85,12 +84,13 @@ Item {
     Rectangle {
         id: resizeSeparator
         visible: true
-        z: 10
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.leftMargin: root.panelMargin
+        anchors.rightMargin: root.panelMargin
         height: root.separatorHeight
-        color: root.panelColor
+        color: Theme.consoleDivider
 
         MouseArea {
             id: resizeMouse

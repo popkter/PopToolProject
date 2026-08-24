@@ -93,6 +93,51 @@ def test_controller_sorts_by_name_usage_and_dragged_custom_order(tmp_path: Path)
     assert visible_ids(reloaded)[0] == alpha.id
 
 
+def test_controller_filters_custom_tools_for_the_grid(tmp_path: Path) -> None:
+    controller, _, registry = make_controller(tmp_path)
+    registry.create_custom(
+        title="Network Probe",
+        description="Checks Android connectivity",
+        kind="powershell",
+        command="Write-Output network",
+    )
+    registry.create_custom(
+        title="Collect Logs",
+        description="Exports device diagnostics",
+        kind="batch",
+        command="echo logs",
+    )
+    controller._refresh()  # noqa: SLF001
+
+    controller.setToolSearchQuery("android")
+    assert [tool.title for tool in controller._tools_model._display_tools] == [  # noqa: SLF001
+        "Network Probe"
+    ]
+
+    controller.setToolSearchQuery("")
+    assert len(controller._tools_model._display_tools) == 2  # noqa: SLF001
+
+
+def test_custom_tool_selection_can_be_cleared_without_stopping_the_tool(
+    tmp_path: Path,
+) -> None:
+    controller, _, registry = make_controller(tmp_path)
+    tool = registry.create_custom(
+        title="Selectable",
+        description="",
+        kind="powershell",
+        command="Write-Output selected",
+    )
+    controller._refresh()  # noqa: SLF001
+
+    controller.selectTool(tool.id)
+    assert controller.selectedTool["id"] == tool.id
+
+    controller.clearToolSelection()
+    assert controller.selectedTool == {}
+    assert controller._tools_model._selected_id == ""  # noqa: SLF001
+
+
 def test_running_custom_tools_are_temporarily_pinned_without_changing_order(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -208,6 +253,6 @@ def test_sort_popup_and_long_press_drag_are_wired_in_qml() -> None:
     assert "visible: root.running" in item
     assert "color: Theme.success" in item
     assert "running: parent.running" in main
-    assert 'background: AppPopupSurface { }' in button
+    assert "background: AppPopupSurface { }" in button
     for mode in ("added_time", "name", "usage", "custom"):
         assert f'"value": "{mode}"' in button

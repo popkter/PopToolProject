@@ -48,14 +48,6 @@ ApplicationWindow {
     readonly property bool compactToolList: toolListWidth < 190
     readonly property bool compactContentActions: width < 760
     readonly property bool compactHeight: height < 620
-    readonly property color middlePanelColor: settingsController.middlePanelColor === "#EEF7FF"
-        ? Theme.middlePanel : settingsController.middlePanelColor
-    readonly property color middlePanelForeground: contrastingForeground(middlePanelColor)
-    readonly property color middlePanelHover: Qt.rgba(
-        middlePanelForeground.r,
-        middlePanelForeground.g,
-        middlePanelForeground.b,
-        0.12)
     readonly property bool scrcpySelected:
         appController.selectedTool.workspace === "scrcpy"
     readonly property bool recordingSelected:
@@ -79,41 +71,12 @@ ApplicationWindow {
         && !developerSelected
         && appController.section === "preset"
         && appController.selectedTool.workspace === "preset"
-
-    function compositeChannel(foreground, background, alpha) {
-        return foreground * alpha + background * (1 - alpha)
-    }
-
-    function linearChannel(channel) {
-        return channel <= 0.04045
-            ? channel / 12.92
-            : Math.pow((channel + 0.055) / 1.055, 2.4)
-    }
-
-    function relativeLuminance(colorValue) {
-        var alpha = colorValue.a
-        var red = compositeChannel(colorValue.r, Theme.surface.r, alpha)
-        var green = compositeChannel(colorValue.g, Theme.surface.g, alpha)
-        var blue = compositeChannel(colorValue.b, Theme.surface.b, alpha)
-        return 0.2126 * linearChannel(red)
-            + 0.7152 * linearChannel(green)
-            + 0.0722 * linearChannel(blue)
-    }
-
-    function contrastRatio(first, second) {
-        var lighter = Math.max(first, second)
-        var darker = Math.min(first, second)
-        return (lighter + 0.05) / (darker + 0.05)
-    }
-
-    function contrastingForeground(background) {
-        var backgroundLuminance = relativeLuminance(background)
-        var dark = Qt.rgba(0.114, 0.106, 0.125, 1)
-        var light = Qt.rgba(1, 1, 1, 1)
-        return contrastRatio(backgroundLuminance, relativeLuminance(dark))
-                >= contrastRatio(backgroundLuminance, relativeLuminance(light))
-            ? dark : light
-    }
+    readonly property bool customToolDrawerVisible:
+        !standbySelected
+        && !developerSelected
+        && appController.section === "custom"
+        && appController.selectedTool.section === "custom"
+        && !!appController.selectedTool.id
 
     function formatStandbyDateTime(date) {
         const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
@@ -129,6 +92,21 @@ ApplicationWindow {
             + pad(date.getHours()) + ":"
             + pad(date.getMinutes()) + ":"
             + pad(date.getSeconds())
+    }
+
+    function openCustomToolDrawer(toolId) {
+        appController.selectTool(toolId)
+    }
+
+    function closeCustomToolDrawer() {
+        appController.clearToolSelection()
+    }
+
+    onToolSearchQueryChanged: appController.setToolSearchQuery(toolSearchQuery)
+    Shortcut {
+        sequence: "Esc"
+        enabled: window.customToolDrawerVisible && !window.applicationOverlayVisible
+        onActivated: window.closeCustomToolDrawer()
     }
 
     function clampPanelWidths() {
@@ -264,10 +242,14 @@ ApplicationWindow {
     onStandbySelectedChanged: {
         if (!scrcpySelected || standbySelected)
             hideScrcpyWindow()
+        if (standbySelected && appController.section === "custom")
+            closeCustomToolDrawer()
     }
     onDeveloperSelectedChanged: {
         if (developerSelected)
             hideScrcpyWindow()
+        if (developerSelected && appController.section === "custom")
+            closeCustomToolDrawer()
     }
 
     function requestTerminalEnable() {
@@ -466,7 +448,8 @@ ApplicationWindow {
         x: window.primaryNavWidth
         width: window.toolListWidth
         visible: !window.standbySelected && !window.developerSelected
-        color: window.middlePanelColor
+            && appController.section === "preset"
+        color: Theme.middlePanel
     }
 
     Rectangle {
@@ -797,15 +780,16 @@ ApplicationWindow {
             color: "transparent"
             clip: true
 
-            RowLayout {
+            Item {
                 anchors.fill: parent
-                spacing: 0
 
                 Rectangle {
-                    Layout.preferredWidth: window.standbySelected || window.developerSelected
-                        ? 0 : window.toolListWidth
-                    Layout.fillHeight: true
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: visible ? window.toolListWidth : 0
                     visible: !window.standbySelected && !window.developerSelected
+                        && appController.section !== "custom"
                     color: "transparent"
                     clip: true
 
@@ -827,7 +811,7 @@ ApplicationWindow {
                             Text {
                                 visible: !window.compactToolList
                                 text: appController.sectionTitle
-                                color: window.middlePanelForeground
+                                color: Theme.textPrimary
                                 font.pixelSize: 20
                                 font.weight: Font.Bold
                                 Layout.fillWidth: true
@@ -840,8 +824,8 @@ ApplicationWindow {
                                 Layout.minimumWidth: 40
                                 visible: appController.section === "custom"
                                 controller: appController
-                                foregroundColor: window.middlePanelForeground
-                                hoverColor: window.middlePanelHover
+                                foregroundColor: Theme.textPrimary
+                                hoverColor: Theme.surfaceContainerHigh
                             }
                             Rectangle {
                                 id: createCommandButton
@@ -851,13 +835,13 @@ ApplicationWindow {
                                 Layout.preferredHeight: 40
                                 radius: 20
                                 color: createCommandMouse.containsMouse
-                                    ? window.middlePanelHover : "transparent"
+                                    ? Theme.surfaceContainerHigh : "transparent"
 
                                 MaterialIcon {
                                     anchors.centerIn: parent
                                     icon: "add"
                                     iconSize: 26
-                                    color: window.middlePanelForeground
+                                    color: Theme.textPrimary
                                 }
 
                                 ToolTip.visible: createCommandMouse.containsMouse
@@ -1030,19 +1014,16 @@ ApplicationWindow {
                                     required property string iconName
                                     required property bool selected
                                     required property bool running
-                                    property bool matches: window.toolSearchQuery.length === 0
-                                        || title.toLowerCase().indexOf(window.toolSearchQuery.toLowerCase()) >= 0
                                     width: toolList.width
-                                    height: matches ? 64 : 0
-                                    visible: matches
+                                    height: 64
                                     ToolListItem {
                                         anchors.fill: parent
                                         title: parent.title
                                         iconName: parent.iconName
                                         selected: parent.selected
                                         running: parent.running
-                                        foregroundColor: window.middlePanelForeground
-                                        hoverColor: window.middlePanelHover
+                                        foregroundColor: Theme.textPrimary
+                                        hoverColor: Theme.surfaceContainerHigh
                                         compact: window.compactToolList
                                         draggable: appController.section === "custom"
                                             && appController.toolSortMode === "custom"
@@ -1093,13 +1074,267 @@ ApplicationWindow {
                 }
 
                 Rectangle {
+                    id: customToolGridPanel
+                    anchors.fill: parent
+                    visible: !window.standbySelected && !window.developerSelected
+                        && appController.section === "custom"
+                    color: Theme.surface
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: window.compactContentActions ? 12 : 20
+                        anchors.rightMargin: window.compactContentActions ? 12 : 20
+                        anchors.topMargin: window.compactHeight ? 12 : 20
+                        anchors.bottomMargin: window.compactHeight ? 12 : 20
+                        spacing: 14
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 10
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                spacing: 2
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "客制脚本"
+                                    color: Theme.textPrimary
+                                    font.pixelSize: 26
+                                    font.weight: Font.Bold
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    visible: !window.compactHeight
+                                    text: "选择脚本以查看参数、运行状态和输出"
+                                    color: Theme.textSecondary
+                                    font.pixelSize: 13
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            ToolSortButton {
+                                Layout.preferredWidth: 42
+                                Layout.preferredHeight: 42
+                                controller: appController
+                                foregroundColor: Theme.textPrimary
+                                hoverColor: Theme.surfaceContainerHigh
+                            }
+
+                            Rectangle {
+                                id: gridCreateCommandButton
+                                Layout.preferredWidth: 42
+                                Layout.preferredHeight: 42
+                                radius: 21
+                                color: gridCreateCommandMouse.containsMouse
+                                    ? Theme.primaryContainerHover : Theme.primaryContainer
+                                MaterialIcon {
+                                    anchors.centerIn: parent
+                                    icon: "add"
+                                    iconSize: 25
+                                    color: Theme.primary
+                                }
+                                ToolTip.visible: gridCreateCommandMouse.containsMouse
+                                ToolTip.text: "新建命令"
+                                ToolTip.delay: 450
+                                MouseArea {
+                                    id: gridCreateCommandMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: window.openCommandEditorForCreate()
+                                }
+                            }
+                        }
+
+                        TextField {
+                            id: customGridSearchField
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 48
+                            leftPadding: 44
+                            rightPadding: 14
+                            placeholderText: "搜索脚本名称、说明或运行方式"
+                            text: window.toolSearchQuery
+                            color: Theme.textPrimary
+                            font.pixelSize: 15
+                            onTextChanged: {
+                                if (window.toolSearchQuery !== text)
+                                    window.toolSearchQuery = text
+                            }
+                            background: Rectangle {
+                                radius: 14
+                                color: Theme.surfaceContainerLow
+                                border.color: customGridSearchField.activeFocus
+                                    ? Theme.primary : Theme.outlineVariant
+                                border.width: customGridSearchField.activeFocus ? 2 : 1
+                                MaterialIcon {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 14
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    icon: "search"
+                                    iconSize: 22
+                                    color: Theme.textSecondary
+                                }
+                            }
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+
+                            GridView {
+                                id: customToolGrid
+                                readonly property int columnCount: Math.max(
+                                    1, Math.min(4, Math.floor(width / 240)))
+                                anchors.fill: parent
+                                clip: true
+                                model: appController.toolsModel
+                                cellWidth: width / columnCount
+                                cellHeight: 92
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                delegate: Item {
+                                    id: customToolDelegate
+                                    required property int index
+                                    required property string toolId
+                                    required property string title
+                                    required property string description
+                                    required property string iconName
+                                    required property string executorKind
+                                    required property bool selected
+                                    required property bool running
+                                    width: customToolGrid.cellWidth
+                                    height: customToolGrid.cellHeight
+                                    z: customToolCard.dragging ? 10 : 0
+
+                                    ToolGridItem {
+                                        id: customToolCard
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.leftMargin: 6
+                                        anchors.rightMargin: 6
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        height: 80
+                                        title: parent.title
+                                        description: parent.description
+                                        iconName: parent.iconName
+                                        executorKind: parent.executorKind
+                                        selected: parent.selected
+                                        running: parent.running
+                                        draggable: appController.toolSortMode === "custom"
+                                            && window.toolSearchQuery.length === 0
+                                        dragTarget: customToolDelegate
+                                        dragMinimumX: 0
+                                        dragMaximumX: Math.max(0,
+                                            customToolGrid.width - customToolDelegate.width)
+                                        dragMinimumY: 0
+                                        dragMaximumY: Math.max(0,
+                                            customToolGrid.contentHeight - customToolDelegate.height)
+                                        onClicked: window.openCustomToolDrawer(parent.toolId)
+                                        onDragFinished: function (centerX, centerY) {
+                                            var column = Math.max(0, Math.min(
+                                                customToolGrid.columnCount - 1,
+                                                Math.floor(centerX / customToolGrid.cellWidth)))
+                                            var row = Math.max(0,
+                                                Math.floor(centerY / customToolGrid.cellHeight))
+                                            var targetIndex = Math.max(0, Math.min(
+                                                customToolGrid.count - 1,
+                                                row * customToolGrid.columnCount + column))
+                                            appController.moveTool(parent.toolId, targetIndex)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: 10
+                                visible: customToolGrid.count === 0
+                                MaterialIcon {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    icon: window.toolSearchQuery ? "search_off" : "inventory_2"
+                                    iconSize: 42
+                                    color: Theme.textSecondary
+                                }
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: window.toolSearchQuery ? "没有匹配的客制脚本" : "还没有客制脚本"
+                                    color: Theme.textSecondary
+                                    font.pixelSize: 15
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    visible: window.customToolDrawerVisible
+                    color: Qt.rgba(0, 0, 0, 0.28)
+                    z: 5
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: window.closeCustomToolDrawer()
+                    }
+                }
+
+                Rectangle {
                     id: contentPanel
                     readonly property real consoleContentGap: 18
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.minimumWidth: window.minimumContentWidth
-                    Layout.minimumHeight: window.minimumContentHeight
+                    readonly property bool drawerMode: customToolGridPanel.visible
+                    readonly property real drawerWidth: Math.min(700, Math.max(560, parent.width * 0.56))
+                    x: (!window.standbySelected && !window.developerSelected)
+                        ? window.toolListWidth : 0
+                    y: drawerMode ? 12 : 0
+                    width: drawerMode ? drawerWidth
+                        : parent.width - ((!window.standbySelected && !window.developerSelected)
+                            ? window.toolListWidth : 0)
+                    height: drawerMode ? parent.height - 24 : parent.height
+                    z: drawerMode ? 6 : 1
+                    radius: drawerMode ? 18 : 0
+                    border.color: drawerMode ? Theme.outlineVariant : "transparent"
+                    border.width: drawerMode ? 1 : 0
+                    clip: true
                     color: Theme.surface
+
+                    state: drawerMode
+                        ? (window.customToolDrawerVisible ? "drawerOpen" : "drawerClosed")
+                        : ""
+                    states: [
+                        State {
+                            name: "drawerOpen"
+                            PropertyChanges {
+                                contentPanel.x: contentPanel.parent.width
+                                    - contentPanel.width - 12
+                            }
+                        },
+                        State {
+                            name: "drawerClosed"
+                            PropertyChanges {
+                                contentPanel.x: contentPanel.parent.width + 12
+                            }
+                        }
+                    ]
+                    transitions: [
+                        Transition {
+                            from: "drawerClosed"
+                            to: "drawerOpen"
+                            NumberAnimation {
+                                property: "x"
+                                duration: 260
+                                easing.type: Easing.OutCubic
+                            }
+                        },
+                        Transition {
+                            from: "drawerOpen"
+                            to: "drawerClosed"
+                            NumberAnimation {
+                                property: "x"
+                                duration: 220
+                                easing.type: Easing.InCubic
+                            }
+                        }
+                    ]
 
                     Text {
                         anchors.centerIn: parent
@@ -1182,6 +1417,31 @@ ApplicationWindow {
                                 RowLayout {
                                     Layout.alignment: Qt.AlignRight
                                     spacing: 4
+
+                                    Rectangle {
+                                        visible: contentPanel.drawerMode
+                                        Layout.preferredWidth: 46
+                                        Layout.preferredHeight: 46
+                                        radius: 23
+                                        color: closeDrawerMouse.containsMouse
+                                            ? Theme.surfaceContainerHigh : "transparent"
+                                        MaterialIcon {
+                                            anchors.centerIn: parent
+                                            icon: "close"
+                                            iconSize: 24
+                                            color: Theme.textSecondary
+                                        }
+                                        ToolTip.visible: closeDrawerMouse.containsMouse
+                                        ToolTip.text: "关闭详情"
+                                        ToolTip.delay: 450
+                                        MouseArea {
+                                            id: closeDrawerMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: window.closeCustomToolDrawer()
+                                        }
+                                    }
 
                                     Rectangle {
                                         visible: appController.section === "custom" && !!appController.selectedTool.id
@@ -1356,7 +1616,7 @@ ApplicationWindow {
                         maximumExpandedHeight: fixedExpandedHeight
                         resizable: workspaceLoader.hasParameters
                         controller: appController
-                        panelColor: window.middlePanelColor
+                        panelMargin: contentPanel.drawerMode ? contentPanel.border.width : 0
                     }
                 }
             }
@@ -1389,6 +1649,7 @@ ApplicationWindow {
     MouseArea {
         id: toolPanelResizeHandle
         visible: !window.standbySelected && !window.developerSelected
+            && appController.section !== "custom"
         property real lastWindowX: 0
         x: window.primaryNavWidth + window.toolListWidth - width / 2
         anchors.top: customTitleBar.bottom

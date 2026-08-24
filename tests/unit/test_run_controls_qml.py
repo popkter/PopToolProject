@@ -78,11 +78,15 @@ def test_run_data_panel_can_be_resized_without_an_export_control() -> None:
 
     assert 'text: "控制台输出"' in console
     assert "id: resizeSeparator" in console
-    assert "readonly property real separatorHeight: 20" in console
+    assert "readonly property real separatorHeight: 8" in console
     assert "anchors.topMargin: root.separatorHeight" in console
     assert "root.collapsedHeight" in console
-    assert "color: root.panelColor" in console
-    assert "panelColor: window.middlePanelColor" in main
+    assert "color: Theme.consoleDivider" in console
+    assert "panelColor:" not in console
+    assert "panelColor: Theme.middlePanel" not in main
+    assert "panelMargin: contentPanel.drawerMode ? contentPanel.border.width : 0" in main
+    assert "anchors.leftMargin: root.panelMargin" in console
+    assert "anchors.rightMargin: root.panelMargin" in console
     assert "anchors.left: parent.left" in console
     assert "anchors.right: parent.right" in console
     assert "id: resizeHandle" not in console

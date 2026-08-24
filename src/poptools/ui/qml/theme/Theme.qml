@@ -32,6 +32,8 @@ QtObject {
     readonly property color consoleTag: darkMode ? "#A8D8FF" : "#075985"
     readonly property color consoleWarning: darkMode ? "#FFD166" : "#9A6700"
     readonly property color consoleError: darkMode ? "#FF9B93" : "#B42318"
+    readonly property color consoleDivider: darkMode ? "#ba0101" : "#e80000"
+
 
     readonly property int radiusSmall: 8
     readonly property int radiusMedium: 12

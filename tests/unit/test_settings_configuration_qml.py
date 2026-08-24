@@ -6,10 +6,6 @@ QML_ROOT = Path(__file__).parents[2] / "src" / "poptools" / "ui" / "qml"
 def test_settings_exposes_configuration_import_export_and_folder_actions() -> None:
     main = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
     settings = (QML_ROOT / "components" / "SettingsDialog.qml").read_text(encoding="utf-8")
-    color_dialog = (QML_ROOT / "components" / "ColorPickerDialog.qml").read_text(
-        encoding="utf-8"
-    )
-
     assert 'text: "客制"' in settings
     assert 'text: "Python 运行环境"' in settings
     assert 'text: "终端功能"' in settings
@@ -28,16 +24,9 @@ def test_settings_exposes_configuration_import_export_and_folder_actions() -> No
     for value in range(1, 6):
         assert f'{{ "label": "{value} 个", "value": {value} }}' in settings
     assert "QtQuick.Dialogs" not in settings
-    assert "ColorPickerDialog {" in settings
-    assert "function openMiddlePanelColorDialog()" in settings
-    assert "middlePanelColorDialog.openWithColor(" in settings
-    assert "onClicked: root.openMiddlePanelColorDialog()" in settings
-    assert 'text: "选择中栏颜色"' in color_dialog
-    assert 'objectName: "middlePanelColorConfirmButton"' in color_dialog
-    assert 'objectName: "middlePanelColorCancelButton"' in color_dialog
-    assert color_dialog.count("radius: 24") >= 2
-    assert "ctx.clip()" in color_dialog
-    assert 'text: "取色"' in settings
+    assert "ColorPickerDialog" not in settings
+    assert "middlePanelColor" not in settings
+    assert 'text: "中栏颜色"' not in settings
     assert "root.controller.configurationDirectory" in settings
     assert "root.controller.openConfigurationDirectory()" in settings
     assert "root.controller.importConfiguration()" in settings

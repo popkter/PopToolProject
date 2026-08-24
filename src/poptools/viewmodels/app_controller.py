@@ -92,7 +92,7 @@ class AppController(QObject):
         self.execution_coordinator.runningChanged.connect(self._on_execution_running_changed)
         self.execution_coordinator.finished.connect(self._on_execution_finished)
         self.execution_coordinator.capacityRequested.connect(self.executionCapacityRequested)
-        self._refresh(select_first=True)
+        self._refresh(select_first=False)
 
     @Property(QObject, constant=True)
     def toolsModel(self) -> QObject:
@@ -222,11 +222,13 @@ class AppController(QObject):
     def navigate(self, section: str) -> None:
         target = ToolSection(section)
         if target == self._section:
+            if target == ToolSection.CUSTOM:
+                self.clearToolSelection()
             return
         self._section = target
         self.sectionChanged.emit()
         self.sectionTitleChanged.emit()
-        self._refresh(select_first=True)
+        self._refresh(select_first=target != ToolSection.CUSTOM)
 
     @Slot(str)
     def selectTool(self, tool_id: str) -> None:
@@ -249,6 +251,20 @@ class AppController(QObject):
         self._status_text = "运行中" if self.running else "就绪"
         self.statusTextChanged.emit()
 
+    @Slot()
+    def clearToolSelection(self) -> None:
+        if self._selected is None:
+            return
+        if self.execution_coordinator.is_scrcpy(self._selected):
+            self._hide_scrcpy_window()
+        self._selected = None
+        self._tools_model.select("")
+        self.selectedToolChanged.emit()
+        self.consoleTextChanged.emit()
+        self.runningChanged.emit()
+        self._status_text = "就绪"
+        self.statusTextChanged.emit()
+
     @Slot(str, result=bool)
     def setToolSortMode(self, mode: str) -> bool:
         try:
@@ -262,6 +278,10 @@ class AppController(QObject):
         selected_id = self._selected.id if self._selected is not None else ""
         self._refresh(select_id=selected_id)
         return True
+
+    @Slot(str)
+    def setToolSearchQuery(self, query: str) -> None:
+        self._tools_model.set_filter(query)
 
     @Slot(str, int, result=bool)
     def moveTool(self, tool_id: str, target_index: int) -> bool:
@@ -349,8 +369,11 @@ class AppController(QObject):
     def reloadImportedScripts(self) -> None:
         selected_id = self._selected.id if self._selected is not None else ""
         self.registry.reload()
-        self._refresh(select_id=selected_id, select_first=not bool(selected_id))
-        if self._selected is None:
+        self._refresh(
+            select_id=selected_id,
+            select_first=self._section != ToolSection.CUSTOM and not bool(selected_id),
+        )
+        if self._selected is None and self._section != ToolSection.CUSTOM:
             self._refresh(select_first=True)
 
     @Slot(str, str, str, str, result=bool)
@@ -602,7 +625,7 @@ class AppController(QObject):
         if not self.registry.delete(self._selected.id):
             return False
         self._selected = None
-        self._refresh(select_first=True)
+        self._refresh(select_first=False)
         self._append_console(f"已删除本地命令：{title}\n")
         return True
 

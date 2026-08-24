@@ -27,7 +27,6 @@ class SettingsController(QObject):
     """Expose settings and configuration transfer without coupling them to tools."""
 
     configurationStatusChanged = Signal()
-    middlePanelColorChanged = Signal()
     meritCountChanged = Signal()
     customScriptConcurrencyChanged = Signal()
     themeChanged = Signal()
@@ -48,7 +47,6 @@ class SettingsController(QObject):
         self.python_environment = python_environment
         self.execution_coordinator = execution_coordinator
         self._configuration_status = ""
-        self._middle_panel_color = config_store.middle_panel_color()
         self._merit_count = config_store.merit_count()
         self._custom_script_concurrency = config_store.custom_script_concurrency()
         self._theme_mode = config_store.theme_mode()
@@ -76,10 +74,6 @@ class SettingsController(QObject):
     @Property(str)
     def pythonEnvironmentStatus(self) -> str:
         return self.python_environment.state().status
-
-    @Property(str, notify=middlePanelColorChanged)
-    def middlePanelColor(self) -> str:
-        return self._middle_panel_color
 
     @Property(int, notify=meritCountChanged)
     def meritCount(self) -> int:
@@ -194,18 +188,6 @@ class SettingsController(QObject):
             self.execution_coordinator.set_ordinary_limit(value)
         self.customScriptConcurrencyChanged.emit()
         self.setStatus(f"客制脚本同时运行数已设置为 {value}")
-        return True
-
-    @Slot(str, result=bool)
-    def saveMiddlePanelColor(self, color: str) -> bool:
-        try:
-            self.config_store.set_middle_panel_color(color)
-        except (OSError, ValueError) as exc:
-            self.setStatus(f"中间栏颜色保存失败：{exc}")
-            return False
-        self._middle_panel_color = self.config_store.middle_panel_color()
-        self.middlePanelColorChanged.emit()
-        self.setStatus(f"中间栏颜色已保存：{self._middle_panel_color}")
         return True
 
     @Slot(str, result=bool)

@@ -74,6 +74,7 @@ def test_legacy_window_settings_are_removed_from_config(tmp_path: Path) -> None:
                 "window_width": 1200,
                 "window_height": 720,
                 "window_centered": False,
+                "middle_panel_color": "#1B476D",
             },
         }
     )
@@ -83,6 +84,7 @@ def test_legacy_window_settings_are_removed_from_config(tmp_path: Path) -> None:
     assert "window_width" not in migrated["app"]
     assert "window_height" not in migrated["app"]
     assert "window_centered" not in migrated["app"]
+    assert "middle_panel_color" not in migrated["app"]
 
 
 def test_theme_mode_defaults_validates_and_round_trips(tmp_path: Path) -> None:
@@ -96,22 +98,6 @@ def test_theme_mode_defaults_validates_and_round_trips(tmp_path: Path) -> None:
     config["app"]["theme"] = "unknown"
     store.save_config(config)
     assert store.theme_mode() == "system"
-
-
-def test_middle_panel_color_defaults_validates_and_round_trips(tmp_path: Path) -> None:
-    store = ConfigStore(AppPaths(tmp_path))
-
-    assert store.middle_panel_color() == "#EEF7FF"
-    store.set_middle_panel_color("#dceeff")
-    assert ConfigStore(AppPaths(tmp_path)).middle_panel_color() == "#DCEEFF"
-
-    store.set_middle_panel_color("#80dceeff")
-    assert ConfigStore(AppPaths(tmp_path)).middle_panel_color() == "#80DCEEFF"
-
-    config = store.load_config()
-    config["app"]["middle_panel_color"] = "not-a-color"
-    store.save_config(config)
-    assert store.middle_panel_color() == "#EEF7FF"
 
 
 def test_merit_count_is_persisted_and_incremented(tmp_path: Path) -> None:

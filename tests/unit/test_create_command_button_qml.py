@@ -3,18 +3,18 @@ from pathlib import Path
 QML_ROOT = Path(__file__).parents[2] / "src" / "poptools" / "ui" / "qml"
 
 
-def test_create_command_button_is_an_icon_action_in_the_tool_list_header() -> None:
+def test_create_command_button_is_an_icon_action_in_the_custom_grid_header() -> None:
     source = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
-    header_start = source.index("id: createCommandButton")
-    header_end = source.index("id: searchField")
+    header_start = source.index("id: gridCreateCommandButton")
+    header_end = source.index("id: customGridSearchField")
     header = source[header_start:header_end]
 
-    assert 'visible: appController.section === "custom"' in header
     assert 'icon: "add"' in header
     assert 'ToolTip.text: "新建命令"' in header
     assert "onClicked: window.openCommandEditorForCreate()" in header
     assert 'iconName: "add_circle"' not in source
     assert 'icon: "filter_list"' not in source
+
 
 def test_compact_search_stays_in_the_search_row_and_opens_a_popup() -> None:
     source = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
@@ -27,9 +27,10 @@ def test_compact_search_stays_in_the_search_row_and_opens_a_popup() -> None:
     assert button_start < header_end
     assert button_start > source.index("id: createCommandButton")
     assert "id: compactSearchSlot" in source
-    assert "visible: window.compactToolList" in source[
-        source.index("id: compactSearchSlot"):button_start
-    ]
+    assert (
+        "visible: window.compactToolList"
+        in source[source.index("id: compactSearchSlot") : button_start]
+    )
     assert 'icon: "search"' in source[button_start:popup_start]
     assert "compactSearchPopup.open()" in source[button_start:popup_start]
     assert "compactSearchField.forceActiveFocus()" in source[button_start:popup_start]

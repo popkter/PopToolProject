@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import QMetaObject, QObject, QTimer, QUrl
+from PySide6.QtCore import QMetaObject, QTimer, QUrl
 from PySide6.QtGui import QFont, QFontDatabase, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtWebEngineQuick import QtWebEngineQuick
@@ -47,18 +47,38 @@ def main() -> int:
     config_store.load_config()
     repository = JsonToolRepository(paths)
     registry = ToolRegistry(resource_path("tools"), repository)
+    if os.environ.get("POPTOOLS_CAPTURE_GRID_SAMPLE") == "1":
+        samples = (
+            ("挂载设备", "使用 Remount 挂载 Android 设备", "batch"),
+            ("同步时间到设备", "同步电脑时间并校准设备时钟", "powershell"),
+            ("点亮 EX-G 屏幕", "唤醒并点亮测试设备屏幕", "python"),
+            ("开启点按位置", "显示设备触摸点与坐标", "batch"),
+            ("清除本地 CRASH 计数", "清理本地崩溃统计数据", "powershell"),
+            ("发送文本到 ASR", "向语音识别服务发送测试文本", "python"),
+            ("打开系统设置", "快速打开 Android 系统设置", "batch"),
+            ("监听设备进程", "持续观察目标进程运行状态", "powershell"),
+            ("查看进程 dumpsys 信息", "读取进程诊断与内存信息", "batch"),
+            ("设置台架环境", "配置台架设备与网络参数", "python"),
+            ("导出设备日志", "收集并导出当前设备日志", "powershell"),
+            ("检查网络连接", "验证设备网络与服务连通性", "batch"),
+        )
+        for title, description, kind in samples:
+            registry.create_custom(
+                title=title,
+                description=description,
+                kind=kind,
+                command="Write-Output preview",
+            )
     python_environment = PythonEnvironment(paths, config_store)
     execution = ExecutionManager(paths, python_environment)
     coordinator = ExecutionCoordinator(execution, config_store.max_parallel())
     android_controller = AndroidController(config_store)
     controller = AppController(registry, coordinator, config_store, android_controller)
-    settings_controller = SettingsController(
-        config_store, python_environment, coordinator
-    )
+    settings_controller = SettingsController(config_store, python_environment, coordinator)
+    if os.environ.get("POPTOOLS_CAPTURE_GRID_SAMPLE") == "1":
+        settings_controller.markUserGuideSeen()
     preset_controller = PresetController()
-    developer_console_controller = DeveloperConsoleController(
-        python_environment, paths.data_dir
-    )
+    developer_console_controller = DeveloperConsoleController(python_environment, paths.data_dir)
     app.aboutToQuit.connect(developer_console_controller.shutdown)
     capture_terminal_tabs = int(os.environ.get("POPTOOLS_CAPTURE_TERMINAL_TABS", "1"))
     for _ in range(max(1, min(capture_terminal_tabs, 7)) - 1):
@@ -129,16 +149,15 @@ def main() -> int:
         capture_width, capture_height = capture_size.lower().split("x", maxsplit=1)
         window.setWidth(int(capture_width))
         window.setHeight(int(capture_height))
+        window.setX(0)
+        window.setY(0)
+    if os.environ.get("POPTOOLS_CAPTURE_CUSTOM_DRAWER") == "1":
+        custom_tools = registry.for_section("custom")
+        if custom_tools:
+            controller.selectTool(custom_tools[0].id)
     capture_dialog = os.environ.get("POPTOOLS_CAPTURE_DIALOG")
-    if capture_dialog in {"settings", "middle-panel-color"}:
+    if capture_dialog == "settings":
         window.openSettingsDialog()
-    if capture_dialog == "middle-panel-color":
-        def open_middle_panel_color_dialog() -> None:
-            settings_dialog = window.findChild(QObject, "settingsDialog")
-            if settings_dialog is not None:
-                QMetaObject.invokeMethod(settings_dialog, "openMiddlePanelColorDialog")
-
-        QTimer.singleShot(250, open_middle_panel_color_dialog)
     if capture_dialog == "update":
         QTimer.singleShot(250, lambda: QMetaObject.invokeMethod(window, "queueUpdateDialog"))
 

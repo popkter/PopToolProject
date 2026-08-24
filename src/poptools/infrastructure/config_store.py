@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import time
 from datetime import datetime
@@ -69,7 +68,12 @@ class ConfigStore:
             app = config.get("app")
             if isinstance(app, dict):
                 changed = False
-                for key in ("window_width", "window_height", "window_centered"):
+                for key in (
+                    "window_width",
+                    "window_height",
+                    "window_centered",
+                    "middle_panel_color",
+                ):
                     if key in app:
                         app.pop(key)
                         changed = True
@@ -236,36 +240,6 @@ class ConfigStore:
             app = {}
             config["app"] = app
         app["theme"] = mode
-        self.save_config(config)
-
-    def middle_panel_color(self) -> str:
-        config = self.load_config()
-        app = config.get("app")
-        if not isinstance(app, dict):
-            app = {}
-            config["app"] = app
-        value = app.get("middle_panel_color", "#EEF7FF")
-        if (
-            not isinstance(value, str)
-            or re.fullmatch(r"#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})", value) is None
-        ):
-            value = "#EEF7FF"
-        value = value.upper()
-        if app.get("middle_panel_color") != value:
-            app["middle_panel_color"] = value
-            self.save_config(config)
-        return value
-
-    def set_middle_panel_color(self, color: str) -> None:
-        value = color.strip().upper()
-        if re.fullmatch(r"#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})", value) is None:
-            raise ValueError("颜色需使用 #RRGGBB 或 #AARRGGBB 格式")
-        config = self.load_config()
-        app = config.get("app")
-        if not isinstance(app, dict):
-            app = {}
-            config["app"] = app
-        app["middle_panel_color"] = value
         self.save_config(config)
 
     def tool_sort_mode(self) -> str:

@@ -23,9 +23,6 @@ Window {
     readonly property real consolePreferredHeight: 292
     readonly property real bodySpacing: 12
 
-    readonly property color middlePanelColor: settingsController.middlePanelColor === "#EEF7FF"
-        ? Theme.middlePanel : settingsController.middlePanelColor
-
     width: presetMode ? 720 : 680
     height: presetMode ? 560 : 600
     visible: false
@@ -269,7 +266,6 @@ Window {
                     maximumExpandedHeight: fixedExpandedHeight
                     resizable: false
                     controller: appController
-                    panelColor: root.middlePanelColor
                 }
             }
         }

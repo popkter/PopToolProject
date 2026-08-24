@@ -60,29 +60,28 @@ def test_raw_text_and_icons_use_theme_foregrounds() -> None:
     assert "color: Theme.textPrimary" in icon
 
 
-def test_console_separator_receives_the_resolved_theme_panel_color() -> None:
+def test_console_separator_uses_its_own_theme_color() -> None:
     main = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
     console = (QML_ROOT / "components" / "ConsolePanel.qml").read_text(encoding="utf-8")
+    theme = (QML_ROOT / "theme" / "Theme.qml").read_text(encoding="utf-8")
 
-    assert "panelColor: window.middlePanelColor" in main
-    assert "property color panelColor: Theme.middlePanel" in console
-    assert "color: root.panelColor" in console
+    assert 'readonly property color consoleDivider: darkMode ? "#ba0101" : "#e80000"' in theme
+    assert "panelColor: Theme.middlePanel" not in main
+    assert "property color panelColor" not in console
+    assert "color: Theme.consoleDivider" in console
 
 
-def test_middle_panel_foreground_is_derived_from_its_actual_background() -> None:
+def test_preset_middle_panel_uses_theme_foregrounds() -> None:
     main = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
     item = (QML_ROOT / "components" / "ToolListItem.qml").read_text(encoding="utf-8")
     sort_button = (QML_ROOT / "components" / "ToolSortButton.qml").read_text(
         encoding="utf-8"
     )
 
-    assert "readonly property color middlePanelForeground" in main
-    assert "function relativeLuminance(colorValue)" in main
-    assert "function contrastRatio(first, second)" in main
-    assert "function contrastingForeground(background)" in main
-    assert "compositeChannel(colorValue.r, Theme.surface.r, alpha)" in main
-    assert main.count("foregroundColor: window.middlePanelForeground") >= 2
-    assert "color: window.middlePanelForeground" in main
+    assert "middlePanelForeground" not in main
+    assert "function contrastingForeground(background)" not in main
+    assert main.count("foregroundColor: Theme.textPrimary") >= 2
+    assert "color: Theme.textPrimary" in main
     assert "property color foregroundColor" in item
     assert "root.selected ? Theme.primary : root.foregroundColor" in item
     assert "property color foregroundColor" in sort_button

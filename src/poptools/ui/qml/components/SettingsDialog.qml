@@ -18,23 +18,10 @@ Dialog {
     padding: 0
     closePolicy: Popup.CloseOnEscape
 
-    function openMiddlePanelColorDialog() {
-        middlePanelColorDialog.openWithColor(
-            middlePanelColorField.acceptableInput
-            ? middlePanelColorField.text
-            : root.controller.middlePanelColor)
-    }
-
     onOpened: {
         themeModeBox.currentIndex = Math.max(0, ["system", "light", "dark"].indexOf(
                                                  root.controller.themeMode))
         concurrencyBox.currentIndex = Math.max(0, root.controller.customScriptConcurrency - 1)
-        middlePanelColorField.text = root.controller.middlePanelColor
-    }
-
-    ColorPickerDialog {
-        id: middlePanelColorDialog
-        onAccepted: middlePanelColorField.text = selectedColor
     }
 
     background: Rectangle {
@@ -162,62 +149,6 @@ Dialog {
                             }
                         }
 
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.outlineVariant }
-
-                        Text {
-                            text: "中栏颜色"
-                            color: Theme.textPrimary
-                            font.pixelSize: 14
-                        }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 10
-                            Rectangle {
-                                Layout.preferredWidth: 46
-                                Layout.preferredHeight: 46
-                                radius: Theme.radiusMedium
-                                color: middlePanelColorField.acceptableInput
-                                       ? middlePanelColorField.text : root.controller.middlePanelColor
-                                border.color: Theme.outline
-                            }
-                            TextField {
-                                id: middlePanelColorField
-                                Layout.fillWidth: true
-                                implicitHeight: 46
-                                placeholderText: "#RRGGBB 或 #AARRGGBB"
-                                color: Theme.textPrimary
-                                validator: RegularExpressionValidator {
-                                    regularExpression: /#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})/
-                                }
-                                font.family: "Cascadia Mono"
-                                font.pixelSize: 14
-                                leftPadding: 14
-                                rightPadding: 14
-                                background: Rectangle {
-                                    radius: Theme.radiusMedium
-                                    color: Theme.surface
-                                    border.color: parent.activeFocus ? Theme.primary : Theme.outline
-                                    border.width: parent.activeFocus ? 2 : 1
-                                }
-                            }
-                            PrimaryButton {
-                                implicitWidth: 92
-                                implicitHeight: 46
-                                text: "取色"
-                                iconName: "colorize"
-                                tonal: true
-                                onClicked: root.openMiddlePanelColorDialog()
-                            }
-                            PrimaryButton {
-                                implicitWidth: 92
-                                implicitHeight: 46
-                                text: "保存"
-                                iconName: "palette"
-                                tonal: true
-                                enabled: middlePanelColorField.acceptableInput
-                                onClicked: root.controller.saveMiddlePanelColor(middlePanelColorField.text)
-                            }
-                        }
                     }
                 }
 
