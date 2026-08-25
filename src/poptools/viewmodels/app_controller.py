@@ -82,6 +82,7 @@ class AppController(QObject):
         self._status_text = "就绪"
         self._tool_sort_mode = config_store.tool_sort_mode()
         self._tools_model = ToolListModel()
+        self._tools_ready = False
         self.android_controller = android_controller
         self._python_doctor = python_doctor or PythonDoctor()
         self._python_doctor_command = ""
@@ -93,10 +94,15 @@ class AppController(QObject):
         self.execution_coordinator.finished.connect(self._on_execution_finished)
         self.execution_coordinator.capacityRequested.connect(self.executionCapacityRequested)
         self._refresh(select_first=False)
+        self._tools_ready = True
 
     @Property(QObject, constant=True)
     def toolsModel(self) -> QObject:
         return self._tools_model
+
+    @Property(bool, constant=True)
+    def toolsReady(self) -> bool:
+        return self._tools_ready
 
     @Property(str, notify=sectionChanged)
     def section(self) -> str:

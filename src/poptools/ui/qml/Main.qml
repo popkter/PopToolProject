@@ -34,6 +34,7 @@ ApplicationWindow {
     property var parameterValues: ({})
     property var customDrawerDisplayTool: ({})
     property string toolSearchQuery: ""
+    property bool customGridLayoutReady: false
     property real primaryNavWidth: 86
     property real toolListWidth: 120
     property bool standbySelected: false
@@ -154,6 +155,22 @@ ApplicationWindow {
         toolListWidth = Math.max(minimumToolListWidth,
             Math.min(toolListWidth,
                 width - primaryNavWidth - minimumContentWidth))
+    }
+
+    function prepareCustomGridLayout() {
+        customGridLayoutReady = false
+        if (!appController.toolsReady)
+            return
+
+        // The model is already complete at this point. Defer card creation until
+        // the window and navigation widths have both reached their final values.
+        Qt.callLater(function () {
+            window.clampPanelWidths()
+            Qt.callLater(function () {
+                window.customGridLayoutReady = true
+                customGridRelayoutTimer.restart()
+            })
+        })
     }
 
     function addMeritBurst() {
@@ -393,6 +410,7 @@ ApplicationWindow {
         primaryNavWidth = width < 1180 ? 86 : 262
         toolListWidth = width < 900 ? minimumToolListWidth : 286
         clampPanelWidths()
+        prepareCustomGridLayout()
         resetParameters()
         if (settingsController.terminalEnabled
                 && !developerConsoleController.pluginInstalled)
@@ -1156,10 +1174,20 @@ ApplicationWindow {
                                     1, Math.min(4, Math.floor(width / 240)))
                                 anchors.fill: parent
                                 clip: true
-                                model: appController.toolsModel
+                                visible: window.customGridLayoutReady
+                                model: window.customGridLayoutReady && appController.toolsReady
+                                    ? appController.toolsModel : null
                                 cellWidth: width / columnCount
                                 cellHeight: 92
                                 boundsBehavior: Flickable.StopAtBounds
+                                onWidthChanged: {
+                                    if (window.customGridLayoutReady)
+                                        customGridRelayoutTimer.restart()
+                                }
+                                onColumnCountChanged: {
+                                    if (window.customGridLayoutReady)
+                                        customGridRelayoutTimer.restart()
+                                }
 
                                 delegate: Item {
                                     id: customToolDelegate
@@ -1217,7 +1245,8 @@ ApplicationWindow {
                             Column {
                                 anchors.centerIn: parent
                                 spacing: 10
-                                visible: customToolGrid.count === 0
+                                visible: window.customGridLayoutReady
+                                    && customToolGrid.count === 0
                                 MaterialIcon {
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     icon: window.toolSearchQuery ? "search_off" : "inventory_2"
@@ -1232,6 +1261,16 @@ ApplicationWindow {
                                 }
                             }
                         }
+                    }
+                }
+
+                Timer {
+                    id: customGridRelayoutTimer
+                    interval: 0
+                    repeat: false
+                    onTriggered: {
+                        if (window.customGridLayoutReady && appController.toolsReady)
+                            customToolGrid.forceLayout()
                     }
                 }
 
