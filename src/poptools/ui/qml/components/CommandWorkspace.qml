@@ -94,7 +94,7 @@ ColumnLayout {
                       ? "正在连接设备并准备投屏…"
                       : "点击“开始投屏”，设备画面将在此处显示"
                 color: Theme.consoleText
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontBody
             }
         }
 
@@ -141,7 +141,7 @@ ColumnLayout {
                         height: root.parameterLabelHeight
                         text: modelData.label + (modelData.required ? " *" : "")
                         color: Theme.textPrimary
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fontLabel
                         font.weight: Font.Medium
                     }
 
@@ -161,7 +161,7 @@ ColumnLayout {
                                 text: String(modelData.default || "")
                                 placeholderText: modelData.placeholder || ""
                                 color: Theme.textPrimary
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fontBody
                                 leftPadding: 16
                                 rightPadding: 16
                                 echoMode: modelData.kind === "secret"
@@ -183,7 +183,7 @@ ColumnLayout {
                                 text: String(modelData.default || "")
                                 placeholderText: modelData.placeholder || ""
                                 color: Theme.textPrimary
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fontBody
                                 leftPadding: 16
                                 rightPadding: 16
                                 topPadding: 14
@@ -215,7 +215,7 @@ ColumnLayout {
                                 }
                                 leftPadding: 16
                                 rightPadding: 42
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fontBody
                                 onCurrentTextChanged: {
                                     if (currentIndex >= 0)
                                         root.parameterValues[modelData.id] = currentText

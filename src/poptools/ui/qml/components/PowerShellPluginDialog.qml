@@ -91,14 +91,14 @@ Dialog {
                     Text {
                         text: "安装 PowerShell 7 插件"
                         color: Theme.textPrimary
-                        font.pixelSize: 23
+                        font.pixelSize: Theme.fontDialogTitle
                         font.weight: Font.Bold
                     }
                     Text {
                         Layout.fillWidth: true
                         text: "为内置终端安装应用专用的 PowerShell 运行环境"
                         color: Theme.textSecondary
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fontSupporting
                         elide: Text.ElideRight
                     }
                 }
@@ -142,20 +142,20 @@ Dialog {
                 text: "终端需要应用专用的 PowerShell " + root.controller.pluginVersion
                     + "。是否下载并安装官方 PowerShell 7 插件？"
                 color: Theme.textPrimary
-                font.pixelSize: 14
+                font.pixelSize: Theme.fontBody
                 wrapMode: Text.WordWrap
             }
             Text {
                 Layout.fillWidth: true
                 text: "插件约 120 MB，仅安装到当前用户的应用数据目录，不修改系统 PowerShell。"
                 color: Theme.textSecondary
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
                 wrapMode: Text.WordWrap
             }
             Text {
                 text: "安装目录"
                 color: Theme.textSecondary
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
             }
             TextField {
                 Layout.fillWidth: true
@@ -165,7 +165,7 @@ Dialog {
                 selectByMouse: true
                 color: Theme.textPrimary
                 font.family: "Cascadia Mono"
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
                 leftPadding: 12
                 rightPadding: 12
                 background: Rectangle {
@@ -187,7 +187,7 @@ Dialog {
                 text: root.controller.pluginInstallStatus
                 color: text.indexOf("失败") >= 0
                        ? Theme.errorColor : Theme.textSecondary
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
                 wrapMode: Text.WordWrap
             }
             Item { Layout.fillHeight: true }

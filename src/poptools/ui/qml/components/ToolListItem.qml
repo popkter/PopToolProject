@@ -52,7 +52,7 @@ Rectangle {
             visible: !root.compact
             text: root.title
             color: root.selected ? Theme.primary : root.foregroundColor
-            font.pixelSize: 16
+            font.pixelSize: Theme.fontComponentTitle
             font.weight: root.selected ? Font.DemiBold : Font.Normal
             elide: Text.ElideRight
             Layout.fillWidth: true

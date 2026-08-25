@@ -59,12 +59,24 @@ new QWebChannel(qt.webChannelTransport, (channel) => {
   });
   bridge.resetRequested.connect(() => terminal.reset());
 
+  const terminalElement = document.getElementById("terminal");
+  let pendingFitFrame = 0;
   const fit = () => {
-    fitAddon.fit();
-    bridge.resizeTerminal(terminal.cols, terminal.rows);
+    if (pendingFitFrame !== 0) {
+      cancelAnimationFrame(pendingFitFrame);
+    }
+    pendingFitFrame = requestAnimationFrame(() => {
+      pendingFitFrame = 0;
+      const bounds = terminalElement.getBoundingClientRect();
+      if (bounds.width <= 32 || bounds.height <= 32) {
+        return;
+      }
+      fitAddon.fit();
+      bridge.resizeTerminal(terminal.cols, terminal.rows);
+    });
   };
   const resizeObserver = new ResizeObserver(fit);
-  resizeObserver.observe(document.getElementById("terminal"));
+  resizeObserver.observe(terminalElement);
   window.addEventListener("resize", fit);
   terminal.onResize(({ cols, rows }) => bridge.resizeTerminal(cols, rows));
   fit();
@@ -72,6 +84,9 @@ new QWebChannel(qt.webChannelTransport, (channel) => {
   terminal.focus();
 
   window.addEventListener("beforeunload", () => {
+    if (pendingFitFrame !== 0) {
+      cancelAnimationFrame(pendingFitFrame);
+    }
     resizeObserver.disconnect();
     inputSubscription.dispose();
     terminal.dispose();

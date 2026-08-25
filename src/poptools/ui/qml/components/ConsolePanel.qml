@@ -34,7 +34,7 @@ Item {
     FontMetrics {
         id: consoleFontMetrics
         font.family: "Cascadia Mono"
-        font.pixelSize: 13
+        font.pixelSize: Theme.fontSupporting
     }
 
     clip: true
@@ -136,7 +136,7 @@ Item {
             Text {
                 text: "控制台输出"
                 color: Theme.textPrimary
-                font.pixelSize: 17
+                font.pixelSize: Theme.fontComponentTitle
                 font.weight: Font.DemiBold
             }
             MaterialIcon {
@@ -155,7 +155,7 @@ Item {
                     anchors.centerIn: parent
                     spacing: 7
                     MaterialIcon { icon: "delete"; iconSize: 19; color: Theme.textSecondary }
-                    Text { text: "清空"; font.pixelSize: 14; color: Theme.textSecondary }
+                    Text { text: "清空"; font.pixelSize: Theme.fontBody; color: Theme.textSecondary }
                 }
                 MouseArea {
                     id: clearMouse
@@ -212,7 +212,7 @@ Item {
                     selectionColor: Theme.primary
                     selectedTextColor: "white"
                     font.family: "Cascadia Mono"
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fontSupporting
                     topPadding: root.outputTextVerticalPadding / 2
                     bottomPadding: root.outputTextVerticalPadding / 2
                     background: null

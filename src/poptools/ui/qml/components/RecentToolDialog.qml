@@ -112,7 +112,7 @@ Window {
                     anchors.verticalCenter: parent.verticalCenter
                     text: appController.selectedTool.title || "运行工具"
                     color: Theme.textPrimary
-                    font.pixelSize: 20
+                    font.pixelSize: Theme.fontSectionTitle
                     font.weight: Font.Bold
                     elide: Text.ElideRight
                 }
@@ -218,7 +218,7 @@ Window {
                         color: Theme.textSecondary
                         Layout.leftMargin: 20
                         Layout.rightMargin: 20
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fontBody
                         wrapMode: Text.WordWrap
                     }
 

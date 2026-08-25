@@ -49,7 +49,7 @@ Dialog {
                     Layout.fillWidth: true
                     text: "设置"
                     color: Theme.textPrimary
-                    font.pixelSize: 22
+                    font.pixelSize: Theme.fontDialogTitle
                     font.weight: Font.Bold
                 }
                 Rectangle {
@@ -118,7 +118,7 @@ Dialog {
                             Text {
                                 text: "外观"
                                 color: Theme.textPrimary
-                                font.pixelSize: 16
+                                font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
                             }
                         }
@@ -130,14 +130,14 @@ Dialog {
                                 Layout.fillWidth: true
                                 text: "主题"
                                 color: Theme.textPrimary
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fontBody
                             }
                             AppComboBox {
                                 id: themeModeBox
                                 objectName: "themeModeBox"
                                 Layout.preferredWidth: 230
                                 implicitHeight: 46
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fontBody
                                 textRole: "label"
                                 valueRole: "value"
                                 model: [
@@ -177,13 +177,13 @@ Dialog {
                                 Layout.fillWidth: true
                                 text: "Python 运行环境"
                                 color: Theme.textPrimary
-                                font.pixelSize: 16
+                                font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
                             }
                             Text {
                                 text: "应用专属"
                                 color: Theme.success
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.fontCaption
                             }
                         }
 
@@ -210,7 +210,7 @@ Dialog {
                                     text: root.controller.pythonEnvironmentStatus + "\n" + root.controller.pythonExecutable
                                     wrapMode: Text.WrapAnywhere
                                     color: Theme.textSecondary
-                                    font.pixelSize: 12
+                                    font.pixelSize: Theme.fontCaption
                                 }
                             }
                         }
@@ -219,7 +219,7 @@ Dialog {
                             Layout.fillWidth: true
                             text: "Python 脚本的第三方依赖可直接在依赖提示中使用应用内 pip 安装。"
                             color: Theme.textSecondary
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fontCaption
                             wrapMode: Text.WordWrap
                         }
                     }
@@ -254,7 +254,7 @@ Dialog {
                             Text {
                                 text: "终端功能"
                                 color: Theme.textPrimary
-                                font.pixelSize: 16
+                                font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
                             }
                             Text {
@@ -264,7 +264,7 @@ Dialog {
                                     : "开启后可使用应用专属 "
                                       + developerConsoleController.terminalName + " 终端"
                                 color: Theme.textSecondary
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.fontCaption
                                 wrapMode: Text.WordWrap
                             }
                         }
@@ -314,7 +314,7 @@ Dialog {
                                 Layout.fillWidth: true
                                 text: "客制"
                                 color: Theme.textPrimary
-                                font.pixelSize: 16
+                                font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
                             }
                         }
@@ -328,12 +328,12 @@ Dialog {
                                 Text {
                                     text: "脚本并发数量"
                                     color: Theme.textPrimary
-                                    font.pixelSize: 14
+                                    font.pixelSize: Theme.fontBody
                                 }
                                 Text {
                                     text: "限制同时运行的客制脚本数量"
                                     color: Theme.textSecondary
-                                    font.pixelSize: 12
+                                    font.pixelSize: Theme.fontCaption
                                 }
                             }
                             AppComboBox {
@@ -377,7 +377,7 @@ Dialog {
                                     text: root.controller.configurationDirectory
                                     color: Theme.textPrimary
                                     font.family: "Cascadia Mono"
-                                    font.pixelSize: 12
+                                    font.pixelSize: Theme.fontCaption
                                     elide: Text.ElideMiddle
                                 }
                                 Rectangle {
@@ -407,7 +407,7 @@ Dialog {
                             Layout.fillWidth: true
                             text: "导入会备份并替换默认目录中的脚本；导出至“文档”目录。"
                             color: Theme.textSecondary
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fontCaption
                             wrapMode: Text.WordWrap
                         }
 
@@ -438,7 +438,7 @@ Dialog {
                             wrapMode: Text.WrapAnywhere
                             color: text.indexOf("失败") >= 0 || text.indexOf("无法") >= 0
                                    ? Theme.errorColor : Theme.success
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fontCaption
                         }
                     }
                 }
@@ -450,7 +450,7 @@ Dialog {
                     horizontalAlignment: Text.AlignHCenter
                     text: "泡泡工具箱 版本 " + root.controller.appVersion
                     color: Theme.textSecondary
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fontCaption
                     font.underline: true
                     bottomPadding: 16
 

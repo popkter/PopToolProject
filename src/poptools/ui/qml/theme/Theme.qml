@@ -34,6 +34,21 @@ QtObject {
     readonly property color consoleError: darkMode ? "#FF9B93" : "#B42318"
     readonly property color consoleDivider: darkMode ? "#ba0101" : "#e80000"
 
+    // Shared desktop typography scale. Components should use these semantic
+    // roles instead of introducing local pixel sizes.
+    readonly property int fontDisplay: 40
+    readonly property int fontPageTitle: 30
+    readonly property int fontTitleLarge: 24
+    readonly property int fontDialogTitle: 22
+    readonly property int fontSectionTitle: 20
+    readonly property int fontComponentTitle: 16
+    readonly property int fontButton: 16
+    readonly property int fontBody: 14
+    readonly property int fontLabel: 13
+    readonly property int fontSupporting: 13
+    readonly property int fontCode: 13
+    readonly property int fontCaption: 12
+    readonly property int fontMicro: 10
 
     readonly property int radiusSmall: 8
     readonly property int radiusMedium: 12

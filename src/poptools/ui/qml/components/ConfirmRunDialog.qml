@@ -26,14 +26,14 @@ Dialog {
         Text {
             text: "确认运行此功能？"
             color: Theme.textPrimary
-            font.pixelSize: 23
+            font.pixelSize: Theme.fontDialogTitle
             font.weight: Font.Bold
         }
         Text {
             Layout.fillWidth: true
             text: "此功能可能修改设备或本地文件。请确认当前设备与参数无误后继续。"
             color: Theme.textSecondary
-            font.pixelSize: 14
+            font.pixelSize: Theme.fontBody
             wrapMode: Text.WordWrap
         }
         Item { Layout.fillHeight: true }

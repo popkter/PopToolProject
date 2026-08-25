@@ -79,7 +79,7 @@ Rectangle {
                 Layout.fillWidth: true
                 text: root.title
                 color: root.selected ? Theme.primaryText : Theme.textPrimary
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontComponentTitle
                 font.weight: root.selected ? Font.DemiBold : Font.Medium
                 elide: Text.ElideRight
             }
@@ -103,7 +103,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: root.executorKind
                         color: root.selected ? Theme.primaryText : Theme.textSecondary
-                        font.pixelSize: 10
+                        font.pixelSize: Theme.fontMicro
                         font.family: "Cascadia Mono"
                     }
                 }
@@ -113,7 +113,7 @@ Rectangle {
                     Layout.minimumWidth: 0
                     text: root.description || "暂无功能说明"
                     color: Theme.textSecondary
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fontCaption
                     elide: Text.ElideRight
                 }
             }

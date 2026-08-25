@@ -66,6 +66,18 @@ def test_custom_drawer_only_animates_when_its_open_state_changes() -> None:
     )
 
 
+def test_custom_drawer_keeps_tool_copy_during_its_exit_animation() -> None:
+    source = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
+
+    assert "property var customDrawerDisplayTool: ({})" in source
+    assert "function cacheCustomDrawerTool()" in source
+    assert "customDrawerDisplayTool = tool" in source
+    assert "window.cacheCustomDrawerTool()" in source
+    assert "readonly property var displayedTool: drawerMode" in source
+    assert 'text: contentPanel.displayedTool.title || "请选择工具"' in source
+    assert "text: contentPanel.displayedTool.description" in source
+
+
 def test_custom_grid_search_filters_the_shared_tool_model() -> None:
     source = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
     controller = (

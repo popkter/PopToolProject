@@ -32,6 +32,7 @@ ApplicationWindow {
     }
 
     property var parameterValues: ({})
+    property var customDrawerDisplayTool: ({})
     property string toolSearchQuery: ""
     property real primaryNavWidth: 86
     property real toolListWidth: 120
@@ -48,6 +49,12 @@ ApplicationWindow {
     readonly property bool compactToolList: toolListWidth < 190
     readonly property bool compactContentActions: width < 760
     readonly property bool compactHeight: height < 620
+    readonly property real pageHorizontalMargin: compactContentActions ? 12 : 20
+    readonly property real pageTopMargin: compactHeight ? 12 : 20
+    readonly property real pageHeaderHeight: compactHeight ? 54 : 68
+    readonly property real pageSectionGap: compactHeight ? 8 : 14
+    readonly property real pageWorkspaceTop:
+        pageTopMargin + pageHeaderHeight + pageSectionGap
     readonly property bool scrcpySelected:
         appController.selectedTool.workspace === "scrcpy"
     readonly property bool recordingSelected:
@@ -100,6 +107,13 @@ ApplicationWindow {
 
     function closeCustomToolDrawer() {
         appController.clearToolSelection()
+    }
+
+    function cacheCustomDrawerTool() {
+        var tool = appController.selectedTool
+        if (appController.section === "custom"
+                && tool.section === "custom" && !!tool.id)
+            customDrawerDisplayTool = tool
     }
 
     onToolSearchQueryChanged: appController.setToolSearchQuery(toolSearchQuery)
@@ -275,6 +289,7 @@ ApplicationWindow {
         target: appController
 
         function onSelectedToolChanged() {
+            window.cacheCustomDrawerTool()
             window.resetParameters()
             if (!window.scrcpySelected)
                 window.hideScrcpyWindow()
@@ -442,17 +457,6 @@ ApplicationWindow {
     }
 
     Rectangle {
-        id: middlePanelBackground
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        x: window.primaryNavWidth
-        width: window.toolListWidth
-        visible: !window.standbySelected && !window.developerSelected
-            && appController.section === "preset"
-        color: Theme.middlePanel
-    }
-
-    Rectangle {
         id: customTitleBar
         anchors.top: parent.top
         anchors.left: parent.left
@@ -565,7 +569,7 @@ ApplicationWindow {
                     y: -height / 2
                     text: "功德 +1"
                     color: Theme.primary
-                    font.pixelSize: 24
+                    font.pixelSize: Theme.fontTitleLarge
                     font.weight: Font.Bold
                     style: Text.Outline
                     styleColor: Theme.surface
@@ -647,7 +651,7 @@ ApplicationWindow {
                                 Layout.minimumWidth: 0
                                 text: "泡泡工具箱"
                                 color: Theme.textPrimary
-                                font.pixelSize: 24
+                                font.pixelSize: Theme.fontTitleLarge
                                 font.weight: Font.Bold
                                 elide: Text.ElideRight
                             }
@@ -656,7 +660,7 @@ ApplicationWindow {
                                 Layout.minimumWidth: 0
                                 text: "Android 开发者工具箱"
                                 color: Theme.textSecondary
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fontSupporting
                                 elide: Text.ElideRight
                             }
                         }
@@ -670,7 +674,7 @@ ApplicationWindow {
                         visible: meritBurstModel.count > 0
                         text: "累计功德 +" + settingsController.meritCount
                         color: Theme.primary
-                        font.pixelSize: window.compactHeight ? 10 : 12
+                        font.pixelSize: window.compactHeight ? Theme.fontMicro : Theme.fontCaption
                         fontSizeMode: Text.Fit
                         minimumPixelSize: 8
                         font.weight: Font.DemiBold
@@ -781,16 +785,31 @@ ApplicationWindow {
             clip: true
 
             Item {
+                id: workspaceRoot
                 anchors.fill: parent
+
+                WorkspacePageHeader {
+                    id: presetPageHeader
+                    x: window.pageHorizontalMargin
+                    y: window.pageTopMargin
+                    width: parent.width - window.pageHorizontalMargin * 2
+                    height: window.pageHeaderHeight
+                    visible: !window.standbySelected && !window.developerSelected
+                        && appController.section === "preset"
+                    compact: window.compactHeight
+                    title: "预设功能"
+                    description: "选择内置工具，配置参数并查看运行信息"
+                }
 
                 Rectangle {
                     anchors.left: parent.left
                     anchors.top: parent.top
+                    anchors.topMargin: window.pageWorkspaceTop
                     anchors.bottom: parent.bottom
                     width: visible ? window.toolListWidth : 0
                     visible: !window.standbySelected && !window.developerSelected
                         && appController.section !== "custom"
-                    color: "transparent"
+                    color: Theme.middlePanel
                     clip: true
 
                     ColumnLayout {
@@ -800,66 +819,6 @@ ApplicationWindow {
                         anchors.topMargin: window.compactHeight ? 8 : 16
                         anchors.bottomMargin: window.compactHeight ? 8 : 16
                         spacing: window.compactHeight ? 8 : 16
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: window.compactHeight ? 42 : 48
-                            clip: true
-                            Item {
-                                visible: window.compactToolList; Layout.fillWidth: true
-                            }
-                            Text {
-                                visible: !window.compactToolList
-                                text: appController.sectionTitle
-                                color: Theme.textPrimary
-                                font.pixelSize: 20
-                                font.weight: Font.Bold
-                                Layout.fillWidth: true
-                                Layout.minimumWidth: 0
-                                elide: Text.ElideRight
-                            }
-
-                            ToolSortButton {
-                                Layout.preferredWidth: 40
-                                Layout.minimumWidth: 40
-                                visible: appController.section === "custom"
-                                controller: appController
-                                foregroundColor: Theme.textPrimary
-                                hoverColor: Theme.surfaceContainerHigh
-                            }
-                            Rectangle {
-                                id: createCommandButton
-                                visible: appController.section === "custom"
-                                Layout.preferredWidth: 40
-                                Layout.minimumWidth: 40
-                                Layout.preferredHeight: 40
-                                radius: 20
-                                color: createCommandMouse.containsMouse
-                                    ? Theme.surfaceContainerHigh : "transparent"
-
-                                MaterialIcon {
-                                    anchors.centerIn: parent
-                                    icon: "add"
-                                    iconSize: 26
-                                    color: Theme.textPrimary
-                                }
-
-                                ToolTip.visible: createCommandMouse.containsMouse
-                                ToolTip.text: "新建命令"
-                                ToolTip.delay: 450
-
-                                MouseArea {
-                                    id: createCommandMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: window.openCommandEditorForCreate()
-                                }
-                            }
-                            Item {
-                                visible: window.compactToolList; Layout.fillWidth: true
-                            }
-                        }
 
                         Item {
                             id: compactSearchSlot
@@ -931,7 +890,7 @@ ApplicationWindow {
                             placeholderText: "搜索工具"
                             text: window.toolSearchQuery
                             color: Theme.textPrimary
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fontBody
                             onTextChanged: {
                                 if (window.toolSearchQuery !== text)
                                     window.toolSearchQuery = text
@@ -970,7 +929,7 @@ ApplicationWindow {
                                 leftPadding: 42
                                 rightPadding: 14
                                 color: Theme.textPrimary
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fontBody
                                 onTextChanged: {
                                     if (window.toolSearchQuery !== text)
                                         window.toolSearchQuery = text
@@ -1088,30 +1047,13 @@ ApplicationWindow {
                         anchors.bottomMargin: window.compactHeight ? 12 : 20
                         spacing: 14
 
-                        RowLayout {
+                        WorkspacePageHeader {
                             Layout.fillWidth: true
-                            spacing: 10
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                Layout.minimumWidth: 0
-                                spacing: 2
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: "客制脚本"
-                                    color: Theme.textPrimary
-                                    font.pixelSize: 26
-                                    font.weight: Font.Bold
-                                }
-                                Text {
-                                    Layout.fillWidth: true
-                                    visible: !window.compactHeight
-                                    text: "选择脚本以查看参数、运行状态和输出"
-                                    color: Theme.textSecondary
-                                    font.pixelSize: 13
-                                    elide: Text.ElideRight
-                                }
-                            }
+                            Layout.preferredHeight: window.pageHeaderHeight
+                            compact: window.compactHeight
+                            title: "客制脚本"
+                            description: "选择脚本以查看参数、运行状态和输出"
+                            actionWidth: 92
 
                             ToolSortButton {
                                 Layout.preferredWidth: 42
@@ -1156,7 +1098,7 @@ ApplicationWindow {
                             placeholderText: "搜索脚本名称、说明或运行方式"
                             text: window.toolSearchQuery
                             color: Theme.textPrimary
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fontBody
                             onTextChanged: {
                                 if (window.toolSearchQuery !== text)
                                     window.toolSearchQuery = text
@@ -1260,7 +1202,7 @@ ApplicationWindow {
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: window.toolSearchQuery ? "没有匹配的客制脚本" : "还没有客制脚本"
                                     color: Theme.textSecondary
-                                    font.pixelSize: 15
+                                    font.pixelSize: Theme.fontBody
                                 }
                             }
                         }
@@ -1282,14 +1224,22 @@ ApplicationWindow {
                     id: contentPanel
                     readonly property real consoleContentGap: 18
                     readonly property bool drawerMode: customToolGridPanel.visible
+                    readonly property bool presetMode:
+                        !window.standbySelected && !window.developerSelected
+                        && appController.section === "preset"
+                    readonly property var displayedTool: drawerMode
+                        && !!window.customDrawerDisplayTool.id
+                        ? window.customDrawerDisplayTool
+                        : appController.selectedTool
                     readonly property real drawerWidth: Math.min(700, Math.max(560, parent.width * 0.56))
                     x: (!window.standbySelected && !window.developerSelected)
                         ? window.toolListWidth : 0
-                    y: drawerMode ? 12 : 0
+                    y: drawerMode ? 12 : (presetMode ? window.pageWorkspaceTop : 0)
                     width: drawerMode ? drawerWidth
                         : parent.width - ((!window.standbySelected && !window.developerSelected)
                             ? window.toolListWidth : 0)
-                    height: drawerMode ? parent.height - 24 : parent.height
+                    height: drawerMode ? parent.height - 24
+                        : (presetMode ? parent.height - y : parent.height)
                     z: drawerMode ? 6 : 1
                     radius: drawerMode ? 18 : 0
                     border.color: drawerMode ? Theme.outlineVariant : "transparent"
@@ -1341,7 +1291,7 @@ ApplicationWindow {
                         visible: window.standbySelected
                         text: window.standbyDateTime
                         color: Theme.textPrimary
-                        font.pixelSize: window.compactContentActions ? 28 : 40
+                        font.pixelSize: window.compactContentActions ? Theme.fontPageTitle : Theme.fontDisplay
                         font.weight: Font.DemiBold
                     }
 
@@ -1373,9 +1323,9 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                                 spacing: 8
                                 Text {
-                                    text: appController.selectedTool.title || "请选择工具"
+                                    text: contentPanel.displayedTool.title || "请选择工具"
                                     color: Theme.textPrimary
-                                    font.pixelSize: window.compactContentActions ? 24 : 36
+                                    font.pixelSize: window.compactContentActions ? Theme.fontTitleLarge : Theme.fontPageTitle
                                     font.weight: Font.Bold
                                     elide: Text.ElideRight
                                     maximumLineCount: 1
@@ -1383,29 +1333,13 @@ ApplicationWindow {
                                     Layout.fillWidth: true
                                 }
                                 Text {
-                                    text: appController.selectedTool.description || "这个人很懒，并没有写脚本介绍"
+                                    text: contentPanel.displayedTool.description
+                                        || "这个人很懒，并没有写脚本介绍"
                                     visible: !window.compactHeight
                                     color: Theme.textSecondary
-                                    font.pixelSize: 15
+                                    font.pixelSize: Theme.fontBody
                                     wrapMode: Text.WordWrap
                                     Layout.fillWidth: true
-                                }
-                                Rectangle {
-                                    visible: !window.compactHeight && !!appController.selectedTool.executor
-                                    Layout.preferredWidth: runnerChipText.implicitWidth + 30
-                                    Layout.preferredHeight: 36
-                                    radius: 12
-                                    color: Theme.tealContainer
-                                    Text {
-                                        id: runnerChipText
-                                        anchors.centerIn: parent
-                                        text: appController.selectedTool.executor
-                                            ? "›_  " + appController.selectedTool.executor.kind + " · 本地配置"
-                                            : ""
-                                        color: Theme.teal
-                                        font.pixelSize: 13
-                                        font.weight: Font.DemiBold
-                                    }
                                 }
                             }
 

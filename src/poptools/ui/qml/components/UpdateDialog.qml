@@ -52,7 +52,7 @@ Dialog {
                           : root.controller.state === "error" ? "更新遇到问题"
                           : "发现新版本"
                     color: Theme.textPrimary
-                    font.pixelSize: 22
+                    font.pixelSize: Theme.fontDialogTitle
                     font.weight: Font.Bold
                 }
                 Text {
@@ -60,7 +60,7 @@ Dialog {
                     text: "当前 " + root.controller.currentVersion
                           + "  →  最新 " + root.controller.availableVersion
                     color: Theme.textSecondary
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fontSupporting
                 }
             }
         }
@@ -80,7 +80,7 @@ Dialog {
                     Layout.fillWidth: true
                     text: root.controller.releaseName
                     color: Theme.textPrimary
-                    font.pixelSize: 16
+                    font.pixelSize: Theme.fontComponentTitle
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
@@ -88,7 +88,7 @@ Dialog {
                     visible: root.controller.releasePageUrl.length > 0
                     text: "在 GitHub 查看完整发行说明"
                     color: Theme.primary
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fontSupporting
                     MouseArea {
                         anchors.fill: parent
                         hoverEnabled: true
@@ -121,7 +121,7 @@ Dialog {
                 Layout.fillWidth: true
                 text: root.controller.status
                 color: Theme.textPrimary
-                font.pixelSize: 16
+                font.pixelSize: Theme.fontComponentTitle
                 horizontalAlignment: Text.AlignHCenter
             }
             ProgressBar {
@@ -154,7 +154,7 @@ Dialog {
                       ? root.controller.downloadedSize + " / " + root.controller.totalSize
                       : root.controller.downloadedSize
                 color: Theme.textSecondary
-                font.pixelSize: 13
+                font.pixelSize: Theme.fontSupporting
                 horizontalAlignment: Text.AlignHCenter
             }
             Item { Layout.fillHeight: true }
@@ -175,7 +175,7 @@ Dialog {
                     Layout.fillWidth: true
                     text: root.controller.status
                     color: Theme.textPrimary
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fontBody
                     wrapMode: Text.WordWrap
                 }
             }

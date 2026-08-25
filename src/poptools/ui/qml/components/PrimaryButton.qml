@@ -37,7 +37,7 @@ Rectangle {
             visible: !root.compact
             text: root.text
             color: root.contentColor
-            font.pixelSize: 17
+            font.pixelSize: Theme.fontButton
             font.weight: Font.DemiBold
         }
     }

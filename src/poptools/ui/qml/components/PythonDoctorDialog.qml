@@ -53,7 +53,7 @@ Dialog {
                     Layout.fillWidth: true
                     text: "检查 Python 依赖"
                     color: Theme.textPrimary
-                    font.pixelSize: 18
+                    font.pixelSize: Theme.fontSectionTitle
                     font.weight: Font.Bold
                 }
             }
@@ -69,7 +69,7 @@ Dialog {
                 Layout.fillWidth: true
                 text: root.message
                 color: Theme.textPrimary
-                font.pixelSize: 14
+                font.pixelSize: Theme.fontBody
                 wrapMode: Text.WordWrap
             }
 
@@ -77,7 +77,7 @@ Dialog {
                 Layout.fillWidth: true
                 text: "Python 环境目录"
                 color: Theme.textSecondary
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
             }
 
             TextField {
@@ -86,7 +86,7 @@ Dialog {
                 text: root.controller.pythonEnvironmentDirectory
                 color: Theme.textPrimary
                 font.family: "Cascadia Mono"
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
                 selectByMouse: true
                 implicitHeight: 38
                 background: Rectangle {
@@ -101,7 +101,7 @@ Dialog {
                 visible: root.packageNames.length > 0
                 text: "待安装依赖"
                 color: Theme.textSecondary
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
             }
 
             TextArea {
@@ -112,7 +112,7 @@ Dialog {
                 text: root.packageNames
                 color: Theme.textPrimary
                 font.family: "Cascadia Mono"
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
                 wrapMode: TextEdit.Wrap
                 selectByMouse: true
                 background: Rectangle {
@@ -127,7 +127,7 @@ Dialog {
                 visible: root.packageNames.length > 0
                 text: "确认后开始安装，安装完成前此窗口不会关闭。"
                 color: Theme.textSecondary
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
                 wrapMode: Text.WordWrap
             }
 
@@ -137,7 +137,7 @@ Dialog {
                 text: root.installStatus
                 color: root.installStatus.indexOf("失败") >= 0
                        ? Theme.errorColor : Theme.textSecondary
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
                 wrapMode: Text.WordWrap
             }
         }

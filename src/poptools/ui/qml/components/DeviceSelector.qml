@@ -51,7 +51,7 @@ Rectangle {
                 Layout.minimumWidth: 0
                 text: "全局 Android 设备"
                 color: Theme.textSecondary
-                font.pixelSize: 10
+                font.pixelSize: Theme.fontMicro
                 elide: Text.ElideRight
             }
             Text {
@@ -59,7 +59,7 @@ Rectangle {
                 Layout.minimumWidth: 0
                 text: root.controller.selectedAndroidDeviceLabel
                 color: Theme.textPrimary
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
                 font.weight: Font.DemiBold
                 elide: Text.ElideMiddle
             }
@@ -113,7 +113,7 @@ Rectangle {
                         Layout.fillWidth: true
                         text: "选择 Android 设备"
                         horizontalAlignment: Text.AlignHCenter
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fontCaption
                         font.weight: Font.DemiBold
                         color: Theme.textPrimary
                     }
@@ -157,7 +157,7 @@ Rectangle {
                     anchors.centerIn: parent
                     spacing: 10
                     MaterialIcon { anchors.horizontalCenter: parent.horizontalCenter; icon: "phonelink_off"; iconSize: 34; color: Theme.textSecondary }
-                    Text { visible: !root.popupIconOnly; text: root.controller.androidDeviceRefreshing ? "正在查找设备…" : "未检测到已连接设备"; color: Theme.textSecondary; font.pixelSize: 13 }
+                    Text { visible: !root.popupIconOnly; text: root.controller.androidDeviceRefreshing ? "正在查找设备…" : "未检测到已连接设备"; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting }
                 }
             }
 
@@ -204,7 +204,7 @@ Rectangle {
                                 text: deviceRow.modelData.label
                                 horizontalAlignment: Text.AlignHCenter
                                 elide: Text.ElideMiddle
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fontSupporting
                                 font.weight: Font.DemiBold
                                 color: Theme.textPrimary
                             }
@@ -212,7 +212,7 @@ Rectangle {
                                 Layout.fillWidth: true
                                 text: deviceRow.modelData.status
                                 horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: 10
+                                font.pixelSize: Theme.fontMicro
                                 color: Theme.success
                             }
                         }

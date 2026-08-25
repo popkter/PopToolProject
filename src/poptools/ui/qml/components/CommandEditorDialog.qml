@@ -243,7 +243,7 @@ Dialog {
                     Text {
                         text: root.editMode ? "编辑脚本" : "新建脚本"
                         color: Theme.textPrimary
-                        font.pixelSize: 23
+                        font.pixelSize: Theme.fontDialogTitle
                         font.weight: Font.Bold
                     }
                     Text {
@@ -251,7 +251,7 @@ Dialog {
                         text: "命令和脚本内容将保存在本地配置中"
 
                         color: Theme.textSecondary
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fontSupporting
                         elide: Text.ElideRight
                     }
                 }
@@ -299,7 +299,7 @@ Dialog {
                         Layout.fillWidth: true
                         Layout.preferredWidth: 440
                         spacing: 6
-                        Text { text: "命令名称"; color: Theme.textPrimary; font.pixelSize: 13; font.weight: Font.DemiBold }
+                        Text { text: "命令名称"; color: Theme.textPrimary; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold }
                         TextField {
                             id: titleField
                             Layout.fillWidth: true
@@ -406,7 +406,7 @@ Dialog {
                         Layout.fillWidth: true
                         Layout.preferredWidth: 220
                         spacing: 6
-                        Text { text: "运行方式"; color: Theme.textPrimary; font.pixelSize: 13; font.weight: Font.DemiBold }
+                        Text { text: "运行方式"; color: Theme.textPrimary; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold }
                         AppComboBox {
                             id: kindBox
                             Layout.fillWidth: true
@@ -425,7 +425,7 @@ Dialog {
                     Layout.leftMargin: 22
                     Layout.rightMargin: 22
                     spacing: 6
-                    Text { text: "功能说明"; color: Theme.textPrimary; font.pixelSize: 13; font.weight: Font.DemiBold }
+                    Text { text: "功能说明"; color: Theme.textPrimary; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold }
                     TextField {
                         id: descriptionField
                         Layout.fillWidth: true
@@ -472,14 +472,14 @@ Dialog {
                             Text {
                                 text: "脚本内容"
                                 color: Theme.primary
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fontSupporting
                                 font.weight: Font.DemiBold
                             }
                             Item { Layout.fillWidth: true }
                             Text {
                                 text: "支持 pVal 声明和 ${参数名=默认值} 快速写法"
                                 color: Theme.textSecondary
-                                font.pixelSize: 11
+                                font.pixelSize: Theme.fontMicro
                             }
                         }
 
@@ -513,7 +513,7 @@ Dialog {
                                 selectionColor: Theme.primary
                                 selectedTextColor: "white"
                                 font.family: "Cascadia Mono"
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fontSupporting
                                 wrapMode: TextEdit.NoWrap
                                 selectByMouse: true
                                 background: null
@@ -539,7 +539,7 @@ Dialog {
                             Layout.fillWidth: true
                             text: "pVal vin = ${显示名称=默认值} 可先声明并多次使用 ${vin}；也兼容冒号声明及原有 ${参数名} 快速写法。"
                             color: Theme.teal
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fontCaption
                             wrapMode: Text.WordWrap
                         }
                     }

@@ -8,7 +8,7 @@ ComboBox {
     implicitHeight: 46
     leftPadding: 14
     rightPadding: 42
-    font.pixelSize: 14
+    font.pixelSize: Theme.fontBody
 
     contentItem: Text {
         leftPadding: control.leftPadding

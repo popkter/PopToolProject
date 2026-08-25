@@ -81,7 +81,7 @@ ScrollView {
         Text {
             text: "颜色值"
             color: Theme.textPrimary
-            font.pixelSize: 16
+            font.pixelSize: Theme.fontComponentTitle
             font.weight: Font.DemiBold
         }
 
@@ -143,7 +143,7 @@ ScrollView {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 48
                 text: "#4543C7"
-                font.pixelSize: 16
+                font.pixelSize: Theme.fontComponentTitle
                 validator: RegularExpressionValidator {
                     regularExpression: /#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})/
                 }
@@ -296,7 +296,7 @@ ScrollView {
             Text {
                 text: "透明度"
                 color: Theme.textPrimary
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontBody
             }
 
             Slider {
@@ -317,7 +317,7 @@ ScrollView {
                 horizontalAlignment: Text.AlignRight
                 text: picker.selectedAlpha
                 color: Theme.textSecondary
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontBody
             }
         }
 
@@ -328,7 +328,7 @@ ScrollView {
                     + ", " + Math.round(picker.opaqueColor().b * 255)
                   : "请输入 #RRGGBB 或 #AARRGGBB"
             color: Theme.textSecondary
-            font.pixelSize: 14
+            font.pixelSize: Theme.fontBody
         }
 
         Item { Layout.preferredHeight: 2 }

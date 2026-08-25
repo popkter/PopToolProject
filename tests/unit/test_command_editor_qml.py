@@ -78,8 +78,8 @@ def test_device_popup_matches_selector_and_wraps_up_to_three_devices() -> None:
     assert "implicitHeight: emptyColumn.implicitHeight + 28" in source
     assert "readonly property int popupGap: 8" in source
     assert "point.y - devicePopup.height - root.popupGap" in source
-    assert "font.pixelSize: 13" in source
-    assert "font.pixelSize: 12" in source
+    assert "font.pixelSize: Theme.fontSupporting" in source
+    assert "font.pixelSize: Theme.fontCaption" in source
     assert "root.mapToItem(Overlay.overlay, 0, 0)" in source
     assert "background: AppPopupSurface { }" in source
     assert "设备列表每 5 秒自动刷新" not in source

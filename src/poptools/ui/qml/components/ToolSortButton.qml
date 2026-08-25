@@ -88,7 +88,7 @@ Rectangle {
                             Layout.fillWidth: true
                             text: optionRow.modelData.label
                             color: Theme.textPrimary
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fontSupporting
                         }
                         MaterialIcon {
                             visible: optionRow.modelData.value === root.controller.toolSortMode

@@ -50,13 +50,13 @@ ColumnLayout {
                     ? "正在录制画面、系统声音、麦克风并截取日志…"
                     : "录制设备画面、系统声音和麦克风，同时保存 logcat 日志"
                 color: Theme.textPrimary
-                font.pixelSize: 16
+                font.pixelSize: Theme.fontComponentTitle
             }
             Text {
                 Layout.alignment: Qt.AlignHCenter
                 text: root.androidController.selectedAndroidDeviceLabel
                 color: Theme.textSecondary
-                font.pixelSize: 13
+                font.pixelSize: Theme.fontSupporting
             }
         }
     }

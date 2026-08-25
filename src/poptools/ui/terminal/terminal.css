@@ -17,3 +17,14 @@ body {
   padding: 14px 16px;
   box-sizing: border-box;
 }
+
+#terminal .xterm-viewport {
+  background-color: #141a20;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+#terminal .xterm-viewport::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

@@ -20,7 +20,7 @@ Dialog {
         Text {
             text: "删除客制命令？"
             color: Theme.textPrimary
-            font.pixelSize: 23
+            font.pixelSize: Theme.fontDialogTitle
             font.weight: Font.Bold
         }
         Text {
@@ -28,7 +28,7 @@ Dialog {
             text: "“" + (root.controller.selectedTool.title || "当前命令")
                   + "”将从本地脚本中删除。删除前会自动创建备份。"
             color: Theme.textSecondary
-            font.pixelSize: 14
+            font.pixelSize: Theme.fontBody
             wrapMode: Text.WordWrap
         }
         Item { Layout.fillHeight: true }

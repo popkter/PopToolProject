@@ -25,8 +25,8 @@ def test_compact_search_stays_in_the_search_row_and_opens_a_popup() -> None:
     popup = source[popup_start:popup_end]
 
     assert button_start < header_end
-    assert button_start > source.index("id: createCommandButton")
     assert "id: compactSearchSlot" in source
+    assert "id: createCommandButton" not in source
     assert (
         "visible: window.compactToolList"
         in source[source.index("id: compactSearchSlot") : button_start]

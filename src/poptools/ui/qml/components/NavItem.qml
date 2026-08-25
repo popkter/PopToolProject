@@ -40,7 +40,7 @@ Rectangle {
             visible: !root.compact
             text: root.label
             color: root.selected ? Theme.primary : Theme.textPrimary
-            font.pixelSize: 17
+            font.pixelSize: Theme.fontComponentTitle
             font.weight: root.selected ? Font.DemiBold : Font.Normal
             Layout.fillWidth: true
             Layout.minimumWidth: 0
@@ -75,7 +75,7 @@ Rectangle {
             anchors.centerIn: parent
             text: root.actionText
             color: Theme.primaryText
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontCaption
             font.weight: Font.DemiBold
         }
         ToolTip.visible: root.compact && actionMouse.containsMouse

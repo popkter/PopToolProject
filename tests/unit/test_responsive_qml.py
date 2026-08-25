@@ -22,12 +22,12 @@ def test_preset_middle_panel_uses_the_theme_background_without_dividers() -> Non
     source = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
     settings = (QML_ROOT / "components" / "SettingsDialog.qml").read_text(encoding="utf-8")
 
-    assert "id: middlePanelBackground" in source
     assert "color: Theme.middlePanel" in source
     assert "visible: !window.standbySelected" in source
     assert 'appController.section === "preset"' in source
     assert 'appController.section !== "custom"' in source
     assert "width: visible ? window.toolListWidth : 0" in source
+    assert "anchors.topMargin: window.pageWorkspaceTop" in source
     assert "middlePanelColor" not in source
     assert "middlePanelColor" not in settings
     assert "中栏颜色" not in settings
@@ -52,9 +52,10 @@ def test_detail_panel_has_a_hard_minimum_drawer_size() -> None:
     source = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
 
     content_start = source.index("id: contentPanel")
-    content_panel = source[content_start : content_start + 900]
+    content_panel = source[content_start : content_start + 1300]
     assert "Math.max(560, parent.width * 0.56)" in content_panel
-    assert "height: drawerMode ? parent.height - 24 : parent.height" in content_panel
+    assert "height: drawerMode ? parent.height - 24" in content_panel
+    assert "presetMode ? parent.height - y : parent.height" in content_panel
     assert "width - minimumToolListWidth - minimumContentWidth" in source
     assert "width - primaryNavWidth - minimumContentWidth" in source
 
@@ -122,8 +123,6 @@ def test_side_panel_content_stays_within_resized_columns() -> None:
     assert "horizontalAlignment: Text.AlignHCenter" in main
     assert "visible: meritBurstModel.count > 0" in main
     assert "elide: Text.ElideRight" in main
-    assert "Layout.preferredWidth: 40" in main
-    assert "Layout.minimumWidth: 40" in main
     assert "clip: true" in nav_item
     assert "Layout.minimumWidth: 0" in nav_item
     assert "elide: Text.ElideRight" in nav_item

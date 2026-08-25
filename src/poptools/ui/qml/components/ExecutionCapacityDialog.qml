@@ -39,7 +39,7 @@ Dialog {
         }
         Text {
             text: "运行名额已用完"
-            font.pixelSize: 23
+            font.pixelSize: Theme.fontDialogTitle
             font.weight: Font.Bold
             color: Theme.textPrimary
         }
@@ -48,7 +48,7 @@ Dialog {
             text: "是否停止最先运行的“" + root.victimTitle
                   + "”，并开始“" + root.requestedTitle + "”？"
             color: Theme.textSecondary
-            font.pixelSize: 14
+            font.pixelSize: Theme.fontBody
             wrapMode: Text.WordWrap
         }
         Item { Layout.fillHeight: true }

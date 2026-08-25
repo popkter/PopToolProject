@@ -52,31 +52,16 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 24
-        spacing: 16
+        anchors.margins: 20
+        spacing: 14
 
-        RowLayout {
+        WorkspacePageHeader {
             Layout.fillWidth: true
-            spacing: 12
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 4
-                Text {
-                    text: "终端"
-                    color: Theme.textPrimary
-                    font.pixelSize: 30
-                    font.weight: Font.Bold
-                }
-                Text {
-                    Layout.fillWidth: true
-                    text: "原生 " + root.controller.terminalName
-                          + " 输入体验，python 与 pip 使用应用专属环境"
-                    color: Theme.textSecondary
-                    font.pixelSize: 14
-                    elide: Text.ElideRight
-                }
-            }
+            Layout.preferredHeight: 68
+            title: "终端"
+            description: "原生 " + root.controller.terminalName
+                + " 输入体验，python 与 pip 使用应用专属环境"
+            actionWidth: 112
 
             Rectangle {
                 Layout.preferredWidth: 112
@@ -95,7 +80,7 @@ Item {
                     Text {
                         text: root.controller.running ? "会话运行中" : "会话已停止"
                         color: root.controller.running ? Theme.success : Theme.errorColor
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fontSupporting
                         font.weight: Font.DemiBold
                     }
                 }
@@ -155,7 +140,7 @@ Item {
                                     text: terminalTabDelegate.modelData.title
                                     color: terminalTabDelegate.modelData.active
                                            ? Theme.primary : Theme.textSecondary
-                                    font.pixelSize: 13
+                                    font.pixelSize: Theme.fontSupporting
                                     font.weight: terminalTabDelegate.modelData.active
                                                  ? Font.DemiBold : Font.Normal
                                     elide: Text.ElideRight
@@ -226,7 +211,7 @@ Item {
                     text: root.controller.pythonExecutable
                     color: Theme.teal
                     font.family: "Cascadia Mono"
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fontCaption
                     elide: Text.ElideMiddle
                 }
             }
@@ -252,12 +237,15 @@ Item {
 
         RowLayout {
             Layout.fillWidth: true
+            Layout.preferredHeight: 40
+            Layout.minimumHeight: 40
+            Layout.maximumHeight: 40
             spacing: 8
             Text {
                 Layout.fillWidth: true
                 text: "PSReadLine 历史预测 · Tab 补全 · ↑↓ 历史命令 · Ctrl+R 搜索 · Ctrl+L 清屏"
                 color: Theme.textSecondary
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontCaption
             }
             Button {
                 text: "清屏"

@@ -47,7 +47,7 @@ ColumnLayout {
                         Text {
                             text: "输入 JSON"
                             color: Theme.textPrimary
-                            font.pixelSize: 17
+                            font.pixelSize: Theme.fontComponentTitle
                             font.weight: Font.DemiBold
                             Layout.fillWidth: true
                         }
@@ -61,7 +61,7 @@ ColumnLayout {
                         text: "{\n  \"device\": \"Pixel 8\",\n  \"connected\": true\n}"
                         color: Theme.textPrimary
                         font.family: "Cascadia Mono"
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fontBody
                         wrapMode: TextEdit.NoWrap
                         selectByMouse: true
                         background: Rectangle { radius: 12; color: Theme.surface }
@@ -109,7 +109,7 @@ ColumnLayout {
                         Text {
                             text: "格式化结果"
                             color: Theme.textPrimary
-                            font.pixelSize: 17
+                            font.pixelSize: Theme.fontComponentTitle
                             font.weight: Font.DemiBold
                             Layout.fillWidth: true
                         }
@@ -138,7 +138,7 @@ ColumnLayout {
                         selectByMouse: true
                         color: Theme.textPrimary
                         font.family: "Cascadia Mono"
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fontBody
                         wrapMode: TextEdit.NoWrap
                         background: Rectangle { radius: 12; color: Theme.surface }
                     }
@@ -152,7 +152,7 @@ ColumnLayout {
             Text {
                 text: "输入时间戳或本地时间"
                 color: Theme.textPrimary
-                font.pixelSize: 16
+                font.pixelSize: Theme.fontComponentTitle
                 font.weight: Font.DemiBold
             }
             TextField {
@@ -161,7 +161,7 @@ ColumnLayout {
                 Layout.preferredHeight: 58
                 placeholderText: "例如 1718000000 或 2026-07-29 14:30:00"
                 color: Theme.textPrimary
-                font.pixelSize: 16
+                font.pixelSize: Theme.fontComponentTitle
                 background: Rectangle {
                     radius: 14
                     color: Theme.surface
@@ -189,7 +189,7 @@ ColumnLayout {
                     verticalAlignment: Text.AlignVCenter
                     text: "转换结果"
                     color: Theme.primaryText
-                    font.pixelSize: 19
+                    font.pixelSize: Theme.fontSectionTitle
                     font.weight: Font.DemiBold
                     wrapMode: Text.WordWrap
                 }
