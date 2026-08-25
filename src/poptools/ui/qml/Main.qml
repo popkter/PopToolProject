@@ -38,6 +38,7 @@ ApplicationWindow {
     property real toolListWidth: 120
     property bool standbySelected: false
     property bool developerSelected: false
+    property bool customToolDrawerClosing: false
     property bool terminalEnablePending: false
     property bool updateDialogPending: false
     property string standbyDateTime: formatStandbyDateTime(new Date())
@@ -84,6 +85,7 @@ ApplicationWindow {
         && appController.section === "custom"
         && appController.selectedTool.section === "custom"
         && !!appController.selectedTool.id
+        && !customToolDrawerClosing
 
     function formatStandbyDateTime(date) {
         const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
@@ -102,11 +104,33 @@ ApplicationWindow {
     }
 
     function openCustomToolDrawer(toolId) {
+        customToolDrawerClosing = false
         appController.selectTool(toolId)
     }
 
     function closeCustomToolDrawer() {
+        if (appController.section !== "custom") {
+            customToolDrawerClosing = false
+            appController.clearToolSelection()
+            return
+        }
+        if (appController.selectedTool.section === "custom"
+                && !!appController.selectedTool.id)
+            customToolDrawerClosing = true
+    }
+
+    function closeCustomToolDrawerImmediately() {
+        customToolDrawerClosing = false
         appController.clearToolSelection()
+    }
+
+    function finishCustomToolDrawerClose() {
+        if (!customToolDrawerClosing)
+            return
+        if (appController.section === "custom"
+                && appController.selectedTool.section === "custom")
+            appController.clearToolSelection()
+        customToolDrawerClosing = false
     }
 
     function cacheCustomDrawerTool() {
@@ -257,13 +281,13 @@ ApplicationWindow {
         if (!scrcpySelected || standbySelected)
             hideScrcpyWindow()
         if (standbySelected && appController.section === "custom")
-            closeCustomToolDrawer()
+            closeCustomToolDrawerImmediately()
     }
     onDeveloperSelectedChanged: {
         if (developerSelected)
             hideScrcpyWindow()
         if (developerSelected && appController.section === "custom")
-            closeCustomToolDrawer()
+            closeCustomToolDrawerImmediately()
     }
 
     function requestTerminalEnable() {
@@ -290,6 +314,8 @@ ApplicationWindow {
 
         function onSelectedToolChanged() {
             window.cacheCustomDrawerTool()
+            if (appController.selectedTool.section !== "custom")
+                window.customToolDrawerClosing = false
             window.resetParameters()
             if (!window.scrcpySelected)
                 window.hideScrcpyWindow()
@@ -1279,9 +1305,11 @@ ApplicationWindow {
                             from: "drawerOpen"
                             to: "drawerClosed"
                             NumberAnimation {
+                                id: drawerCloseAnimation
                                 property: "x"
                                 duration: 220
                                 easing.type: Easing.InCubic
+                                onStopped: window.finishCustomToolDrawerClose()
                             }
                         }
                     ]

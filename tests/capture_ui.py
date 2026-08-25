@@ -155,6 +155,11 @@ def main() -> int:
         custom_tools = registry.for_section("custom")
         if custom_tools:
             controller.selectTool(custom_tools[0].id)
+            if os.environ.get("POPTOOLS_CAPTURE_CLOSING_DRAWER") == "1":
+                QTimer.singleShot(
+                    1400,
+                    lambda: QMetaObject.invokeMethod(window, "closeCustomToolDrawer"),
+                )
     capture_dialog = os.environ.get("POPTOOLS_CAPTURE_DIALOG")
     if capture_dialog == "settings":
         window.openSettingsDialog()

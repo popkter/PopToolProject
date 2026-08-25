@@ -41,6 +41,7 @@ def test_custom_tool_card_opens_a_right_side_detail_drawer() -> None:
     assert "readonly property bool customToolDrawerVisible" in source
     assert 'appController.selectedTool.section === "custom"' in source
     assert "property bool customToolDrawerOpen" not in source
+    assert "property bool customToolDrawerClosing: false" in source
     assert "appController.clearToolSelection()" in source
     assert 'sequence: "Esc"' in source
     assert "enabled: window.customToolDrawerVisible && !window.applicationOverlayVisible" in source
@@ -49,6 +50,20 @@ def test_custom_tool_card_opens_a_right_side_detail_drawer() -> None:
     assert "Easing.OutCubic" in source
     assert "onClicked: window.closeCustomToolDrawer()" in source
     assert 'ToolTip.text: "关闭详情"' in source
+
+
+def test_custom_drawer_keeps_its_tool_state_until_exit_animation_finishes() -> None:
+    source = (QML_ROOT / "Main.qml").read_text(encoding="utf-8")
+
+    close_start = source.index("function closeCustomToolDrawer()")
+    close_end = source.index("function finishCustomToolDrawerClose()")
+    close_function = source[close_start:close_end]
+    finish_end = source.index("function cacheCustomDrawerTool()")
+    finish_function = source[close_end:finish_end]
+
+    assert "customToolDrawerClosing = true" in close_function
+    assert "appController.clearToolSelection()" in finish_function
+    assert "onStopped: window.finishCustomToolDrawerClose()" in source
 
 
 def test_custom_drawer_only_animates_when_its_open_state_changes() -> None:
