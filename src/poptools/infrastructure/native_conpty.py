@@ -259,13 +259,13 @@ class NativeConPty:
         finally:
             _kernel32.DeleteProcThreadAttributeList(attribute_list)
 
-    def read(self, *, blocking: bool = False) -> str:
+    def read(self, *, blocking: bool = False) -> bytes:
         while not self._closed:
             available = _DWORD()
             if not _kernel32.PeekNamedPipe(
                 self._output_read, None, 0, None, ctypes.byref(available), None
             ):
-                return ""
+                return b""
             if available.value:
                 size = min(available.value, 65_536)
                 buffer = ctypes.create_string_buffer(size)
@@ -273,17 +273,16 @@ class NativeConPty:
                 if not _kernel32.ReadFile(
                     self._output_read, buffer, size, ctypes.byref(read), None
                 ):
-                    return ""
-                return buffer.raw[: read.value].decode("utf-8", errors="replace")
+                    return b""
+                return buffer.raw[: read.value]
             if not blocking or not self.isalive():
-                return ""
+                return b""
             time.sleep(0.005)
-        return ""
+        return b""
 
-    def write(self, text: str) -> int:
-        if self._closed or not text:
+    def write(self, payload: bytes) -> int:
+        if self._closed or not payload:
             return 0
-        payload = text.encode("utf-8")
         written = _DWORD()
         buffer = ctypes.create_string_buffer(payload)
         if not _kernel32.WriteFile(

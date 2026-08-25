@@ -131,7 +131,7 @@ Dialog {
                             MaterialIcon { icon: "input"; iconSize: 24; color: Theme.primary }
                             Text {
                                 Layout.fillWidth: true
-                                text: "2. 用变量生成输入框"
+                                text: "2. 用变量生成参数控件"
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
@@ -139,7 +139,7 @@ Dialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "在脚本中写 ${参数名} 会自动生成输入框；写 ${参数名=默认值} 会生成带默认值的输入框。需要重复使用时，可在开头写 pVal serial = ${设备序列号=emulator-5554}，之后使用 ${serial}。pVal 声明行不会被执行。"
+                            text: "在脚本中写 ${参数名} 会自动生成输入框；写 ${参数名:默认值} 会生成带默认值的输入框。输入内容与默认值不同时，可点击输入框右侧的“设为默认值”将内容写回客制脚本。${触摸点显示:开启=1|关闭=0} 会生成标题为“触摸点显示”的下拉菜单，并在执行时使用所选项的值。需要重复使用时，可在开头写 pVal serial = ${设备序列号:emulator-5554}，之后使用 ${serial}。pVal 声明行不会被执行。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap

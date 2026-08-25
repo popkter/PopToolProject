@@ -413,6 +413,25 @@ class AppController(QObject):
             self._append_console(f"保存失败：{exc}\n")
             return False
 
+    @Slot(str, str, result=bool)
+    def setParameterDefault(self, parameter_id: str, default: str) -> bool:
+        if (
+            self._selected is None
+            or self._selected.section != ToolSection.CUSTOM
+            or not self._selected.editable
+            or self.running
+        ):
+            return False
+        try:
+            selected_id = self._selected.id
+            self.registry.set_parameter_default(selected_id, parameter_id, default)
+            self._refresh(select_id=selected_id)
+            self._append_console(f"已更新参数“{parameter_id}”的默认值。\n")
+            return True
+        except (KeyError, OSError, ValueError) as exc:
+            self._append_console(f"默认值保存失败：{exc}\n")
+            return False
+
     @Slot(str, str, str, str, result=bool)
     @Slot(str, str, str, str, str, result=bool)
     def createCommand(

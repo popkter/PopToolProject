@@ -157,13 +157,23 @@ ColumnLayout {
                         Component {
                             id: normalField
                             TextField {
+                                id: normalTextField
+                                readonly property string savedDefault:
+                                    String(modelData.default || "")
+                                readonly property bool defaultButtonVisible:
+                                    modelData.kind === "text"
+                                    && root.controller.selectedTool.section === "custom"
+                                    && root.controller.selectedTool.editable
+                                    && !root.controller.running
+                                    && text.length > 0
+                                    && text !== savedDefault
                                 implicitHeight: parameterInputLoader.singleLineHeight
                                 text: String(modelData.default || "")
                                 placeholderText: modelData.placeholder || ""
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontBody
                                 leftPadding: 16
-                                rightPadding: 16
+                                rightPadding: defaultButtonVisible ? 126 : 16
                                 echoMode: modelData.kind === "secret"
                                           ? TextInput.Password : TextInput.Normal
                                 background: Rectangle {
@@ -173,6 +183,36 @@ ColumnLayout {
                                     border.width: parent.activeFocus ? 2 : 1
                                 }
                                 onTextChanged: root.parameterValues[modelData.id] = text
+
+                                Rectangle {
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 9
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: normalTextField.defaultButtonVisible
+                                    width: 108
+                                    height: 36
+                                    radius: Theme.radiusSmall
+                                    color: defaultValueMouse.containsMouse
+                                        ? Theme.primaryContainerHover
+                                        : Theme.primaryContainer
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "设为默认值"
+                                        color: Theme.primaryText
+                                        font.pixelSize: Theme.fontCaption
+                                        font.weight: Font.DemiBold
+                                    }
+
+                                    MouseArea {
+                                        id: defaultValueMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.controller.setParameterDefault(
+                                            modelData.id, normalTextField.text)
+                                    }
+                                }
                             }
                         }
 
@@ -203,12 +243,21 @@ ColumnLayout {
                             id: choiceField
                             AppComboBox {
                                 id: choiceControl
+                                readonly property var choiceOptions: modelData.options || []
+                                function optionValue(index) {
+                                    if (index < 0 || index >= choiceOptions.length)
+                                        return ""
+                                    const option = choiceOptions[index]
+                                    return typeof option === "object" ? option.value : option
+                                }
                                 implicitHeight: parameterInputLoader.singleLineHeight
-                                model: modelData.options || []
+                                model: choiceOptions
+                                textRole: choiceOptions.length > 0
+                                    && typeof choiceOptions[0] === "object" ? "label" : ""
                                 currentIndex: {
                                     const expected = String(modelData.default || "")
                                     for (let index = 0; index < count; index++) {
-                                        if (String(choiceControl.textAt(index)) === expected)
+                                        if (String(choiceControl.optionValue(index)) === expected)
                                             return index
                                     }
                                     return count > 0 ? 0 : -1
@@ -216,9 +265,9 @@ ColumnLayout {
                                 leftPadding: 16
                                 rightPadding: 42
                                 font.pixelSize: Theme.fontBody
-                                onCurrentTextChanged: {
+                                onCurrentIndexChanged: {
                                     if (currentIndex >= 0)
-                                        root.parameterValues[modelData.id] = currentText
+                                        root.parameterValues[modelData.id] = optionValue(currentIndex)
                                 }
                             }
                         }

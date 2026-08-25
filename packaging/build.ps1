@@ -128,11 +128,23 @@ try {
         $JunitReport = Join-Path $TestResultsDir "pytest.xml"
         New-Item -ItemType Directory -Path $TestWorkspace -Force | Out-Null
         New-Item -ItemType Directory -Path $TestResultsDir -Force | Out-Null
-        & $VenvPython -m pytest "--basetemp=$PytestBaseTemp" -o "cache_dir=$PytestCacheDir" `
-            "--junitxml=$JunitReport" --tb=long -ra
-        $TestExitCode = $LASTEXITCODE
-        if ($TestExitCode -ne 0) {
-            throw "Tests failed with exit code $TestExitCode. JUnit report: $JunitReport"
+        $TestFiles = @(
+            Get-ChildItem -LiteralPath (Join-Path $ProjectRoot "tests") -Recurse -File `
+                -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $_.Name -match '^test_.*\.py$' -or $_.Name -match '.*_test\.py$'
+                }
+        )
+        if ($TestFiles.Count -eq 0) {
+            Write-Host "No pytest test files found; skipping test stage." -ForegroundColor Yellow
+        }
+        else {
+            & $VenvPython -m pytest "--basetemp=$PytestBaseTemp" -o "cache_dir=$PytestCacheDir" `
+                "--junitxml=$JunitReport" --tb=long -ra
+            $TestExitCode = $LASTEXITCODE
+            if ($TestExitCode -ne 0) {
+                throw "Tests failed with exit code $TestExitCode. JUnit report: $JunitReport"
+            }
         }
     }
 

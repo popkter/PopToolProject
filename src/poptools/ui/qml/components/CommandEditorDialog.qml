@@ -477,7 +477,7 @@ Dialog {
                             }
                             Item { Layout.fillWidth: true }
                             Text {
-                                text: "支持 pVal 声明和 ${参数名=默认值} 快速写法"
+                                text: "支持 ${标题}、${标题:默认值} 和 ${标题:选项=值|选项=值}"
                                 color: Theme.textSecondary
                                 font.pixelSize: Theme.fontMicro
                             }
@@ -537,7 +537,7 @@ Dialog {
                         Text {
                             id: helperText
                             Layout.fillWidth: true
-                            text: "pVal vin = ${显示名称=默认值} 可先声明并多次使用 ${vin}；也兼容冒号声明及原有 ${参数名} 快速写法。"
+                            text: "${请输入数值:1} 会生成带默认值的输入框；${触摸点显示:开启=1|关闭=0} 会生成下拉菜单。需要重复使用时可写 pVal value = ${显示名称:默认值}。"
                             color: Theme.teal
                             font.pixelSize: Theme.fontCaption
                             wrapMode: Text.WordWrap

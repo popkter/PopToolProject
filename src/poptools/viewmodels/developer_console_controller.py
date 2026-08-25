@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import codecs
 import os
 import sys
 import urllib.error
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from PySide6.QtCore import (
@@ -58,6 +59,9 @@ class TerminalTabState:
     exit_code: int = 0
     restart_pending: bool = False
     intentional_stop: bool = False
+    output_decoder: codecs.IncrementalDecoder = field(
+        default_factory=lambda: codecs.getincrementaldecoder("utf-8")(errors="replace")
+    )
 
 
 class DeveloperConsoleController(QObject):
@@ -93,6 +97,8 @@ class DeveloperConsoleController(QObject):
         self._active_tab_id = ""
         self._next_tab_number = 1
         self._terminal_ready = False
+        self._terminal_columns = 120
+        self._terminal_rows = 30
         self._shutdown_pending = False
         self._plugin = powershell_plugin
         if self._plugin is None and sys.platform == "win32":
@@ -163,6 +169,12 @@ class DeveloperConsoleController(QObject):
     @Property(str, constant=True)
     def terminalName(self) -> str:
         return "PowerShell 7" if sys.platform == "win32" else "macOS Shell"
+
+    @Property(int, constant=True)
+    def windowsBuildNumber(self) -> int:
+        if sys.platform != "win32":
+            return 0
+        return int(sys.getwindowsversion().build)
 
     @Slot(result=bool)
     def requestTerminalAccess(self) -> bool:
@@ -260,6 +272,7 @@ class DeveloperConsoleController(QObject):
         )
 
         session = ConPtySession(self)
+        tab.output_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         session.outputReceived.connect(self._on_terminal_output)
         session.processExited.connect(self._on_process_exited)
         session.finished.connect(self._on_session_finished)
@@ -272,6 +285,8 @@ class DeveloperConsoleController(QObject):
                 arguments,
                 self.working_directory,
                 environment,
+                columns=self._terminal_columns,
+                rows=self._terminal_rows,
             )
         except Exception as exc:
             tab.session = None
@@ -321,9 +336,11 @@ class DeveloperConsoleController(QObject):
 
     @Slot(int, int)
     def resizeTerminal(self, columns: int, rows: int) -> None:
+        self._terminal_columns = max(2, columns)
+        self._terminal_rows = max(1, rows)
         tab = self._active_tab()
         if tab is not None and tab.session is not None:
-            tab.session.resize(columns, rows)
+            tab.session.resize(self._terminal_columns, self._terminal_rows)
 
     @Slot()
     def terminalReady(self) -> None:
@@ -436,7 +453,7 @@ class DeveloperConsoleController(QObject):
     def _on_terminal_output(self, payload: bytes) -> None:
         tab = self._tab_for_session(self.sender())
         if tab is not None:
-            self._append_to_tab(tab, payload.decode("utf-8", errors="replace"))
+            self._append_to_tab(tab, tab.output_decoder.decode(payload, final=False))
 
     @Slot(int)
     def _on_process_exited(self, exit_code: int) -> None:
@@ -455,6 +472,7 @@ class DeveloperConsoleController(QObject):
             session.dispose()
             session.deleteLater()
             return
+        self._append_to_tab(tab, tab.output_decoder.decode(b"", final=True))
         tab_id = tab.tab_id
         tab.session = None
         session.dispose()

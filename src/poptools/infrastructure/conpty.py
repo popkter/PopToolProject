@@ -85,7 +85,7 @@ class ConPtySession(QThread):
         pty = self._pty
         if pty is None:
             return
-        pending: list[str] = []
+        pending: list[bytes] = []
         pending_size = 0
         while not self.isInterruptionRequested() and pty.isalive():
             try:
@@ -102,7 +102,7 @@ class ConPtySession(QThread):
                     try:
                         following = pty.read(blocking=False)
                     except Exception:
-                        following = ""
+                        following = b""
                     if not following:
                         break
                     pending.append(following)
@@ -139,7 +139,7 @@ class ConPtySession(QThread):
             return False
         with self._write_lock:
             try:
-                pty.write(data.decode("utf-8", errors="replace"))
+                pty.write(data)
             except Exception:
                 return False
             return True
@@ -223,9 +223,9 @@ class ConPtySession(QThread):
             _kernel32.CloseHandle(self._job)
             self._job = None
 
-    def _emit_pending(self, chunks: list[str]) -> None:
+    def _emit_pending(self, chunks: list[bytes]) -> None:
         if chunks:
-            self.outputReceived.emit("".join(chunks).encode("utf-8", errors="replace"))
+            self.outputReceived.emit(b"".join(chunks))
 
     def _start_posix_process(
         self,

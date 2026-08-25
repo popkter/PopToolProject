@@ -13,7 +13,7 @@ from poptools.domain.models import (
     ToolOrigin,
     ToolSection,
 )
-from poptools.domain.parameter_templates import synchronize_parameters
+from poptools.domain.parameter_templates import synchronize_parameters, update_parameter_default
 from poptools.domain.repositories import ToolRepository
 
 
@@ -137,6 +137,22 @@ class ToolRegistry:
         self.repository.save_tool(tool)
         self.reload()
         return self._tools[tool_id]
+
+    def set_parameter_default(
+        self, tool_id: str, parameter_id: str, default: str
+    ) -> ToolDefinition:
+        current = self._tools[tool_id]
+        if current.section != ToolSection.CUSTOM or not current.editable:
+            raise ValueError("只有可编辑的客制脚本可以修改参数默认值")
+        command = update_parameter_default(current.executor.command, parameter_id, default)
+        return self.update_tool(
+            tool_id,
+            title=current.title,
+            description=current.description,
+            kind=current.executor.kind,
+            command=command,
+            args=list(current.executor.args),
+        )
 
     def reset(self, tool_id: str) -> bool:
         changed = self.repository.remove_override(tool_id)

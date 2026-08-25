@@ -41,6 +41,12 @@ terminal.open(document.getElementById("terminal"));
 
 new QWebChannel(qt.webChannelTransport, (channel) => {
   const bridge = channel.objects.terminalBridge;
+  if (bridge.windowsBuildNumber > 0) {
+    terminal.options.windowsPty = {
+      backend: "conpty",
+      buildNumber: bridge.windowsBuildNumber
+    };
+  }
   let replayWritesPending = 0;
   const inputSubscription = terminal.onData((data) => {
     if (replayWritesPending === 0) {
@@ -61,25 +67,29 @@ new QWebChannel(qt.webChannelTransport, (channel) => {
 
   const terminalElement = document.getElementById("terminal");
   let pendingFitFrame = 0;
+  const syncSize = () => {
+    const bounds = terminalElement.getBoundingClientRect();
+    if (bounds.width <= 32 || bounds.height <= 32) {
+      return false;
+    }
+    fitAddon.fit();
+    bridge.resizeTerminal(terminal.cols, terminal.rows);
+    return true;
+  };
   const fit = () => {
     if (pendingFitFrame !== 0) {
       cancelAnimationFrame(pendingFitFrame);
     }
     pendingFitFrame = requestAnimationFrame(() => {
       pendingFitFrame = 0;
-      const bounds = terminalElement.getBoundingClientRect();
-      if (bounds.width <= 32 || bounds.height <= 32) {
-        return;
-      }
-      fitAddon.fit();
-      bridge.resizeTerminal(terminal.cols, terminal.rows);
+      syncSize();
     });
   };
   const resizeObserver = new ResizeObserver(fit);
   resizeObserver.observe(terminalElement);
   window.addEventListener("resize", fit);
   terminal.onResize(({ cols, rows }) => bridge.resizeTerminal(cols, rows));
-  fit();
+  syncSize();
   bridge.terminalReady();
   terminal.focus();
 

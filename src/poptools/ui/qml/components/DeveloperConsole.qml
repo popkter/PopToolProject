@@ -16,6 +16,7 @@ Item {
     QtObject {
         id: terminalBridge
         WebChannel.id: "terminalBridge"
+        readonly property int windowsBuildNumber: root.controller.windowsBuildNumber
         signal dataReceived(string data)
         signal snapshotReceived(string data)
         signal resetRequested()

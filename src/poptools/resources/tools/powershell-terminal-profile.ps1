@@ -1,5 +1,6 @@
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+& "$env:SystemRoot\System32\chcp.com" 65001 > $null
 
 function global:python {
     & $env:POPTOOLS_PYTHON @args

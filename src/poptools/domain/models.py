@@ -48,6 +48,13 @@ class ParameterKind(StrEnum):
     SECRET = "secret"
 
 
+class ParameterOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    value: str
+
+
 class ParameterDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -57,7 +64,7 @@ class ParameterDefinition(BaseModel):
     required: bool = False
     default: Any = ""
     placeholder: str = ""
-    options: list[str] = Field(default_factory=list)
+    options: list[str | ParameterOption] = Field(default_factory=list)
 
     @field_validator("id")
     @classmethod
