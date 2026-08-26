@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from poptools.domain.models import ToolDefinition, ToolOrigin
+from poptools.domain.models import ToolDefinition, ToolOrigin, ToolSection
 from poptools.domain.repositories import ToolRepository
 from poptools.infrastructure.json_file_storage import JsonFileStorage
 from poptools.paths import AppPaths
@@ -20,6 +20,24 @@ class JsonToolRepository(ToolRepository):
             for file_path in sorted(folder.glob("*.json")):
                 try:
                     tool = ToolDefinition.model_validate_json(file_path.read_text("utf-8"))
+                    # The containing folder is the persistence authority. Older
+                    # exports can contain custom scripts whose metadata still says
+                    # ``override``/``local``. Treating that metadata literally makes
+                    # edits land in tools/overrides while the original custom file
+                    # wins on reload, and makes deletion appear to do nothing.
+                    if folder == self.paths.custom_dir and (
+                        tool.origin != ToolOrigin.CUSTOM
+                        or tool.section != ToolSection.CUSTOM
+                        or not tool.editable
+                    ):
+                        tool = tool.model_copy(
+                            update={
+                                "origin": ToolOrigin.CUSTOM,
+                                "section": ToolSection.CUSTOM,
+                                "editable": True,
+                            }
+                        )
+                        self.files.write(file_path, tool.model_dump(mode="json"))
                     migrated_path = file_path.with_name(f"{tool.id}.json")
                     if migrated_path != file_path:
                         if migrated_path.exists():
@@ -56,4 +74,11 @@ class JsonToolRepository(ToolRepository):
             return False
         self.files.backup(target, suffix="deleted")
         target.unlink()
+        # Releases affected by the imported-custom metadata bug may have written
+        # attempted edits or delete markers to overrides under the same id. Once
+        # the user deletes the custom tool, that stale file must not resurrect it.
+        stale_override = self.paths.overrides_dir / f"{tool_id}.json"
+        if stale_override.exists():
+            self.files.backup(stale_override, suffix="stale-override")
+            stale_override.unlink()
         return True
