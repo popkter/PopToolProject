@@ -92,12 +92,21 @@ if ! "$VENV_PYTHON" -c 'import PIL, PyInstaller, PySide6, platformdirs, psutil, 
 fi
 
 if [[ "$SKIP_TESTS" -eq 0 ]]; then
-    mkdir -p "$PROJECT_ROOT/build/test-results" "$PROJECT_ROOT/build/pytest-macos"
-    "$VENV_PYTHON" -m pytest \
-        --basetemp="$PROJECT_ROOT/build/pytest-macos/tmp" \
-        -o cache_dir="$PROJECT_ROOT/build/pytest-macos/cache" \
-        --junitxml="$PROJECT_ROOT/build/test-results/pytest-macos-$ARCHITECTURE.xml" \
-        --tb=long -ra
+    TESTS_DIR="$PROJECT_ROOT/tests"
+    TEST_FILE=""
+    if [[ -d "$TESTS_DIR" ]]; then
+        TEST_FILE="$(find "$TESTS_DIR" -type f \( -name 'test_*.py' -o -name '*_test.py' \) -print -quit)"
+    fi
+    if [[ -z "$TEST_FILE" ]]; then
+        echo "No pytest test files found; skipping test stage."
+    else
+        mkdir -p "$PROJECT_ROOT/build/test-results" "$PROJECT_ROOT/build/pytest-macos"
+        "$VENV_PYTHON" -m pytest \
+            --basetemp="$PROJECT_ROOT/build/pytest-macos/tmp" \
+            -o cache_dir="$PROJECT_ROOT/build/pytest-macos/cache" \
+            --junitxml="$PROJECT_ROOT/build/test-results/pytest-macos-$ARCHITECTURE.xml" \
+            --tb=long -ra
+    fi
 fi
 
 BASE_VERSION="$($VENV_PYTHON -c 'import pathlib,sys,tomllib; print(tomllib.loads(pathlib.Path(sys.argv[1]).read_text())["project"]["version"])' "$PROJECT_ROOT/pyproject.toml")"
