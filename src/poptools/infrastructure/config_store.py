@@ -391,12 +391,11 @@ class ConfigStore:
             for entry in current_entries:
                 self._copy_entry(entry, backup / entry.name)
 
+        # Import is additive: retain current tools/scripts and merge the selected
+        # export into them. Files with the same relative path are updated from the
+        # import, while unrelated local entries remain in place and recoverable in
+        # the pre-import backup above.
         destination.mkdir(parents=True, exist_ok=True)
-        for entry in current_entries:
-            if entry.is_dir():
-                shutil.rmtree(entry)
-            else:
-                entry.unlink()
         for entry in entries:
             self._copy_entry(entry, destination / entry.name)
         return backup

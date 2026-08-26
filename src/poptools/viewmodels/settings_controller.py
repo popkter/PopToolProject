@@ -133,8 +133,8 @@ class SettingsController(QObject):
             return False
         try:
             self.config_store.import_user_configuration(Path(source))
-            self.setStatus("本地脚本导入成功，已应用到默认目录")
-            self.consoleMessage.emit("客制脚本导入成功。\n")
+            self.setStatus("本地脚本导入成功，已与现有脚本合并")
+            self.consoleMessage.emit("客制脚本导入并合并成功。\n")
             self.scriptsImported.emit()
             return True
         except (OSError, ValueError) as exc:

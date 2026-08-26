@@ -405,7 +405,7 @@ Dialog {
 
                         Text {
                             Layout.fillWidth: true
-                            text: "导入会备份并替换默认目录中的脚本；导出至“文档”目录。"
+                            text: "导入会先备份，再与现有脚本合并；同名脚本使用导入版本。导出至“文档”目录。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontCaption
                             wrapMode: Text.WordWrap

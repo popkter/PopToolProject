@@ -159,19 +159,21 @@ def synchronize_parameters(
     for parameter_id, (label, default, declared, options) in parsed.items():
         existing_parameter = existing_by_id.get(parameter_id)
         if existing_parameter is not None:
-            updates: dict[str, object] = {}
+            # Default, choice kind and options are derived from the current
+            # template. They must be replaced rather than only filled in, or an
+            # edited `${name:first=1|second=2}` keeps rendering as a choice after
+            # it becomes `${name:value}`.
+            updates: dict[str, object] = {
+                "default": default or "",
+                "options": list(options),
+            }
             if declared:
                 updates["label"] = label
-            if default is not None:
-                updates["default"] = default
             if options:
                 updates["kind"] = ParameterKind.CHOICE
-                updates["options"] = list(options)
-            parameters.append(
-                existing_parameter.model_copy(update=updates)
-                if updates
-                else existing_parameter
-            )
+            elif existing_parameter.kind == ParameterKind.CHOICE:
+                updates["kind"] = ParameterKind.TEXT
+            parameters.append(existing_parameter.model_copy(update=updates))
             continue
         parameters.append(
             ParameterDefinition(
