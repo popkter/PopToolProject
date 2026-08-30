@@ -116,10 +116,12 @@ def main() -> int:
         android_controller = components.android_controller
         settings_controller = components.settings_controller
         preset_controller = components.preset_controller
+        jira_feishu_controller = components.jira_feishu_controller
         developer_console_controller = components.developer_console_controller
         update_controller = components.update_controller
         app.aboutToQuit.connect(developer_console_controller.shutdown)
         app.aboutToQuit.connect(update_controller.shutdown)
+        app.aboutToQuit.connect(jira_feishu_controller.shutdown)
         tray_controller.set_app_controller(controller)
         if python_setup_error:
             settings_controller.setStatus(f"Python 环境初始化失败：{python_setup_error}")
@@ -128,6 +130,9 @@ def main() -> int:
         engine.rootContext().setContextProperty("appController", controller)
         engine.rootContext().setContextProperty("settingsController", settings_controller)
         engine.rootContext().setContextProperty("presetController", preset_controller)
+        engine.rootContext().setContextProperty(
+            "jiraFeishuController", jira_feishu_controller
+        )
         engine.rootContext().setContextProperty(
             "developerConsoleController", developer_console_controller
         )

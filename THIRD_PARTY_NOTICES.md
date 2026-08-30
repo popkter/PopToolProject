@@ -1,5 +1,18 @@
 # Third-party notices
 
+## Requests
+
+泡泡工具箱 uses the Requests HTTP library for the Jira and Feishu preset,
+together with its runtime dependencies urllib3, certifi, charset-normalizer,
+and idna.
+
+- Source: https://github.com/psf/requests
+- License: Apache License 2.0
+- Copyright: Kenneth Reitz and Requests contributors
+
+These packages are installed as Python dependencies and retain their upstream
+license metadata.
+
 ## Material Symbols Rounded
 
 泡泡工具箱 includes the Material Symbols Rounded variable font from Google's

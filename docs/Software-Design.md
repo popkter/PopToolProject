@@ -18,7 +18,7 @@ PopTools 是单机、单用户的 Android 开发与测试工具箱。所有工�
 
 | 分区 | 定义 | 当前能力 |
 | --- | --- | --- |
-| 预设功能 | 随应用发布、用户不可编辑的内建能力 | Android 投屏、录屏与 logcat、JSON、时间戳、调色盘 |
+| 预设功能 | 随应用发布、用户不可编辑的内建能力 | Android 投屏、录屏与 logcat、JSON、时间戳、调色盘、Jira 飞书推送 |
 | 客制功能 | 用户创建并持久化的脚本 | PowerShell、Bash、BAT、Python，参数模板，导入导出 |
 | 基础能力 | 为两类工具提供的公共运行环境 | 设备选择、执行配额、控制台、Python 环境、可选终端、托盘、更新、主题与配置 |
 
@@ -113,6 +113,7 @@ src/poptools/ui/qml/
 - `AppController`：分区与工具选择、搜索/排序数据、客制工具生命周期、最近使用和普通运行交互。
 - `SettingsController`：外观、窗口、终端开关、并发数、用户引导状态、本地脚本导入导出、Python 环境检查和应用重启。
 - `PresetController`：JSON/时间戳转换、屏幕取色和 Android 录制流程。
+- `JiraFeishuController`：Jira/飞书多方案配置、串行推送任务、日志与应用内定时调度。
 - `AndroidController`：设备选择、自动刷新和 Android 进程列表。
 - `DeveloperConsoleController`：PowerShell 插件门禁、ConPTY 会话、终端输入输出与回放上限。
 - `UpdateController`：异步检查、下载进度、跳过版本、安装并重启。

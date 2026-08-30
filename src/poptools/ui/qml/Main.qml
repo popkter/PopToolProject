@@ -1688,7 +1688,8 @@ ApplicationWindow {
         PresetWorkspace {
             toolController: appController
             utilities: presetController
-            androidController: androidController
+            androidBackend: androidController
+            jiraFeishuBackend: jiraFeishuController
             compact: window.compactPrimaryNav
         }
     }
@@ -1777,6 +1778,7 @@ ApplicationWindow {
         RecentToolDialog {
             presetUtilities: presetController
             deviceController: androidController
+            jiraFeishuBackend: jiraFeishuController
         }
     }
 

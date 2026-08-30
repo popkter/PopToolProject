@@ -1,6 +1,35 @@
 [
   {
     "schema_version": 1,
+    "id": "preset.jira_feishu",
+    "revision": 1,
+    "origin": "builtin",
+    "section": "preset",
+    "title": "Jira 飞书推送",
+    "description": "按 JQL 汇总 Jira 功能与问题，通过飞书机器人推送互动卡片，支持多方案与定时推送",
+    "tags": ["Jira", "飞书", "机器人", "定时"],
+    "editable": false,
+    "enabled": true,
+    "executor": {
+      "kind": "internal",
+      "command": "jira_feishu",
+      "args": [],
+      "cwd": null,
+      "timeout_seconds": null,
+      "encoding": "utf-8",
+      "env": {},
+      "requirements": []
+    },
+    "parameters": [],
+    "presentation": {
+      "icon": "send",
+      "order": 25,
+      "confirm_before_run": false,
+      "output_mode": "inline"
+    }
+  },
+  {
+    "schema_version": 1,
     "id": "preset.android.recording",
     "revision": 1,
     "origin": "builtin",

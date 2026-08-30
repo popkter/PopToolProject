@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "poptools"
-version = "1.0.5"
+version = "1.0.6"
 description = "A self-contained Material 3 desktop toolbox for Android development and log analysis."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
@@ -15,6 +15,7 @@ dependencies = [
   "pydantic>=2.12,<3",
   "pypinyin>=0.55,<1",
   "psutil>=7,<8",
+  "requests>=2.28,<3",
   "setuptools>=65,<70",
   "wexpect>=4,<5; sys_platform == 'win32'",
 ]

@@ -23,6 +23,7 @@ from poptools.viewmodels import (
     AndroidController,
     AppController,
     DeveloperConsoleController,
+    JiraFeishuController,
     PresetController,
     SettingsController,
     UpdateController,
@@ -78,8 +79,10 @@ def main() -> int:
     if os.environ.get("POPTOOLS_CAPTURE_GRID_SAMPLE") == "1":
         settings_controller.markUserGuideSeen()
     preset_controller = PresetController()
+    jira_feishu_controller = JiraFeishuController(paths.data_dir)
     developer_console_controller = DeveloperConsoleController(python_environment, paths.data_dir)
     app.aboutToQuit.connect(developer_console_controller.shutdown)
+    app.aboutToQuit.connect(jira_feishu_controller.shutdown)
     capture_terminal_tabs = int(os.environ.get("POPTOOLS_CAPTURE_TERMINAL_TABS", "1"))
     for _ in range(max(1, min(capture_terminal_tabs, 7)) - 1):
         developer_console_controller.createTerminalTab()
@@ -127,6 +130,9 @@ def main() -> int:
     engine.rootContext().setContextProperty("appController", controller)
     engine.rootContext().setContextProperty("settingsController", settings_controller)
     engine.rootContext().setContextProperty("presetController", preset_controller)
+    engine.rootContext().setContextProperty(
+        "jiraFeishuController", jira_feishu_controller
+    )
     engine.rootContext().setContextProperty(
         "developerConsoleController", developer_console_controller
     )

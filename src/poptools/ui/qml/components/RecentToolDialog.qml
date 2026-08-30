@@ -13,6 +13,7 @@ Window {
     property var parameterValues: ({})
     property var presetUtilities
     property var deviceController
+    property var jiraFeishuBackend
     readonly property bool presetMode: appController.selectedTool.workspace === "preset"
     readonly property bool recordingPreset: presetMode
         && appController.selectedTool.executor
@@ -287,7 +288,8 @@ Window {
         PresetWorkspace {
             toolController: appController
             utilities: root.presetUtilities
-            androidController: root.deviceController
+            androidBackend: root.deviceController
+            jiraFeishuBackend: root.jiraFeishuBackend
             compact: true
         }
     }

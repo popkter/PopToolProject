@@ -8,7 +8,8 @@ ColumnLayout {
 
     required property var toolController
     required property var utilities
-    required property var androidController
+    required property var androidBackend
+    required property var jiraFeishuBackend
     property bool compact: false
     property string jsonOutput: ""
 
@@ -23,7 +24,8 @@ ColumnLayout {
         Layout.fillHeight: true
             currentIndex: root.toolController.selectedTool.executor.command === "timestamp" ? 1
                       : root.toolController.selectedTool.executor.command === "colors" ? 2
-                      : root.toolController.selectedTool.executor.command === "recording" ? 3 : 0
+                      : root.toolController.selectedTool.executor.command === "recording" ? 3
+                      : root.toolController.selectedTool.executor.command === "jira_feishu" ? 4 : 0
 
         RowLayout {
             spacing: root.compact ? 0 : 14
@@ -208,7 +210,14 @@ ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             controller: root.utilities
-            androidController: root.androidController
+            androidController: root.androidBackend
+        }
+
+        JiraFeishuWorkspace {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            controller: root.jiraFeishuBackend
+            compact: root.compact
         }
     }
 }
