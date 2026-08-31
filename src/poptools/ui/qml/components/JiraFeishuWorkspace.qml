@@ -5,13 +5,25 @@ import "../theme"
 
 ColumnLayout {
     id: root
+    objectName: "jiraFeishuWorkspace"
 
     required property var controller
     property bool compact: false
     readonly property bool narrow: width < 760
     property var profile: ({})
+    property bool outputExpanded: false
+    property real outputReveal: outputExpanded ? 1 : 0
+    readonly property real outputPanelCollapsedHeight: 66
+    readonly property real outputPanelMaxHeight: Math.max(
+        outputPanelCollapsedHeight,
+        height - headerCard.height - root.spacing * 2
+    )
 
     spacing: 8
+
+    Behavior on outputReveal {
+        NumberAnimation { duration: 220; easing.type: Easing.InOutCubic }
+    }
 
     function value(section, key, fallback) {
         if (!profile || !profile[section] || profile[section][key] === undefined)
@@ -26,7 +38,6 @@ ColumnLayout {
         jiraToken.text = value("jira", "token", "")
         jiraJql.text = value("jira", "jql_filter", "")
         jiraMax.value = Number(value("jira", "max_results", 200))
-        jiraProxy.text = value("jira", "proxy", "")
         webhook.text = value("feishu", "webhook_url", "")
         keyword.text = value("feishu", "keyword", "")
         signSecret.text = value("feishu", "secret", "")
@@ -47,7 +58,6 @@ ColumnLayout {
         controller.updateField("jira", "token", jiraToken.text)
         controller.updateField("jira", "jql_filter", jiraJql.text)
         controller.updateField("jira", "max_results", jiraMax.value)
-        controller.updateField("jira", "proxy", jiraProxy.text.trim())
         controller.updateField("feishu", "webhook_url", webhook.text.trim())
         controller.updateField("feishu", "keyword", keyword.text.trim())
         controller.updateField("feishu", "secret", signSecret.text)
@@ -95,7 +105,7 @@ ColumnLayout {
         property string iconName: ""
         property bool danger: false
         signal clicked()
-        implicitHeight: 40
+        implicitHeight: 46
         implicitWidth: 88
         radius: Theme.radiusMedium
         color: danger ? (hover.containsMouse ? Qt.darker(Theme.errorContainer, 1.05) : Theme.errorContainer)
@@ -104,11 +114,13 @@ ColumnLayout {
             anchors.centerIn: parent
             spacing: 6
             MaterialIcon {
+                Layout.alignment: Qt.AlignVCenter
                 icon: mini.iconName
                 iconSize: 18
                 color: mini.danger ? Theme.errorColor : Theme.primaryText
             }
             Text {
+                Layout.alignment: Qt.AlignVCenter
                 text: mini.text
                 color: mini.danger ? Theme.errorColor : Theme.primaryText
                 font.pixelSize: Theme.fontLabel
@@ -132,83 +144,101 @@ ColumnLayout {
     Component.onCompleted: reloadProfile()
 
     Rectangle {
+        id: headerCard
         Layout.fillWidth: true
-        Layout.preferredHeight: compact ? 132 : 76
+        Layout.preferredHeight: 68
         radius: Theme.radiusLarge
         color: Theme.surfaceContainerLow
         border.color: Theme.outlineVariant
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 10
-            spacing: 12
+            anchors.margins: root.narrow ? 8 : 10
+            spacing: root.narrow ? 6 : 12
+
+            Text {
+                Layout.alignment: Qt.AlignVCenter
+                text: root.narrow ? "当前方案" : "当前推送方案"
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontComponentTitle
+                font.weight: Font.DemiBold
+            }
 
             Rectangle {
-                Layout.preferredWidth: 50
-                Layout.preferredHeight: 50
-                radius: 15
-                color: Theme.primaryContainer
-                MaterialIcon {
-                    anchors.centerIn: parent
-                    icon: "send"
-                    iconSize: 27
-                    color: Theme.primaryText
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
+                readonly property bool successState: controller.status.indexOf("成功") >= 0
+                readonly property bool errorState: controller.status.indexOf("失败") >= 0
                 visible: !root.narrow
-                spacing: 3
-                Text {
-                    text: "Jira → 飞书推送"
-                    color: Theme.textPrimary
-                    font.pixelSize: Theme.fontComponentTitle
-                    font.weight: Font.DemiBold
-                }
-                Text {
-                    text: controller.status
-                    color: Theme.textSecondary
-                    font.pixelSize: Theme.fontSupporting
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                }
-            }
+                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: Math.min(240, statusText.implicitWidth + 28)
+                Layout.preferredHeight: 34
+                radius: Theme.radiusSmall
+                color: successState ? Theme.successContainer
+                                    : errorState ? Theme.errorContainer
+                                    : Theme.surfaceContainerHigh
 
-            ColumnLayout {
-                Layout.preferredWidth: root.narrow ? 160 : 300
-                spacing: 4
-                FieldLabel { text: "当前推送方案" }
-                AppComboBox {
-                    id: profileSelector
-                    Layout.fillWidth: true
-                    model: controller.profileNames
-                    currentIndex: controller.currentIndex
-                    onActivated: {
-                        root.commitForm()
-                        controller.selectProfile(currentIndex)
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: 7
+                    Rectangle {
+                        Layout.preferredWidth: 8
+                        Layout.preferredHeight: 8
+                        radius: 4
+                        color: parent.parent.successState ? Theme.success
+                                                       : parent.parent.errorState ? Theme.errorColor
+                                                                                 : Theme.outline
+                    }
+                    Text {
+                        id: statusText
+                        Layout.fillWidth: true
+                        text: controller.status
+                        color: parent.parent.successState ? Theme.success
+                                                        : parent.parent.errorState ? Theme.errorColor
+                                                                                  : Theme.textSecondary
+                        font.pixelSize: Theme.fontSupporting
+                        elide: Text.ElideRight
                     }
                 }
             }
 
-            RowLayout {
-                spacing: 6
-                MiniButton { text: "新建"; iconName: "add"; onClicked: { root.commitForm(); controller.newProfile() } }
-                MiniButton { text: "复制"; iconName: "content_copy"; visible: !root.narrow; onClicked: { root.commitForm(); controller.duplicateProfile() } }
-                MiniButton { text: "删除"; iconName: "delete"; danger: true; visible: !root.narrow; onClicked: controller.deleteProfile() }
-                MiniButton { text: "更多"; iconName: "more_horiz"; visible: root.narrow; onClicked: profileMenu.open() }
-                Menu {
-                    id: profileMenu
-                    MenuItem { text: "复制当前方案"; onTriggered: { root.commitForm(); controller.duplicateProfile() } }
-                    MenuItem { text: "删除当前方案"; onTriggered: controller.deleteProfile() }
+            AppComboBox {
+                id: profileSelector
+                Layout.fillWidth: true
+                Layout.minimumWidth: root.narrow ? 150 : 260
+                Layout.alignment: Qt.AlignVCenter
+                model: controller.profileNames
+                currentIndex: controller.currentIndex
+                onActivated: {
+                    root.commitForm()
+                    controller.selectProfile(currentIndex)
                 }
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignVCenter
+                spacing: root.narrow ? 4 : 6
+                MiniButton { implicitWidth: root.narrow ? 66 : 88; text: "新建"; iconName: "add"; onClicked: { root.commitForm(); controller.newProfile() } }
+                MiniButton { implicitWidth: root.narrow ? 66 : 88; text: "复制"; iconName: "content_copy"; onClicked: { root.commitForm(); controller.duplicateProfile() } }
+                MiniButton { implicitWidth: root.narrow ? 66 : 88; text: "删除"; iconName: "delete"; danger: true; onClicked: controller.deleteProfile() }
             }
         }
     }
 
-    RowLayout {
+    Item {
+        id: configRegion
         Layout.fillWidth: true
-        spacing: 12
+        Layout.fillHeight: true
+        Layout.minimumHeight: 0
+        clip: true
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 8
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
 
         Rectangle {
             Layout.fillWidth: true
@@ -244,46 +274,64 @@ ColumnLayout {
             }
         }
 
-        TabBar {
+        Rectangle {
             id: tabs
+            property int currentIndex: 0
             Layout.preferredWidth: root.narrow ? 230 : 360
             Layout.preferredHeight: 42
-            background: Rectangle { radius: Theme.radiusMedium; color: Theme.surfaceContainer }
-            Repeater {
-                model: ["Jira", "飞书", "定时"]
-                TabButton {
-                    text: modelData
-                    font.pixelSize: Theme.fontBody
-                    font.weight: checked ? Font.DemiBold : Font.Normal
-                    contentItem: Text {
-                        text: parent.text
-                        color: parent.checked ? Theme.primaryText : Theme.textSecondary
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        font: parent.font
-                    }
-                    background: Rectangle {
-                        anchors.margins: 4
+            Layout.minimumHeight: 42
+            Layout.maximumHeight: 42
+            Layout.alignment: Qt.AlignVCenter
+            radius: Theme.radiusMedium
+            color: Theme.surfaceContainer
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 4
+                spacing: 4
+
+                Repeater {
+                    model: ["Jira", "飞书", "定时"]
+                    Rectangle {
+                        required property int index
+                        required property string modelData
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
                         radius: Theme.radiusSmall
-                        color: parent.checked ? Theme.primaryContainer : "transparent"
+                        color: tabs.currentIndex === index ? Theme.primaryContainer : "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData
+                            color: tabs.currentIndex === index ? Theme.primaryText : Theme.textSecondary
+                            font.pixelSize: Theme.fontBody
+                            font.weight: tabs.currentIndex === index ? Font.DemiBold : Font.Normal
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: tabs.currentIndex = index
+                        }
                     }
                 }
             }
         }
     }
 
-    Rectangle {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        Layout.minimumHeight: 190
-        radius: Theme.radiusLarge
-        color: Theme.surfaceContainerLow
-        border.color: Theme.outlineVariant
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: 0
+                radius: Theme.radiusLarge
+                color: Theme.surfaceContainerLow
+                border.color: Theme.outlineVariant
 
-        StackLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            currentIndex: tabs.currentIndex
+                StackLayout {
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    currentIndex: tabs.currentIndex
 
             Flickable {
                 clip: true
@@ -298,7 +346,7 @@ ColumnLayout {
                     Text { text: "使用 JQL 获取议题与变更记录，Token 仅保存在本机。"; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting }
                     GridLayout {
                         Layout.fillWidth: true
-                        columns: root.narrow ? 1 : 2
+                        columns: root.narrow ? 1 : 3
                         columnSpacing: 14
                         rowSpacing: 10
                         ColumnLayout {
@@ -312,19 +360,14 @@ ColumnLayout {
                             AppField { id: jiraToken; echoMode: TextInput.Password; placeholderText: "输入访问令牌"; onEditingFinished: controller.updateField("jira", "token", text) }
                         }
                         ColumnLayout {
-                            Layout.fillWidth: true; spacing: 5
+                            spacing: 5
                             FieldLabel { text: "最多获取数" }
                             SpinBox {
                                 id: jiraMax
-                                Layout.fillWidth: true; Layout.preferredHeight: 46
+                                Layout.preferredWidth: 240; Layout.preferredHeight: 46
                                 from: 1; to: 1000; editable: true
                                 onValueModified: controller.updateField("jira", "max_results", value)
                             }
-                        }
-                        ColumnLayout {
-                            Layout.fillWidth: true; spacing: 5
-                            FieldLabel { text: "代理（可选）" }
-                            AppField { id: jiraProxy; placeholderText: "http://127.0.0.1:7890"; onEditingFinished: controller.updateField("jira", "proxy", text.trim()) }
                         }
                     }
                     FieldLabel { text: "JQL 查询 *" }
@@ -488,84 +531,134 @@ ColumnLayout {
                     Item { Layout.preferredHeight: 2 }
                 }
             }
-        }
-    }
-
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: 10
-        PrimaryButton {
-            Layout.fillWidth: root.narrow
-            Layout.preferredWidth: root.narrow ? 118 : 150
-            implicitHeight: 44
-            text: root.narrow ? "测试" : "测试连接"
-            iconName: "lan"
-            tonal: true
-            enabled: !controller.busy
-            onClicked: root.runCurrent("test")
-        }
-        PrimaryButton {
-            Layout.fillWidth: root.narrow
-            Layout.preferredWidth: root.narrow ? 118 : 140
-            implicitHeight: 44
-            text: root.narrow ? "预览" : "预览消息"
-            iconName: "preview"
-            tonal: true
-            enabled: !controller.busy
-            onClicked: root.runCurrent("dry")
-        }
-        PrimaryButton {
-            Layout.fillWidth: root.narrow
-            Layout.preferredWidth: root.narrow ? 118 : 140
-            implicitHeight: 44
-            text: root.narrow ? "保存" : "保存配置"
-            iconName: "save"
-            tonal: true
-            onClicked: {
-                root.commitForm()
-                controller.saveProfiles()
-            }
-        }
-        Item { Layout.fillWidth: !root.narrow }
-        BusyIndicator { visible: controller.busy; running: visible; Layout.preferredWidth: 32; Layout.preferredHeight: 32 }
-        PrimaryButton {
-            Layout.fillWidth: root.narrow
-            Layout.preferredWidth: root.narrow ? 124 : 170
-            implicitHeight: 44
-            text: controller.busy ? "处理中" : (root.narrow ? "推送" : "立即推送")
-            iconName: controller.busy ? "hourglass_top" : "send"
-            enabled: !controller.busy
-            onClicked: root.runCurrent("push")
-        }
-    }
-
-    Rectangle {
-        Layout.fillWidth: true
-        Layout.preferredHeight: 96
-        radius: Theme.radiusLarge
-        color: Theme.consoleBackground
-        border.color: Theme.outlineVariant
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
-            RowLayout {
-                Layout.fillWidth: true; Layout.preferredHeight: 32; Layout.leftMargin: 12; Layout.rightMargin: 8
-                Text { text: "运行记录"; color: Theme.consoleText; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold; Layout.fillWidth: true }
-                MiniButton { text: "清空"; iconName: "delete_sweep"; implicitWidth: 78; implicitHeight: 30; onClicked: controller.clearLog() }
-            }
-            ScrollView {
-                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
-                TextArea {
-                    text: controller.logText
-                    readOnly: true
-                    selectByMouse: true
-                    color: Theme.consoleText
-                    font.family: "Cascadia Mono"
-                    font.pixelSize: Theme.fontCaption
-                    wrapMode: TextEdit.Wrap
-                    background: null
                 }
             }
         }
+    }
+
+    ColumnLayout {
+        id: outputPanel
+        Layout.fillWidth: true
+        Layout.fillHeight: false
+        Layout.preferredHeight: root.outputPanelCollapsedHeight
+                                + (root.outputPanelMaxHeight
+                                   - root.outputPanelCollapsedHeight)
+                                  * root.outputReveal
+        Layout.minimumHeight: root.outputPanelCollapsedHeight
+        Layout.maximumHeight: root.outputPanelMaxHeight
+        spacing: 6
+
+        Item {
+            id: outputToggle
+            objectName: "jiraFeishuOutputToggle"
+            Layout.fillWidth: true
+            Layout.preferredHeight: 10
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 52
+                height: 4
+                radius: 2
+                color: outputToggleArea.containsMouse ? Theme.primary : Theme.outline
+            }
+
+            MouseArea {
+                id: outputToggleArea
+                anchors.centerIn: parent
+                width: 96
+                height: 28
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.outputExpanded = !root.outputExpanded
+            }
+
+            ToolTip.visible: outputToggleArea.containsMouse
+            ToolTip.text: root.outputExpanded ? "隐藏运行记录" : "显示运行记录"
+            ToolTip.delay: 450
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10
+            PrimaryButton {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 150
+                implicitHeight: 44
+                text: root.narrow ? "测试" : "测试连接"
+                iconName: "lan"
+                tonal: true
+                enabled: !controller.busy
+                onClicked: root.runCurrent("test")
+            }
+            PrimaryButton {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 150
+                implicitHeight: 44
+                text: root.narrow ? "预览" : "预览消息"
+                iconName: "preview"
+                tonal: true
+                enabled: !controller.busy
+                onClicked: root.runCurrent("dry")
+            }
+            PrimaryButton {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 150
+                implicitHeight: 44
+                text: root.narrow ? "保存" : "保存配置"
+                iconName: "save"
+                tonal: true
+                onClicked: {
+                    root.commitForm()
+                    controller.saveProfiles()
+                }
+            }
+            PrimaryButton {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 150
+                implicitHeight: 44
+                text: controller.busy ? "处理中" : (root.narrow ? "推送" : "立即推送")
+                iconName: controller.busy ? "hourglass_top" : "send"
+                enabled: !controller.busy
+                onClicked: root.runCurrent("push")
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumHeight: 0
+            radius: Theme.radiusLarge
+            color: Theme.consoleBackground
+            border.color: Theme.outlineVariant
+            clip: true
+            opacity: root.outputExpanded ? 1 : 0
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
+                RowLayout {
+                    Layout.fillWidth: true; Layout.preferredHeight: 32; Layout.leftMargin: 12; Layout.rightMargin: 8
+                    Text { text: "运行记录"; color: Theme.consoleText; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold; Layout.fillWidth: true }
+                    MiniButton { text: "清空"; iconName: "delete_sweep"; implicitWidth: 78; implicitHeight: 30; onClicked: controller.clearLog() }
+                }
+                ScrollView {
+                    Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                    TextArea {
+                        text: controller.logText
+                        readOnly: true
+                        selectByMouse: true
+                        color: Theme.consoleText
+                        font.family: "Cascadia Mono"
+                        font.pixelSize: Theme.fontCaption
+                        wrapMode: TextEdit.Wrap
+                        background: null
+                    }
+                }
+            }
+
+            Behavior on opacity {
+                NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+            }
+        }
+
     }
 }

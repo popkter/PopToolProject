@@ -59,69 +59,6 @@
   },
   {
     "schema_version": 1,
-    "id": "preset.json",
-    "revision": 1,
-    "origin": "builtin",
-    "section": "preset",
-    "title": "JSON 解析",
-    "description": "在本机格式化、压缩并检查 JSON，不上传数据",
-    "tags": [
-      "JSON",
-      "本地"
-    ],
-    "editable": false,
-    "enabled": true,
-    "executor": {
-      "kind": "internal",
-      "command": "json",
-      "args": [],
-      "cwd": null,
-      "timeout_seconds": 30,
-      "encoding": "utf-8",
-      "env": {},
-      "requirements": []
-    },
-    "parameters": [],
-    "presentation": {
-      "icon": "data_object",
-      "order": 10,
-      "confirm_before_run": false,
-      "output_mode": "inline"
-    }
-  },
-  {
-    "schema_version": 1,
-    "id": "preset.timestamp",
-    "revision": 1,
-    "origin": "builtin",
-    "section": "preset",
-    "title": "时间戳转换",
-    "description": "秒、毫秒时间戳与本地时间互转",
-    "tags": [
-      "时间"
-    ],
-    "editable": false,
-    "enabled": true,
-    "executor": {
-      "kind": "internal",
-      "command": "timestamp",
-      "args": [],
-      "cwd": null,
-      "timeout_seconds": 30,
-      "encoding": "utf-8",
-      "env": {},
-      "requirements": []
-    },
-    "parameters": [],
-    "presentation": {
-      "icon": "schedule",
-      "order": 20,
-      "confirm_before_run": false,
-      "output_mode": "inline"
-    }
-  },
-  {
-    "schema_version": 1,
     "id": "preset.colors",
     "revision": 1,
     "origin": "builtin",

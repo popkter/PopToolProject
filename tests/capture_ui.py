@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import QMetaObject, QTimer, QUrl
+from PySide6.QtCore import QMetaObject, QObject, QTimer, QUrl
 from PySide6.QtGui import QFont, QFontDatabase, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtWebEngineQuick import QtWebEngineQuick
@@ -144,6 +144,13 @@ def main() -> int:
         print("\n".join(qml_warnings), file=sys.stderr)
         return 1
     window = cast(QWindow, engine.rootObjects()[0])
+    if os.environ.get("POPTOOLS_CAPTURE_JIRA_OUTPUT_MAX") == "1":
+        jira_workspace = window.findChild(QObject, "jiraFeishuWorkspace")
+        if jira_workspace is not None:
+            QTimer.singleShot(
+                250,
+                lambda: jira_workspace.setProperty("outputExpanded", True),
+            )
     if len(sys.argv) > 2 and sys.argv[2] == "developer":
         window.setProperty("developerSelected", True)
     elif len(sys.argv) > 2 and sys.argv[2] == "powershell-plugin":

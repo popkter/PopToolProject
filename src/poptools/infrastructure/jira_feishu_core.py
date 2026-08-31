@@ -109,33 +109,25 @@ def gen_feishu_sign(timestamp, secret):
 # ─── Jira API ──────────────────────────────────────────────
 
 def jira_creds(jira_cfg):
-    """从 jira 配置段取出 (base_url, token, proxy)。
+    """从 jira 配置段取出 (base_url, token)。
 
     兼容旧配置的 `pat` 键：若没有 `token` 则回退到 `pat`。
     """
     base_url = jira_cfg.get("base_url", "")
     token = jira_cfg.get("token") or jira_cfg.get("pat", "")
-    proxy = jira_cfg.get("proxy")
-    return base_url, token, proxy
+    return base_url, token
 
 
 class JiraClient:
     """Jira Server (Data Center) REST API 客户端"""
 
-    def __init__(self, base_url, token, proxy=None):
+    def __init__(self, base_url, token):
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
 
         # 挂载自定义 SSL 适配器，跳过证书验证，兼容内网老 TLS
         self.session.mount("https://", LegacySSLAdapter())
         self.session.verify = False  # 跳过 SSL 证书验证（内网自签名证书）
-
-        # 代理设置（如果需要）
-        if proxy:
-            self.session.proxies = {
-                "http": proxy,
-                "https": proxy,
-            }
 
         # 认证：Token 走 Bearer
         self.session.headers.update({
@@ -273,7 +265,10 @@ class FeishuAppClient:
             )
             data = resp.json()
             if data.get("code") != 0:
-                _LOG(f"⚠️ 获取飞书 tenant_access_token 失败: code={data.get('code')}, msg={data.get('msg')}")
+                _LOG(
+                    "⚠️ 获取飞书 tenant_access_token 失败: "
+                    f"code={data.get('code')}, msg={data.get('msg')}"
+                )
                 return None
             self._token = data["tenant_access_token"]
             # expire 单位秒，留 10 分钟余量
@@ -302,7 +297,10 @@ class FeishuAppClient:
                 resp = self.session.get(url, params=params, headers=headers, timeout=30)
                 data = resp.json()
                 if data.get("code") != 0:
-                    _LOG(f"⚠️ 飞书 batch_get_id 失败: code={data.get('code')}, msg={data.get('msg')}")
+                    _LOG(
+                        "⚠️ 飞书 batch_get_id 失败: "
+                        f"code={data.get('code')}, msg={data.get('msg')}"
+                    )
                     result.update({e: None for e in chunk})
                     continue
                 # data.data.user_list: [{user_id, email, mobile}, ...]，未找到时 user_id 为空
@@ -411,7 +409,10 @@ def resolve_open_ids(config, emails):
                     cache[e] = ""  # 标记已查但未找到，避免反复请求
             _save_open_id_cache(cache)
         else:
-            _LOG("ℹ️ 未配置飞书 app_id/app_secret，跳过 open_id 自动解析，改用邮箱前缀作为飞书用户名")
+            _LOG(
+                "ℹ️ 未配置飞书 app_id/app_secret，跳过 open_id 自动解析，"
+                "改用邮箱前缀作为飞书用户名"
+            )
 
     # 4. 兜底：邮箱去域名 = 飞书用户名（@geely.com 前缀即飞书账号）
     email_domain = config.get("message", {}).get("email_domain", "@geely.com")
@@ -663,7 +664,8 @@ def _fits(elems, feishu_cfg):
 def _person_chunks(header, issues, feishu_cfg):
     """把一个人的 issues 拆成若干元素块，每块 = [header, issues_div] 且能放进一张卡。
 
-    issues_div 是 lark_md，内容为该批 issue 行（序号在该人内连续）。行少则一块；太多则按行拆，每块带 header。
+    issues_div 是 lark_md，内容为该批 issue 行（序号在该人内连续）。
+    行少则一块；太多则按行拆，每块带 header。
     """
     if not issues:
         return []
@@ -837,8 +839,8 @@ def run_test(config, log=print):
     """测试 Jira 连通性。返回 True/False。"""
     set_log(log)
     jira_cfg = config["jira"]
-    _base, _token, _proxy = jira_creds(jira_cfg)
-    jira = JiraClient(_base, _token, _proxy)
+    _base, _token = jira_creds(jira_cfg)
+    jira = JiraClient(_base, _token)
     _LOG("=" * 50)
     _LOG("测试 Jira 连通性")
     _LOG("=" * 50)
@@ -854,8 +856,8 @@ def run_push(config, log=print, dry_run=False):
     jira_cfg = config["jira"]
     feishu_cfg = config["feishu"]
 
-    _base, _token, _proxy = jira_creds(jira_cfg)
-    jira = JiraClient(_base, _token, _proxy)
+    _base, _token = jira_creds(jira_cfg)
+    jira = JiraClient(_base, _token)
 
     _LOG("=" * 50)
     _LOG(f"Jira → 飞书推送开始 ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"
@@ -932,8 +934,8 @@ def gen_mapping_template(config, log=print):
     """从看板提取所有负责人，生成 user_mapping.json 模板。"""
     set_log(log)
     jira_cfg = config["jira"]
-    _base, _token, _proxy = jira_creds(jira_cfg)
-    jira = JiraClient(_base, _token, _proxy)
+    _base, _token = jira_creds(jira_cfg)
+    jira = JiraClient(_base, _token)
     _LOG("=" * 50)
     _LOG("生成用户映射模板")
     _LOG("=" * 50)

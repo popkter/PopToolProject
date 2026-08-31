@@ -112,7 +112,7 @@ src/poptools/ui/qml/
 
 - `AppController`：分区与工具选择、搜索/排序数据、客制工具生命周期、最近使用和普通运行交互。
 - `SettingsController`：外观、窗口、终端开关、并发数、用户引导状态、本地脚本导入导出、Python 环境检查和应用重启。
-- `PresetController`：JSON/时间戳转换、屏幕取色和 Android 录制流程。
+- `PresetController`：屏幕取色和 Android 录制流程。
 - `JiraFeishuController`：Jira/飞书多方案配置、串行推送任务、日志与应用内定时调度。
 - `AndroidController`：设备选择、自动刷新和 Android 进程列表。
 - `DeveloperConsoleController`：PowerShell 插件门禁、ConPTY 会话、终端输入输出与回放上限。

@@ -35,7 +35,6 @@ class JiraFeishuProfileStore:
                 "token": "",
                 "jql_filter": "status != Done ORDER BY assignee ASC, priority DESC",
                 "max_results": 200,
-                "proxy": "",
             },
             "feishu": {
                 "webhook_url": "",
@@ -59,6 +58,7 @@ class JiraFeishuProfileStore:
         for section in ("jira", "feishu", "message"):
             profile.setdefault(section, {})
         jira = profile["jira"]
+        jira.pop("proxy", None)
         if "token" not in jira and "pat" in jira:
             jira["token"] = jira.pop("pat")
         jira.setdefault("token", "")
@@ -83,14 +83,18 @@ class JiraFeishuProfileStore:
     def load(self) -> list[dict[str, Any]]:
         self.directory.mkdir(parents=True, exist_ok=True)
         if not self.profiles_path.exists():
-            profiles = [self._migrate_from_config()]
+            profiles = [self.normalize(self._migrate_from_config())]
             self.save(profiles)
             return profiles
         try:
             data = json.loads(self.profiles_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             data = []
-        profiles = [self.normalize(item) for item in data if isinstance(item, dict)] if isinstance(data, list) else []
+        profiles = (
+            [self.normalize(item) for item in data if isinstance(item, dict)]
+            if isinstance(data, list)
+            else []
+        )
         if not profiles:
             profiles = [self.blank_profile("默认")]
             self.save(profiles)

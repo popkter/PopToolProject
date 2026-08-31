@@ -10,7 +10,11 @@ from poptools.viewmodels.jira_feishu_controller import JiraFeishuController
 
 def test_profile_store_migrates_legacy_config(tmp_path):
     legacy = {
-        "jira": {"base_url": "https://jira.test", "pat": "legacy-token"},
+        "jira": {
+            "base_url": "https://jira.test",
+            "pat": "legacy-token",
+            "proxy": "http://legacy-proxy.test:7890",
+        },
         "feishu": {"webhook_url": "https://feishu.test/hook"},
         "message": {"at_assignee": False},
     }
@@ -21,6 +25,7 @@ def test_profile_store_migrates_legacy_config(tmp_path):
     assert len(profiles) == 1
     assert profiles[0]["name"] == "默认"
     assert core.jira_creds(profiles[0]["jira"])[1] == "legacy-token"
+    assert "proxy" not in profiles[0]["jira"]
     assert profiles[0]["schedule"]["mode"] == "interval"
 
 

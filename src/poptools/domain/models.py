@@ -7,8 +7,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 LEGACY_TOOL_IDS = {
-    "online.json": "preset.json",
-    "online.timestamp": "preset.timestamp",
     "online.colors": "preset.colors",
     "local.android.scrcpy": "preset.android.scrcpy",
 }
