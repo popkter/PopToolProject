@@ -82,7 +82,8 @@ class JiraFeishuController(QObject):
         self._current_index = 0
         self._logs: list[str] = []
         self._busy_count = 0
-        self._status = "配置仅保存在本机"
+        self._dirty_profile_ids: set[str] = set()
+        self._status = "已保存"
         self._last_run: dict[str, datetime] = {}
         self._fired_today: dict[str, set[str]] = {}
 
@@ -131,6 +132,7 @@ class JiraFeishuController(QObject):
         if 0 <= index < len(self._profiles) and index != self._current_index:
             self._current_index = index
             self.currentProfileChanged.emit()
+            self._refresh_save_status()
 
     @Slot(str, str, "QVariant")
     def updateField(self, section: str, key: str, value: Any) -> None:
@@ -139,18 +141,34 @@ class JiraFeishuController(QObject):
         profile = self._profiles[self._current_index]
         target = profile if section == "root" else profile.setdefault(section, {})
         if isinstance(target, dict):
+            if target.get(key) == value:
+                return
             target[key] = value
+            self._dirty_profile_ids.add(str(profile.get("id", "")))
+            self._set_status("未保存")
             if section == "root" and key == "name":
                 self.profilesChanged.emit()
             if section == "schedule" and key == "enabled":
                 self.scheduleRunningChanged.emit()
 
     @Slot()
+    def markCurrentProfileDirty(self) -> None:
+        if not self._profiles:
+            return
+        profile_id = str(self._profiles[self._current_index].get("id", ""))
+        self._dirty_profile_ids.add(profile_id)
+        self._set_status("未保存")
+
+    @Slot()
     def newProfile(self) -> None:
         profile = self._store.blank_profile("新配置")
         self._profiles.append(profile)
         self._current_index = len(self._profiles) - 1
-        self._save("已新建配置")
+        self._dirty_profile_ids.add(str(profile.get("id", "")))
+        self.profilesChanged.emit()
+        self.currentProfileChanged.emit()
+        self.scheduleRunningChanged.emit()
+        self._set_status("未保存")
 
     @Slot()
     def duplicateProfile(self) -> None:
@@ -162,20 +180,25 @@ class JiraFeishuController(QObject):
         profile.setdefault("schedule", {})["enabled"] = False
         self._profiles.append(profile)
         self._current_index = len(self._profiles) - 1
-        self._save("已复制配置")
+        self._dirty_profile_ids.add(str(profile.get("id", "")))
+        self.profilesChanged.emit()
+        self.currentProfileChanged.emit()
+        self.scheduleRunningChanged.emit()
+        self._set_status("未保存")
 
     @Slot()
     def deleteProfile(self) -> None:
         if len(self._profiles) <= 1:
-            self._set_status("至少需要保留一个配置")
+            self._append_log("⚠️ 至少需要保留一个配置")
             return
         deleted = self._profiles.pop(self._current_index)
+        self._dirty_profile_ids.discard(str(deleted.get("id", "")))
         self._current_index = min(self._current_index, len(self._profiles) - 1)
-        self._save(f"已删除「{deleted.get('name', '配置')}」")
+        self._save()
 
     @Slot()
     def saveProfiles(self) -> None:
-        self._save("配置已保存")
+        self._save()
         self._append_log("💾 配置已保存")
 
     @Slot(str)
@@ -185,10 +208,12 @@ class JiraFeishuController(QObject):
         profile = copy.deepcopy(self._profiles[self._current_index])
         validation_error = self._validate(profile, action)
         if validation_error:
-            self._set_status(validation_error)
+            if action == "push":
+                self._set_status("推送失败")
             self._append_log(f"⚠️ {validation_error}")
             return
-        self._store.save(self._profiles)
+        if not self._save():
+            return
         label = f"{profile.get('name', '?')}-{action}"
         self._enqueue(profile, action, label)
         verb = {"test": "测试连接", "dry": "预览", "push": "推送"}[action]
@@ -199,9 +224,8 @@ class JiraFeishuController(QObject):
         if not self._profiles:
             return
         self._profiles[self._current_index].setdefault("schedule", {})["enabled"] = True
-        self._store.save(self._profiles)
-        self.currentProfileChanged.emit()
-        self.scheduleRunningChanged.emit()
+        if not self._save():
+            return
         self._tick_schedule()
         self._append_log("⏰ 定时调度已启动（对所有已启用配置生效）")
 
@@ -209,9 +233,8 @@ class JiraFeishuController(QObject):
     def stopSchedule(self) -> None:
         for profile in self._profiles:
             profile.setdefault("schedule", {})["enabled"] = False
-        self._store.save(self._profiles)
-        self.currentProfileChanged.emit()
-        self.scheduleRunningChanged.emit()
+        if not self._save():
+            return
         self._append_log("⏹️ 已停止所有定时调度")
 
     @Slot()
@@ -226,12 +249,19 @@ class JiraFeishuController(QObject):
         self._worker.stop()
         self._worker.wait(2_000)
 
-    def _save(self, status: str) -> None:
-        self._store.save(self._profiles)
+    def _save(self) -> bool:
+        try:
+            self._store.save(self._profiles)
+        except OSError as exc:
+            self._set_status("保存失败")
+            self._append_log(f"❌ 配置保存失败：{exc}")
+            return False
+        self._dirty_profile_ids.clear()
         self.profilesChanged.emit()
         self.currentProfileChanged.emit()
         self.scheduleRunningChanged.emit()
-        self._set_status(status)
+        self._set_status("已保存")
+        return True
 
     def _enqueue(self, profile: dict[str, Any], action: str, label: str) -> None:
         self._busy_count += 1
@@ -264,12 +294,20 @@ class JiraFeishuController(QObject):
         self.busyChanged.emit()
         result = "成功" if ok else "失败"
         self._append_log(f"✔️ 任务完成：{label} — {result}")
-        self._set_status(f"{label}：{result}")
+        if label.endswith(("-push", "-定时")):
+            self._set_status(f"推送{result}")
 
     def _set_status(self, status: str) -> None:
         if self._status != status:
             self._status = status
             self.statusChanged.emit()
+
+    def _refresh_save_status(self) -> None:
+        if not self._profiles:
+            self._set_status("未保存")
+            return
+        profile_id = str(self._profiles[self._current_index].get("id", ""))
+        self._set_status("未保存" if profile_id in self._dirty_profile_ids else "已保存")
 
     @staticmethod
     def _parse_times(value: Any) -> list[str]:

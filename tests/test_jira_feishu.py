@@ -43,6 +43,46 @@ def test_controller_saves_feishu_keyword(qapp, tmp_path):
 
         saved = JiraFeishuProfileStore(tmp_path / "jira_feishu").load()
         assert saved[0]["feishu"]["keyword"] == "质量播报"
+        assert controller.status == "已保存"
+    finally:
+        controller.shutdown()
+
+
+def test_controller_status_only_summarizes_save_and_push(qapp, tmp_path):
+    controller = JiraFeishuController(tmp_path)
+    try:
+        assert controller.status == "已保存"
+
+        controller.updateField("root", "name", "已编辑方案")
+        assert controller.status == "未保存"
+
+        controller.saveProfiles()
+        assert controller.status == "已保存"
+
+        controller.newProfile()
+        new_profile_index = controller.currentIndex
+        assert controller.status == "未保存"
+
+        controller.selectProfile(0)
+        assert controller.status == "已保存"
+
+        controller.selectProfile(new_profile_index)
+        assert controller.status == "未保存"
+
+        controller.saveProfiles()
+        assert controller.status == "已保存"
+
+        controller._on_job_done("方案-push", True)
+        assert controller.status == "推送成功"
+
+        controller._on_job_done("方案-dry", False)
+        assert controller.status == "推送成功"
+
+        controller._on_job_done("方案-push", False)
+        assert controller.status == "推送失败"
+
+        controller.updateField("jira", "base_url", "https://jira.changed.test")
+        assert controller.status == "未保存"
     finally:
         controller.shutdown()
 

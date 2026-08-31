@@ -14,9 +14,9 @@ ColumnLayout {
     property bool outputExpanded: false
     property real outputReveal: outputExpanded ? 1 : 0
     readonly property real outputPanelCollapsedHeight: 66
-    readonly property real outputPanelMaxHeight: Math.max(
-        outputPanelCollapsedHeight,
-        height - headerCard.height - root.spacing * 2
+    readonly property real outputLogMaxHeight: Math.max(
+        0,
+        height - headerCard.height - outputPanelCollapsedHeight - root.spacing
     )
 
     spacing: 8
@@ -165,11 +165,14 @@ ColumnLayout {
             }
 
             Rectangle {
-                readonly property bool successState: controller.status.indexOf("成功") >= 0
+                readonly property bool successState: controller.status === "已保存"
+                                                     || controller.status.indexOf("成功") >= 0
                 readonly property bool errorState: controller.status.indexOf("失败") >= 0
                 visible: !root.narrow
                 Layout.alignment: Qt.AlignVCenter
-                Layout.preferredWidth: Math.min(240, statusText.implicitWidth + 28)
+                Layout.preferredWidth: 112
+                Layout.minimumWidth: 112
+                Layout.maximumWidth: 112
                 Layout.preferredHeight: 34
                 radius: Theme.radiusSmall
                 color: successState ? Theme.successContainer
@@ -256,6 +259,7 @@ ColumnLayout {
                     id: profileName
                     Layout.fillWidth: true
                     background: null
+                    onTextEdited: controller.markCurrentProfileDirty()
                     onEditingFinished: controller.updateField("root", "name", text.trim())
                 }
                 Rectangle {
@@ -352,12 +356,12 @@ ColumnLayout {
                         ColumnLayout {
                             Layout.fillWidth: true; spacing: 5
                             FieldLabel { text: "Jira 地址 *" }
-                            AppField { id: jiraUrl; placeholderText: "https://jira.example.com"; onEditingFinished: controller.updateField("jira", "base_url", text.trim()) }
+                            AppField { id: jiraUrl; placeholderText: "https://jira.example.com"; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("jira", "base_url", text.trim()) }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true; spacing: 5
                             FieldLabel { text: "Token / PAT *" }
-                            AppField { id: jiraToken; echoMode: TextInput.Password; placeholderText: "输入访问令牌"; onEditingFinished: controller.updateField("jira", "token", text) }
+                            AppField { id: jiraToken; echoMode: TextInput.Password; placeholderText: "输入访问令牌"; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("jira", "token", text) }
                         }
                         ColumnLayout {
                             spacing: 5
@@ -382,6 +386,7 @@ ColumnLayout {
                         wrapMode: TextEdit.Wrap
                         selectByMouse: true
                         placeholderText: "status != Done ORDER BY assignee ASC, priority DESC"
+                        onTextChanged: if (activeFocus) controller.markCurrentProfileDirty()
                         onActiveFocusChanged: if (!activeFocus) controller.updateField("jira", "jql_filter", text)
                         background: Rectangle { radius: Theme.radiusMedium; color: Theme.surface; border.color: parent.activeFocus ? Theme.primary : Theme.outline; border.width: parent.activeFocus ? 2 : 1 }
                     }
@@ -408,37 +413,37 @@ ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 5
                             FieldLabel { text: "Webhook URL *" }
-                            AppField { id: webhook; placeholderText: "https://open.feishu.cn/open-apis/bot/v2/hook/..."; onEditingFinished: controller.updateField("feishu", "webhook_url", text.trim()) }
+                            AppField { id: webhook; placeholderText: "https://open.feishu.cn/open-apis/bot/v2/hook/..."; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "webhook_url", text.trim()) }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 5
                             FieldLabel { text: "安全关键词" }
-                            AppField { id: keyword; placeholderText: "与机器人安全设置保持一致"; onEditingFinished: controller.updateField("feishu", "keyword", text.trim()) }
+                            AppField { id: keyword; placeholderText: "与机器人安全设置保持一致"; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "keyword", text.trim()) }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 5
                             FieldLabel { text: "签名 Secret（可选）" }
-                            AppField { id: signSecret; echoMode: TextInput.Password; onEditingFinished: controller.updateField("feishu", "secret", text) }
+                            AppField { id: signSecret; echoMode: TextInput.Password; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "secret", text) }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 5
                             FieldLabel { text: "邮箱域名" }
-                            AppField { id: emailDomain; placeholderText: "@geely.com"; onEditingFinished: controller.updateField("message", "email_domain", text.trim() || "@geely.com") }
+                            AppField { id: emailDomain; placeholderText: "@geely.com"; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("message", "email_domain", text.trim() || "@geely.com") }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 5
                             FieldLabel { text: "App ID（可选）" }
-                            AppField { id: appId; onEditingFinished: controller.updateField("feishu", "app_id", text.trim()) }
+                            AppField { id: appId; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "app_id", text.trim()) }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 5
                             FieldLabel { text: "App Secret（可选）" }
-                            AppField { id: appSecret; echoMode: TextInput.Password; onEditingFinished: controller.updateField("feishu", "app_secret", text) }
+                            AppField { id: appSecret; echoMode: TextInput.Password; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "app_secret", text) }
                         }
                     }
                     CheckBox {
@@ -512,6 +517,7 @@ ColumnLayout {
                         id: dailyTimes
                         enabled: scheduleMode.currentIndex === 1
                         placeholderText: "09:00,15:00,18:00"
+                        onTextEdited: controller.markCurrentProfileDirty()
                         onEditingFinished: controller.updateDailyTimes(text)
                     }
                     Text { text: "多个时刻使用逗号分隔；每个时刻当天只触发一次。"; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting }
@@ -536,23 +542,30 @@ ColumnLayout {
         }
     }
 
-    ColumnLayout {
+    Item {
         id: outputPanel
         Layout.fillWidth: true
-        Layout.fillHeight: false
         Layout.preferredHeight: root.outputPanelCollapsedHeight
-                                + (root.outputPanelMaxHeight
-                                   - root.outputPanelCollapsedHeight)
-                                  * root.outputReveal
         Layout.minimumHeight: root.outputPanelCollapsedHeight
-        Layout.maximumHeight: root.outputPanelMaxHeight
-        spacing: 6
+        Layout.maximumHeight: root.outputPanelCollapsedHeight
+        z: 10
+
+        Rectangle {
+            id: outputDrawer
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: root.outputPanelCollapsedHeight
+                    + root.outputLogMaxHeight * root.outputReveal
+            color: Theme.surface
 
         Item {
             id: outputToggle
             objectName: "jiraFeishuOutputToggle"
-            Layout.fillWidth: true
-            Layout.preferredHeight: 10
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 10
 
             Rectangle {
                 anchors.centerIn: parent
@@ -578,7 +591,12 @@ ColumnLayout {
         }
 
         RowLayout {
-            Layout.fillWidth: true
+            id: actionRow
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: outputToggle.bottom
+            anchors.topMargin: 6
+            height: 44
             spacing: 10
             PrimaryButton {
                 Layout.fillWidth: true
@@ -624,14 +642,18 @@ ColumnLayout {
         }
 
         Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.minimumHeight: 0
+            id: outputLog
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: actionRow.bottom
+            anchors.topMargin: 6
+            anchors.bottom: parent.bottom
             radius: Theme.radiusLarge
             color: Theme.consoleBackground
             border.color: Theme.outlineVariant
             clip: true
-            opacity: root.outputExpanded ? 1 : 0
+            visible: height > 0
+            opacity: root.outputReveal
             ColumnLayout {
                 anchors.fill: parent
                 spacing: 0
@@ -659,6 +681,6 @@ ColumnLayout {
                 NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
             }
         }
-
+        }
     }
 }
