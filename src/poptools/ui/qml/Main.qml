@@ -34,8 +34,21 @@ ApplicationWindow {
     Connections {
         target: settingsController
         function onThemeChanged() {
-            ThemeConfig.applyTheme(settingsController.themeStyle, settingsController.darkTheme)
+            applyThemeFromConfig()
         }
+    }
+
+    function applyThemeFromConfig() {
+        var style = settingsController.themeStyle
+        var dark = settingsController.darkTheme
+        var configObj = null
+        if (style === "mario") {
+            var jsonText = settingsController.themeConfigJson("mario")
+            if (jsonText) {
+                try { configObj = JSON.parse(jsonText) } catch (e) { configObj = null }
+            }
+        }
+        ThemeConfig.applyTheme(style, dark, configObj)
     }
 
     property var parameterValues: ({})
@@ -414,7 +427,7 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
-        ThemeConfig.applyTheme(settingsController.themeStyle, settingsController.darkTheme)
+        applyThemeFromConfig()
         primaryNavWidth = width < 1180 ? 86 : 262
         toolListWidth = width < 900 ? minimumToolListWidth : 286
         clampPanelWidths()
@@ -586,16 +599,6 @@ ApplicationWindow {
                 }
             }
         }
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        color: "transparent"
-        radius: window.visibility === Window.Maximized ? Theme.radiusNone : Theme.radiusSmall
-        border.width: 1
-        border.color: Theme.outlineVariant
-        z: 950
-        enabled: false
     }
 
     Item {
@@ -861,8 +864,17 @@ ApplicationWindow {
                     width: visible ? window.toolListWidth : 0
                     visible: !window.standbySelected && !window.developerSelected
                         && appController.section !== "custom"
+                    radius: Theme.radiusLarge
                     color: Theme.middlePanel
                     clip: true
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: Math.min(Theme.radiusLarge, parent.height)
+                        color: parent.color
+                    }
 
                     ColumnLayout {
                         anchors.fill: parent

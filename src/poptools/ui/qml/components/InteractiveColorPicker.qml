@@ -102,7 +102,11 @@ ScrollView {
                     anchors.margins: 3
                     onPaint: {
                         const ctx = getContext("2d")
-                        const cornerRadius = 9
+                        const cornerRadius = Math.min(
+                            Theme.radiusSmall,
+                            width / 2,
+                            height / 2
+                        )
                         const tile = 7
                         ctx.clearRect(0, 0, width, height)
 
@@ -175,16 +179,40 @@ ScrollView {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 190
-            radius: Theme.radiusLarge
+            radius: Theme.radiusSmall
             color: "transparent"
-            clip: true
 
             Canvas {
                 id: saturationValueCanvas
                 anchors.fill: parent
                 onPaint: {
                     const ctx = getContext("2d")
+                    const cornerRadius = Math.min(
+                        Theme.radiusSmall,
+                        width / 2,
+                        height / 2
+                    )
                     ctx.clearRect(0, 0, width, height)
+
+                    ctx.save()
+                    ctx.beginPath()
+                    ctx.moveTo(cornerRadius, 0)
+                    ctx.lineTo(width - cornerRadius, 0)
+                    ctx.quadraticCurveTo(width, 0, width, cornerRadius)
+                    ctx.lineTo(width, height - cornerRadius)
+                    ctx.quadraticCurveTo(
+                        width,
+                        height,
+                        width - cornerRadius,
+                        height
+                    )
+                    ctx.lineTo(cornerRadius, height)
+                    ctx.quadraticCurveTo(0, height, 0, height - cornerRadius)
+                    ctx.lineTo(0, cornerRadius)
+                    ctx.quadraticCurveTo(0, 0, cornerRadius, 0)
+                    ctx.closePath()
+                    ctx.clip()
+
                     ctx.fillStyle = picker.hueColor()
                     ctx.fillRect(0, 0, width, height)
 
@@ -199,6 +227,7 @@ ScrollView {
                     black.addColorStop(1, "#000000")
                     ctx.fillStyle = black
                     ctx.fillRect(0, 0, width, height)
+                    ctx.restore()
                 }
 
                 Connections {
@@ -348,6 +377,15 @@ ScrollView {
 
         function onScreenColorPickingCancelled() {
             picker.screenPicking = false
+        }
+    }
+
+    Connections {
+        target: Theme
+
+        function onRadiusSmallChanged() {
+            colorPreviewCanvas.requestPaint()
+            saturationValueCanvas.requestPaint()
         }
     }
 

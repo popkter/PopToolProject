@@ -24,6 +24,7 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import quote as url_quote
 
 import requests
 import urllib3
@@ -745,6 +746,73 @@ def _overview_table(groups, unassigned, at_assignee):
 MAX_TABLES_PER_CARD = 5  # 飞书每卡表格数量上限（用户确认）
 
 
+def _split_jql_order_by(jql):
+    """Split a trailing ORDER BY clause without matching text inside quotes."""
+    quote = None
+    escaped = False
+    length = len(jql)
+    index = 0
+
+    while index < length:
+        char = jql[index]
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+            index += 1
+            continue
+
+        if char in {'"', "'"}:
+            quote = char
+            index += 1
+            continue
+
+        before_is_word = index > 0 and (jql[index - 1].isalnum() or jql[index - 1] == "_")
+        if not before_is_word and jql[index:index + 5].lower() == "order":
+            cursor = index + 5
+            if cursor < length and jql[cursor].isspace():
+                while cursor < length and jql[cursor].isspace():
+                    cursor += 1
+                if (jql[cursor:cursor + 2].lower() == "by"
+                        and (cursor + 2 == length
+                             or not (jql[cursor + 2].isalnum()
+                                     or jql[cursor + 2] == "_"))):
+                    return jql[:index].rstrip(), jql[index:].strip()
+        index += 1
+
+    return jql.strip(), ""
+
+
+def _my_issues_button(config):
+    """「查看我的问题」按钮：点击后在浏览器打开当前登录用户在本方案 JQL 范围内的 Issue。
+
+    将方案配置的 jql_filter 整体加括号后追加 AND assignee = currentUser()，
+    由 Jira 按点击者登录态解析 currentUser()，故群里每个人点到的都是自己在本看板范围内的问题。
+    若 JQL 含 ORDER BY，则把 assignee 条件插到 ORDER BY 之前，保证语法合法。
+    Schema 2.0 不再支持 action 容器，button 直接作为 body 元素。
+    """
+    base = config["jira"]["base_url"].strip().rstrip("/")
+    jql = config["jira"].get("jql_filter", "").strip()
+    extra = "assignee = currentUser()"
+    if jql:
+        predicate, order_by = _split_jql_order_by(jql)
+        full = f"({predicate}) AND {extra}" if predicate else extra
+        if order_by:
+            full += f" {order_by}"
+    else:
+        full = extra
+    url = f"{base}/issues/?jql={url_quote(full)}"
+    return {
+        "tag": "button",
+        "text": {"tag": "plain_text", "content": "🔗 查看我的问题"},
+        "type": "primary",
+        "multi_url": {"url": url, "pc_url": url, "ios_url": url, "android_url": url},
+    }
+
+
 def build_feishu_messages(config, issues):
     """构建飞书互动卡片消息列表（Schema 2.0）。
 
@@ -759,12 +827,14 @@ def build_feishu_messages(config, issues):
     at_assignee = msg_cfg.get("at_assignee", True)
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # 概览：总数 div + 每人数量表格（负责人｜数量，可 @）
-    overview_els = [
-        {"tag": "div", "text": {"tag": "lark_md",
-         "content": f"📊 看板概览：共 {len(issues)} 个 Issue"}},
-        _overview_table(groups, unassigned, at_assignee),
-    ]
+    overview_els = []
+    scheme_name = config.get("name", "")
+    if scheme_name:
+        overview_els.append({"tag": "div", "text": {"tag": "lark_md",
+                            "content": f"## 📋 当前看板：{scheme_name}"}})
+    overview_els.append({"tag": "div", "text": {"tag": "lark_md",
+                         "content": f"> 共 {len(issues)} 个 Issue"}})
+    overview_els.append(_overview_table(groups, unassigned, at_assignee))
 
     # 收集每人的元素块（行多则拆多块，每块带 header）+ 未指派
     chunks = []
@@ -782,6 +852,7 @@ def build_feishu_messages(config, issues):
     title = f"{keyword} | Jira看板状态 ({now})"
     current = []
     overview_added = False
+    my_issues = _my_issues_button(config)
 
     def _flush():
         nonlocal current, overview_added
@@ -791,6 +862,9 @@ def build_feishu_messages(config, issues):
         overview_added = True
         idx = len(messages) + 1
         sub_title = title if idx == 1 else f"{title}（续{idx - 1}）"
+        # 仅在首卡末尾放「查看我的问题」按钮，作为全卡入口
+        if idx == 1:
+            els = els + [my_issues]
         messages.append((f"卡片{idx}", _build_card_msg(sub_title, els, feishu_cfg)))
         current = []
 

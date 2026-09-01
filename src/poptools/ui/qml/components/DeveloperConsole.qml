@@ -10,8 +10,20 @@ import "../theme"
 Item {
     id: root
     required property var controller
+    property bool terminalSurfaceRevealed: false
 
     Component.onDestruction: root.controller.terminalDetached()
+
+    Timer {
+        id: terminalRevealTimer
+        interval: 1200
+        repeat: false
+        onTriggered: {
+            root.terminalSurfaceRevealed = true
+            if (root.visible)
+                terminalView.forceActiveFocus()
+        }
+    }
 
     QtObject {
         id: terminalBridge
@@ -44,10 +56,24 @@ Item {
         function onTerminalResetRequested() { terminalBridge.resetRequested() }
     }
 
+    Connections {
+        target: Theme
+
+        function onRadiusLargeChanged() {
+            root.terminalSurfaceRevealed = false
+            terminalRevealTimer.stop()
+            if (root.visible)
+                terminalRevealTimer.start()
+        }
+    }
+
     onVisibleChanged: {
         if (visible) {
             root.controller.ensureStarted()
-            terminalView.forceActiveFocus()
+            if (root.terminalSurfaceRevealed)
+                terminalView.forceActiveFocus()
+            else
+                terminalRevealTimer.start()
         }
     }
 
@@ -228,8 +254,20 @@ Item {
             WebEngineView {
                 id: terminalView
                 anchors.fill: parent
-                anchors.margins: 6
-                backgroundColor: "#141A20"
+                // WebEngineView is rectangular and is not clipped by the
+                // Rectangle's rounded outline. Keep its corners inside the
+                // rounded area, with a larger inset for rounder themes.
+                anchors.margins: Math.max(
+                    6,
+                    Math.ceil(Theme.radiusLarge * 0.3)
+                )
+                // Keep the WebEngine surface transparent while the page is
+                // loading so its temporary rectangular clear does not flash
+                // outside the rounded QML background.
+                backgroundColor: "transparent"
+                // A tiny non-zero opacity keeps the WebEngine compositor
+                // active while making its unstable first frame imperceptible.
+                opacity: root.terminalSurfaceRevealed ? 1 : 0.001
                 webChannel: terminalChannel
                 url: Qt.resolvedUrl("../../terminal/index.html")
                 focus: true

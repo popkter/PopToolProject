@@ -76,16 +76,20 @@ QtObject {
     })
 
     // XP uses small radii; M3 uses larger ones.
+    // Mario is defined in configs/mario.json and applied via _applyConfig.
     readonly property var m3Radius: ({ none: 0, tiny: 4, small: 8, medium: 12, large: 18, xlarge: 24, full: 9999 })
     readonly property var xpRadius: ({ none: 0, tiny: 1, small: 2, medium: 4, large: 6, xlarge: 8, full: 9999 })
 
-    function applyTheme(themeName, isDark) {
+    function applyTheme(themeName, isDark, configObj) {
         currentTheme = themeName
         var palette, radius
 
         if (themeName === "winxp") {
             palette = isDark ? xpDark : xpLight
             radius = xpRadius
+        } else if (themeName === "mario" && configObj) {
+            _applyConfig(configObj, isDark)
+            return
         } else {
             palette = isDark ? m3Dark : m3Light
             radius = m3Radius
@@ -94,6 +98,23 @@ QtObject {
         _applyPalette(palette)
         _applyRadius(radius)
         _applyDerived(palette)
+    }
+
+    function _applyConfig(cfg, isDark) {
+        // Apply a theme loaded from a JSON config (configs/<style>.json via
+        // settingsController.themeConfigJson). colors/darkColors carry the full
+        // palette incl. per-mode button/card states; radius defines corner sizes.
+        var col = isDark ? cfg.darkColors : cfg.colors
+        var fallback = isDark ? m3Dark : m3Light
+        if (!col) {
+            _applyPalette(fallback)
+            _applyRadius(m3Radius)
+            _applyDerived(fallback)
+            return
+        }
+        _applyPalette(col)
+        _applyRadius(cfg.radius || m3Radius)
+        _applyDerived(col)
     }
 
     function _applyPalette(p) {

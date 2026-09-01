@@ -21,7 +21,7 @@ Dialog {
     onOpened: {
         themeModeBox.currentIndex = Math.max(0, ["system", "light", "dark"].indexOf(
                                                  root.controller.themeMode))
-        themeStyleBox.currentIndex = Math.max(0, ["material3", "winxp"].indexOf(
+        themeStyleBox.currentIndex = Math.max(0, ["material3", "winxp", "mario"].indexOf(
                                                  root.controller.themeStyle))
         concurrencyBox.currentIndex = Math.max(0, root.controller.customScriptConcurrency - 1)
     }
@@ -87,6 +87,7 @@ Dialog {
             id: settingsScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.bottomMargin: Theme.radiusLarge
             clip: true
             contentWidth: availableWidth
 
@@ -170,7 +171,8 @@ Dialog {
                                 valueRole: "value"
                                 model: [
                                     { "label": "Material 3", "value": "material3" },
-                                    { "label": "Windows XP", "value": "winxp" }
+                                    { "label": "Windows XP", "value": "winxp" },
+                                    { "label": "Mario", "value": "mario" }
                                 ]
                                 onActivated: root.controller.saveThemeStyle(currentValue)
                             }

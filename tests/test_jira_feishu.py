@@ -2,10 +2,49 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qs, urlparse
+
+import pytest
 
 from poptools.infrastructure import jira_feishu_core as core
 from poptools.infrastructure.jira_feishu_profiles import JiraFeishuProfileStore
 from poptools.viewmodels.jira_feishu_controller import JiraFeishuController
+
+
+@pytest.mark.parametrize(
+    ("jql", "expected"),
+    [
+        ("", "assignee = currentUser()"),
+        ("project = APP", "(project = APP) AND assignee = currentUser()"),
+        (
+            "project = APP OR project = CORE",
+            "(project = APP OR project = CORE) AND assignee = currentUser()",
+        ),
+        (
+            "project = APP OR project = CORE ORDER BY created DESC",
+            "(project = APP OR project = CORE) AND assignee = currentUser() "
+            "ORDER BY created DESC",
+        ),
+        (
+            'summary ~ "order by failure" AND status = Open ORDER BY priority ASC',
+            '(summary ~ "order by failure" AND status = Open) AND assignee = currentUser() '
+            "ORDER BY priority ASC",
+        ),
+        (
+            r"summary ~ 'escaped \'order by\' text' ORDER BY updated DESC",
+            r"(summary ~ 'escaped \'order by\' text') AND assignee = currentUser() "
+            "ORDER BY updated DESC",
+        ),
+    ],
+)
+def test_my_issues_button_preserves_jql_scope(jql, expected):
+    config = {"jira": {"base_url": "https://jira.test", "jql_filter": jql}}
+
+    button = core._my_issues_button(config)
+    url = button["multi_url"]["url"]
+    actual = parse_qs(urlparse(url).query)["jql"][0]
+
+    assert actual == expected
 
 
 def test_profile_store_migrates_legacy_config(tmp_path):

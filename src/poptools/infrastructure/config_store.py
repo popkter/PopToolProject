@@ -41,7 +41,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 TOOL_SORT_MODES = ("added_time", "name", "usage", "custom")
 THEME_MODES = ("system", "light", "dark")
-THEME_STYLES = ("material3", "winxp")
+THEME_STYLES = ("material3", "winxp", "mario")
 LOCAL_SCRIPT_ENTRIES = ("tools", "scripts")
 
 

@@ -22,3 +22,4 @@ src/poptools/resources/vendor/scrcpy-macos-*.tar.gz
 src/poptools/_build_version.py
 .tmp*
 change.patch
+.claude

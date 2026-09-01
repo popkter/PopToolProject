@@ -365,12 +365,101 @@ ColumnLayout {
                         }
                         ColumnLayout {
                             spacing: 5
-                            FieldLabel { text: "最多获取数" }
+
+                            FieldLabel {
+                                text: "最多获取数"
+                            }
+
                             SpinBox {
                                 id: jiraMax
-                                Layout.preferredWidth: 240; Layout.preferredHeight: 46
-                                from: 1; to: 1000; editable: true
-                                onValueModified: controller.updateField("jira", "max_results", value)
+
+                                Layout.preferredWidth: 240
+                                Layout.preferredHeight: 46
+
+                                from: 1
+                                to: 1000
+                                editable: true
+
+                                leftPadding: 48
+                                rightPadding: 48
+
+                                background: Rectangle {
+                                    radius: Theme.radiusSmall
+                                    color: jiraMax.enabled
+                                        ? Theme.inputDefault
+                                        : Theme.inputDisabled
+                                    border.width: Theme.borderWidthThin
+                                    border.color: jiraMax.activeFocus
+                                        ? Theme.borderColorFocused
+                                        : Theme.borderColorDefault
+                                }
+
+                                contentItem: TextInput {
+                                    text: jiraMax.textFromValue(jiraMax.value, jiraMax.locale)
+                                    color: jiraMax.enabled
+                                        ? Theme.textPrimary
+                                        : Theme.textSecondary
+                                    font: jiraMax.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    readOnly: !jiraMax.editable
+                                    validator: jiraMax.validator
+                                    selectByMouse: true
+                                    selectionColor: Theme.primary
+                                    selectedTextColor: Theme.primaryForeground
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                }
+
+                                down.indicator: Item {
+                                    x: 0
+                                    y: 0
+                                    width: 48
+                                    height: jiraMax.height
+
+                                    Rectangle {
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: Theme.borderWidthThin
+                                        height: parent.height - 16
+                                        color: Theme.outlineVariant
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "\u2212"
+                                        color: jiraMax.down.pressed
+                                            ? Theme.primary
+                                            : Theme.textPrimary
+                                        font.pixelSize: 24
+                                    }
+                                }
+
+                                up.indicator: Item {
+                                    x: jiraMax.width - width
+                                    y: 0
+                                    width: 48
+                                    height: jiraMax.height
+
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: Theme.borderWidthThin
+                                        height: parent.height - 16
+                                        color: Theme.outlineVariant
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "+"
+                                        color: jiraMax.up.pressed
+                                            ? Theme.primary
+                                            : Theme.textPrimary
+                                        font.pixelSize: 24
+                                    }
+                                }
+
+                                onValueModified:
+                                    controller.updateField("jira", "max_results", value)
                             }
                         }
                     }
@@ -524,9 +613,99 @@ ColumnLayout {
                             FieldLabel { text: "间隔分钟数" }
                             SpinBox {
                                 id: intervalMinutes
-                                Layout.fillWidth: true; Layout.preferredHeight: 46
-                                from: 1; to: 1440; editable: true
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 46
+
+                                from: 1
+                                to: 1440
+                                editable: true
                                 enabled: scheduleMode.currentIndex === 0
+
+                                leftPadding: 48
+                                rightPadding: 48
+
+                                background: Rectangle {
+                                    radius: Theme.radiusSmall
+                                    color: intervalMinutes.enabled
+                                        ? Theme.inputDefault
+                                        : Theme.inputDisabled
+                                    border.width: Theme.borderWidthThin
+                                    border.color: intervalMinutes.activeFocus
+                                        ? Theme.borderColorFocused
+                                        : Theme.borderColorDefault
+                                }
+
+                                contentItem: TextInput {
+                                    text: intervalMinutes.textFromValue(
+                                        intervalMinutes.value,
+                                        intervalMinutes.locale
+                                    )
+                                    color: intervalMinutes.enabled
+                                        ? Theme.textPrimary
+                                        : Theme.textSecondary
+                                    font: intervalMinutes.font
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    readOnly: !intervalMinutes.editable
+                                    validator: intervalMinutes.validator
+                                    selectByMouse: true
+                                    selectionColor: Theme.primary
+                                    selectedTextColor: Theme.primaryForeground
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                }
+
+                                down.indicator: Item {
+                                    x: 0
+                                    y: 0
+                                    width: 48
+                                    height: intervalMinutes.height
+
+                                    Rectangle {
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: Theme.borderWidthThin
+                                        height: parent.height - 16
+                                        color: Theme.outlineVariant
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "\u2212"
+                                        color: intervalMinutes.enabled
+                                            ? (intervalMinutes.down.pressed
+                                                ? Theme.primary
+                                                : Theme.textPrimary)
+                                            : Theme.textSecondary
+                                        font.pixelSize: 24
+                                    }
+                                }
+
+                                up.indicator: Item {
+                                    x: intervalMinutes.width - width
+                                    y: 0
+                                    width: 48
+                                    height: intervalMinutes.height
+
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: Theme.borderWidthThin
+                                        height: parent.height - 16
+                                        color: Theme.outlineVariant
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "+"
+                                        color: intervalMinutes.enabled
+                                            ? (intervalMinutes.up.pressed
+                                                ? Theme.primary
+                                                : Theme.textPrimary)
+                                            : Theme.textSecondary
+                                        font.pixelSize: 24
+                                    }
+                                }
+
                                 onValueModified: controller.updateField("schedule", "interval_minutes", value)
                             }
                         }
