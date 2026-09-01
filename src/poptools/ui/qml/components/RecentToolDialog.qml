@@ -131,7 +131,7 @@ Window {
                         visible: !root.presetMode
                         width: 48; height: 32
                         anchors.verticalCenter: parent.verticalCenter
-                        radius: 16
+                        radius: Theme.radiusMedium
                         color: root.operationRunning
                             ? (runBtnMouse.containsMouse ? Qt.darker(Theme.errorColor, 1.1) : Theme.errorColor)
                             : (runBtnMouse.containsMouse ? Theme.primaryHover : Theme.primary)

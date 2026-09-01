@@ -30,10 +30,13 @@ ComboBox {
 
     background: Rectangle {
         radius: Theme.radiusMedium
-        color: Theme.surface
-        border.color: control.popup.visible || control.activeFocus
-                      ? Theme.primary : Theme.outline
-        border.width: control.popup.visible || control.activeFocus ? 2 : 1
+        color: control.activeFocus ? (Theme.inputFocused || Theme.primaryContainer)
+               : control.enabled ? (Theme.inputDefault || Theme.surface)
+               : (Theme.inputDisabled || Theme.surfaceContainerLow)
+        border.color: control.activeFocus ? (Theme.borderColorFocused || Theme.primary)
+                    : control.enabled ? (Theme.borderColorDefault || Theme.outline)
+                    : Theme.outline
+        border.width: control.activeFocus ? 2 : 1
     }
 
     delegate: ItemDelegate {
@@ -54,8 +57,8 @@ ComboBox {
         background: Rectangle {
             radius: Theme.radiusSmall
             color: control.currentIndex === index
-                   ? Theme.primaryContainer
-                   : (parent.highlighted ? Theme.surfaceContainerHigh : "transparent")
+                   ? (Theme.cardSelected || Theme.primaryContainer)
+                   : (parent.highlighted ? (Theme.cardHover || Theme.surfaceContainerHigh) : "transparent")
         }
     }
 

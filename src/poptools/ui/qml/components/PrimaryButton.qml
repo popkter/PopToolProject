@@ -18,11 +18,26 @@ Rectangle {
     implicitHeight: 58
     implicitWidth: compact ? 58 : 180
     radius: Theme.radiusMedium
-    color: !enabled ? Theme.surfaceContainerHigh
+    color: !enabled ? (Theme.buttonDisabled || Theme.surfaceContainerHigh)
                     : successStyle ? (mouseArea.containsMouse ? Qt.darker(Theme.success, 1.08) : Theme.success)
                     : tonal ? (mouseArea.containsMouse ? Theme.primaryContainerHover : Theme.primaryContainer)
                             : (mouseArea.containsMouse ? Theme.primaryHover : Theme.primary)
-    opacity: 1
+    border.width: mouseArea.pressed ? 2 : 1
+    border.color: !enabled ? Theme.outline
+                    : mouseArea.pressed ? Theme.buttonShadow
+                    : mouseArea.containsMouse ? Theme.primaryHover
+                    : Theme.primary
+
+    // XP-style highlight edge for 3D effect
+    Rectangle {
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: mouseArea.pressed ? 0 : 1
+        color: mouseArea.pressed ? "transparent" : (Theme.buttonHighlight || "#FFFFFF")
+        visible: !root.tonal && !root.successStyle
+        opacity: mouseArea.containsMouse ? 0.8 : 0.5
+    }
 
     RowLayout {
         anchors.centerIn: parent

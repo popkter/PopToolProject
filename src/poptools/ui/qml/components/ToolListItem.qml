@@ -22,9 +22,9 @@ Rectangle {
 
     implicitHeight: 64
     radius: Theme.radiusMedium
-    color: selected ? Theme.primaryContainer
-                    : (mouseArea.containsMouse || dragging ? root.hoverColor : "transparent")
-    border.color: dragging ? Theme.primary : "transparent"
+    color: selected ? (Theme.cardSelected || Theme.primaryContainer)
+                    : (mouseArea.containsMouse || dragging ? (Theme.cardHover || root.hoverColor) : "transparent")
+    border.color: dragging ? (Theme.borderColorFocused || Theme.primary) : "transparent"
     border.width: dragging ? 2 : 0
     z: dragging ? 10 : 0
 
@@ -39,7 +39,7 @@ Rectangle {
             visible: root.running
             Layout.preferredWidth: 8
             Layout.preferredHeight: 8
-            radius: 4
+            radius: height / 2
             color: Theme.success
         }
         MaterialIcon {

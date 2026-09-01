@@ -199,7 +199,7 @@ Dialog {
     }
 
     background: Rectangle {
-        radius: 22
+        radius: Theme.radiusLarge
         color: Theme.surface
         border.color: Theme.outlineVariant
         border.width: 1
@@ -208,18 +208,9 @@ Dialog {
     contentItem: ColumnLayout {
         spacing: 0
 
-        Rectangle {
+        Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 92
-            color: Theme.surfaceContainerLow
-            radius: 22
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                height: 22
-                color: parent.color
-            }
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 22
@@ -228,7 +219,7 @@ Dialog {
                 Rectangle {
                     Layout.preferredWidth: 48
                     Layout.preferredHeight: 48
-                    radius: 15
+                    radius: Theme.radiusMedium
                     color: Theme.primaryContainer
                     MaterialIcon {
                         anchors.centerIn: parent
@@ -258,7 +249,7 @@ Dialog {
                 Rectangle {
                     Layout.preferredWidth: 42
                     Layout.preferredHeight: 42
-                    radius: 21
+                    radius: height / 2
                     color: closeMouse.containsMouse ? Theme.surfaceContainerHigh : "transparent"
                     MaterialIcon { anchors.centerIn: parent; icon: "close"; iconSize: 23; color: Theme.textSecondary }
                     MouseArea {
@@ -323,7 +314,7 @@ Dialog {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 40
                                 height: 40
-                                radius: 10
+                                radius: Theme.radiusSmall
                                 z: 2
                                 color: iconButtonMouse.containsMouse || iconPopup.opened
                                        ? Theme.primaryContainer : Theme.surfaceContainerLow
@@ -371,7 +362,7 @@ Dialog {
                                             required property var modelData
                                             width: 44
                                             height: 40
-                                            radius: 10
+                                            radius: Theme.radiusSmall
                                             color: root.selectedIcon === modelData.value
                                                    ? Theme.primaryContainer
                                                    : (iconMouse.containsMouse
@@ -549,18 +540,9 @@ Dialog {
             }
         }
 
-        Rectangle {
+        Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 76
-            radius: 22
-            color: Theme.surface
-            Rectangle {
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: 1
-                color: Theme.outlineVariant
-            }
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 20

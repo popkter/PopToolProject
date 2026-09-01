@@ -17,7 +17,7 @@ Rectangle {
 
     implicitWidth: 40
     implicitHeight: 40
-    radius: 20
+    radius: Theme.radiusLarge
     color: buttonMouse.containsMouse || sortPopup.opened
            ? root.hoverColor : "transparent"
 

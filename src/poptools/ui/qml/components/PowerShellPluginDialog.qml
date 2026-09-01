@@ -43,7 +43,7 @@ Dialog {
     }
 
     background: Rectangle {
-        radius: 22
+        radius: Theme.radiusLarge
         color: Theme.surface
         border.color: Theme.outlineVariant
         border.width: 1
@@ -56,7 +56,7 @@ Dialog {
             Layout.fillWidth: true
             Layout.preferredHeight: 92
             color: Theme.surfaceContainerLow
-            radius: 22
+            radius: Theme.radiusLarge
 
             Rectangle {
                 anchors.left: parent.left
@@ -74,7 +74,7 @@ Dialog {
                 Rectangle {
                     Layout.preferredWidth: 48
                     Layout.preferredHeight: 48
-                    radius: 15
+                    radius: Theme.radiusMedium
                     color: Theme.primaryContainer
 
                     MaterialIcon {
@@ -105,7 +105,7 @@ Dialog {
                 Rectangle {
                     Layout.preferredWidth: 42
                     Layout.preferredHeight: 42
-                    radius: 21
+                    radius: height / 2
                     color: closeMouse.containsMouse && closeMouse.enabled
                            ? Theme.surfaceContainerHigh : "transparent"
 
@@ -197,7 +197,7 @@ Dialog {
             id: dialogFooter
             Layout.fillWidth: true
             Layout.preferredHeight: 76
-            radius: 22
+            radius: Theme.radiusLarge
             color: Theme.surface
 
             Rectangle {

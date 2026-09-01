@@ -50,6 +50,7 @@ class SettingsController(QObject):
         self._merit_count = config_store.merit_count()
         self._custom_script_concurrency = config_store.custom_script_concurrency()
         self._theme_mode = config_store.theme_mode()
+        self._theme_style = config_store.theme_style()
         self._terminal_enabled = config_store.terminal_enabled()
         self._system_dark_theme = False
 
@@ -86,6 +87,10 @@ class SettingsController(QObject):
     @Property(str, notify=themeChanged)
     def themeMode(self) -> str:
         return self._theme_mode
+
+    @Property(str, notify=themeChanged)
+    def themeStyle(self) -> str:
+        return self._theme_style
 
     @Property(bool, notify=terminalEnabledChanged)
     def terminalEnabled(self) -> bool:
@@ -198,6 +203,17 @@ class SettingsController(QObject):
             return False
         if mode != self._theme_mode:
             self._theme_mode = mode
+            self.themeChanged.emit()
+        return True
+
+    @Slot(str, result=bool)
+    def saveThemeStyle(self, style: str) -> bool:
+        try:
+            self.config_store.set_theme_style(style)
+        except (OSError, ValueError):
+            return False
+        if style != self._theme_style:
+            self._theme_style = style
             self.themeChanged.emit()
         return True
 

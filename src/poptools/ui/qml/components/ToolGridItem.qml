@@ -25,10 +25,10 @@ Rectangle {
 
     radius: Theme.radiusMedium
     color: root.selected
-           ? Theme.primaryContainer
+           ? (Theme.cardSelected || Theme.primaryContainer)
            : (cardMouse.containsMouse || root.dragging
-                ? Theme.surfaceContainerHigh : Theme.surfaceContainerLow)
-    border.color: root.selected || root.dragging ? Theme.primary : Theme.outlineVariant
+                ? (Theme.cardHover || Theme.surfaceContainerHigh) : (Theme.cardDefault || Theme.surfaceContainerLow))
+    border.color: root.selected || root.dragging ? (Theme.borderColorFocused || Theme.primary) : Theme.outlineVariant
     border.width: root.selected || root.dragging ? 2 : 1
     z: root.dragging ? 10 : 0
 
@@ -44,7 +44,7 @@ Rectangle {
             Layout.preferredWidth: 40
             Layout.preferredHeight: 40
             Layout.alignment: Qt.AlignVCenter
-            radius: 11
+            radius: Theme.radiusSmall
             color: root.selected ? Theme.surface : Theme.primaryContainer
 
             MaterialIcon {
@@ -62,7 +62,7 @@ Rectangle {
                 anchors.topMargin: -3
                 width: 10
                 height: 10
-                radius: 5
+                radius: height / 2
                 color: Theme.success
                 border.color: Theme.surface
                 border.width: 2
@@ -93,8 +93,8 @@ Rectangle {
                     Layout.preferredWidth: kindText.implicitWidth + 12
                     Layout.preferredHeight: 20
                     Layout.alignment: Qt.AlignVCenter
-                    radius: 6
-                    color: root.selected ? Theme.surface : Theme.surfaceContainer
+                    radius: Theme.radiusTiny
+                    color: root.selected ? Theme.surface : (Theme.cardHover || Theme.surfaceContainer)
                     border.color: Theme.outlineVariant
                     border.width: 1
 

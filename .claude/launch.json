@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "poptools",
+      "runtimeExecutable": ".venv/Scripts/python",
+      "runtimeArgs": ["-m", "poptools.main"],
+      "port": 0
+    }
+  ]
+}

@@ -148,7 +148,7 @@ Item {
             Rectangle {
                 Layout.preferredWidth: 86
                 Layout.preferredHeight: 38
-                radius: 10
+                radius: Theme.radiusSmall
                 color: clearMouse.containsMouse ? Theme.surfaceContainerHigh : Theme.surface
                 border.color: Theme.outlineVariant
                 Row {
@@ -169,7 +169,7 @@ Item {
                 visible: root.resizable
                 Layout.preferredWidth: 36
                 Layout.preferredHeight: 36
-                radius: 18
+                radius: Theme.radiusLarge
                 color: toggleMouse.containsMouse ? Theme.surfaceContainerHigh : "transparent"
                 MaterialIcon {
                     anchors.centerIn: parent
@@ -196,7 +196,7 @@ Item {
             Layout.rightMargin: root.outputOuterMargin
             Layout.bottomMargin: root.outputOuterMargin
             Layout.topMargin: 0
-            radius: 14
+            radius: Theme.radiusMedium
             color: Theme.consoleBackground
 
             ScrollView {

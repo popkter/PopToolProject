@@ -49,7 +49,7 @@ Dialog {
             }
             Text {
                 Layout.fillWidth: true
-                text: "用几步了解如何创建客制、生成参数输入框、管理 Python 依赖，以及使用内置终端。"
+                text: "用几步了解如何创建客制、配置 Jira 飞书推送、切换主题、管理 Python 依赖，以及使用内置终端。"
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontBody
                 wrapMode: Text.WordWrap
@@ -63,6 +63,7 @@ Dialog {
         }
 
         ScrollView {
+            id: guideScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.leftMargin: 26
@@ -71,10 +72,21 @@ Dialog {
             Layout.bottomMargin: 14
             clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-            ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+            ScrollBar.vertical: ScrollBar {
+                id: guideScrollBar
+                policy: ScrollBar.AsNeeded
+                implicitWidth: 8
+                background: Rectangle { color: "transparent" }
+                contentItem: Rectangle {
+                    implicitWidth: 4
+                    radius: width / 2
+                    color: guideScrollBar.pressed ? Theme.primary : Theme.outline
+                    opacity: guideScrollBar.active ? 1 : 0.55
+                }
+            }
 
             ColumnLayout {
-                width: root.width - 52
+                width: guideScroll.availableWidth
                 spacing: 12
 
                 Rectangle {
@@ -149,6 +161,76 @@ Dialog {
 
                 Rectangle {
                     Layout.fillWidth: true
+                    implicitHeight: jiraGuide.implicitHeight + 32
+                    radius: Theme.radiusMedium
+                    color: Theme.surfaceContainerLow
+                    border.color: Theme.outlineVariant
+
+                    ColumnLayout {
+                        id: jiraGuide
+                        anchors.fill: parent
+                        anchors.margins: 16
+                        spacing: 6
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 10
+                            MaterialIcon { icon: "send"; iconSize: 24; color: Theme.primary }
+                            Text {
+                                Layout.fillWidth: true
+                                text: "3. 配置 Jira 飞书推送"
+                                color: Theme.textPrimary
+                                font.pixelSize: Theme.fontComponentTitle
+                                font.weight: Font.DemiBold
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "进入“预设 → Jira 飞书推送”，新建或选择方案，填写 Jira 地址、Token/PAT 和 JQL；再配置飞书机器人 Webhook 及安全校验。建议依次使用“测试连接”“预览消息”“保存配置”和“立即推送”。定时推送只在应用保持运行时生效；Token、Webhook 与应用凭据仅保存在本机。"
+                            color: Theme.textSecondary
+                            font.pixelSize: Theme.fontSupporting
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: themeGuide.implicitHeight + 32
+                    radius: Theme.radiusMedium
+                    color: Theme.surfaceContainerLow
+                    border.color: Theme.outlineVariant
+
+                    ColumnLayout {
+                        id: themeGuide
+                        anchors.fill: parent
+                        anchors.margins: 16
+                        spacing: 6
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 10
+                            MaterialIcon { icon: "palette"; iconSize: 24; color: Theme.primary }
+                            Text {
+                                Layout.fillWidth: true
+                                text: "4. 选择主题外观"
+                                color: Theme.textPrimary
+                                font.pixelSize: Theme.fontComponentTitle
+                                font.weight: Font.DemiBold
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "进入“设置 → 外观”，可选择跟随系统、浅色或深色模式，并在 Material 3 与 Windows XP 两种主题风格间切换。修改会立即生效并在下次启动时保留，不会影响脚本和推送方案。"
+                            color: Theme.textSecondary
+                            font.pixelSize: Theme.fontSupporting
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
                     implicitHeight: pythonGuide.implicitHeight + 32
                     radius: Theme.radiusMedium
                     color: Theme.surfaceContainerLow
@@ -166,7 +248,7 @@ Dialog {
                             MaterialIcon { icon: "terminal"; iconSize: 24; color: Theme.primary }
                             Text {
                                 Layout.fillWidth: true
-                                text: "3. 自动配置 Python 依赖"
+                                text: "5. 自动配置 Python 依赖"
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
@@ -201,7 +283,7 @@ Dialog {
                             MaterialIcon { icon: "terminal"; iconSize: 24; color: Theme.primary }
                             Text {
                                 Layout.fillWidth: true
-                                text: "4. 开启并使用内置终端"
+                                text: "6. 开启并使用内置终端"
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold

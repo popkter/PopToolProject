@@ -18,7 +18,8 @@ Rectangle {
 
     implicitHeight: dense ? 58 : 66
     radius: Theme.radiusLarge
-    color: selected ? Theme.primaryContainer : (mouseArea.containsMouse ? Theme.surfaceContainer : "transparent")
+    color: selected ? (Theme.cardSelected || Theme.primaryContainer)
+                   : (mouseArea.containsMouse ? (Theme.cardHover || Theme.surfaceContainer) : "transparent")
 
     RowLayout {
         z: 1

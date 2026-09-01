@@ -20,7 +20,7 @@ Dialog {
     closePolicy: root.installing ? Popup.NoAutoClose : Popup.CloseOnEscape
 
     background: Rectangle {
-        radius: 22
+        radius: Theme.radiusLarge
         color: Theme.surface
         border.color: Theme.outlineVariant
         border.width: 1
@@ -32,7 +32,7 @@ Dialog {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 68
-            radius: 22
+            radius: Theme.radiusLarge
             color: Theme.surfaceContainerLow
 
             Rectangle {
@@ -145,7 +145,7 @@ Dialog {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 68
-            radius: 22
+            radius: Theme.radiusLarge
             color: Theme.surface
 
             Rectangle {

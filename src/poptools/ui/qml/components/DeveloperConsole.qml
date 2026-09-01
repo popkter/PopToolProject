@@ -67,7 +67,7 @@ Item {
             Rectangle {
                 Layout.preferredWidth: 112
                 Layout.preferredHeight: 40
-                radius: 20
+                radius: Theme.radiusLarge
                 color: root.controller.running ? Theme.successContainer : Theme.errorContainer
                 RowLayout {
                     anchors.centerIn: parent
@@ -75,7 +75,7 @@ Item {
                     Rectangle {
                         Layout.preferredWidth: 8
                         Layout.preferredHeight: 8
-                        radius: 4
+                        radius: Theme.radiusTiny
                         color: root.controller.running ? Theme.success : Theme.errorColor
                     }
                     Text {
@@ -116,7 +116,7 @@ Item {
                             required property var modelData
                             width: 154
                             height: 38
-                            radius: 10
+                            radius: Theme.radiusSmall
                             color: terminalTabDelegate.modelData.active
                                    ? Theme.primaryContainer : Theme.surfaceContainerHigh
                             border.width: terminalTabDelegate.modelData.active ? 1 : 0
@@ -132,7 +132,7 @@ Item {
                                 Rectangle {
                                     Layout.preferredWidth: 7
                                     Layout.preferredHeight: 7
-                                    radius: 4
+                                    radius: Theme.radiusTiny
                                     color: terminalTabDelegate.modelData.running
                                            ? Theme.success : Theme.textSecondary
                                 }
@@ -179,7 +179,7 @@ Item {
                     PrimaryButton {
                         width: 42
                         height: 38
-                        radius: 10
+                        radius: Theme.radiusSmall
                         compact: true
                         tonal: true
                         iconName: "add"

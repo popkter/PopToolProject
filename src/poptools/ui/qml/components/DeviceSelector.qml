@@ -21,11 +21,19 @@ Rectangle {
     border.color: Theme.outlineVariant
     border.width: 1
 
-    function openDeviceMenu() {
+    function positionDeviceMenu() {
         var point = root.mapToItem(Overlay.overlay, 0, 0)
         devicePopup.x = Math.max(12, Math.min(point.x, Overlay.overlay.width - devicePopup.width - 12))
         devicePopup.y = Math.max(12, point.y - devicePopup.height - root.popupGap)
+    }
+
+    function openDeviceMenu() {
+        root.positionDeviceMenu()
         devicePopup.open()
+        // The popup content is laid out lazily the first time it is opened. Reposition
+        // after that layout pass so the final height is used instead of overlapping
+        // the selector with the initial, incomplete height.
+        Qt.callLater(root.positionDeviceMenu)
     }
 
     RowLayout {
@@ -95,6 +103,12 @@ Rectangle {
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         background: AppPopupSurface { }
 
+        onOpened: root.positionDeviceMenu()
+        onHeightChanged: {
+            if (opened)
+                root.positionDeviceMenu()
+        }
+
         contentItem: ColumnLayout {
             spacing: 0
 
@@ -122,7 +136,7 @@ Rectangle {
                 Rectangle {
                     Layout.preferredWidth: 40
                     Layout.preferredHeight: 40
-                    radius: 20
+                    radius: Theme.radiusLarge
                     color: refreshMouse.containsMouse ? Theme.primaryContainer : "transparent"
                     MaterialIcon {
                         anchors.centerIn: parent
@@ -192,7 +206,7 @@ Rectangle {
                                 anchors.centerIn: parent
                                 width: 9
                                 height: 9
-                                radius: 5
+                                radius: Theme.radiusTiny
                                 color: Theme.success
                             }
                         }

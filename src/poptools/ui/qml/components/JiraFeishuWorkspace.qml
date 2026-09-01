@@ -187,7 +187,7 @@ ColumnLayout {
                     Rectangle {
                         Layout.preferredWidth: 8
                         Layout.preferredHeight: 8
-                        radius: 4
+                        radius: Theme.radiusTiny
                         color: parent.parent.successState ? Theme.success
                                                        : parent.parent.errorState ? Theme.errorColor
                                                                                  : Theme.outline
@@ -212,9 +212,9 @@ ColumnLayout {
                 Layout.alignment: Qt.AlignVCenter
                 model: controller.profileNames
                 currentIndex: controller.currentIndex
-                onActivated: {
+                onActivated: function (index) {
                     root.commitForm()
-                    controller.selectProfile(currentIndex)
+                    controller.selectProfile(index)
                 }
             }
 
@@ -266,7 +266,7 @@ ColumnLayout {
                     visible: !root.narrow
                     Layout.preferredWidth: 9
                     Layout.preferredHeight: 9
-                    radius: 5
+                    radius: Theme.radiusTiny
                     color: controller.scheduleRunning ? Theme.success : Theme.outline
                 }
                 Text {
@@ -375,20 +375,39 @@ ColumnLayout {
                         }
                     }
                     FieldLabel { text: "JQL 查询 *" }
-                    TextArea {
-                        id: jiraJql
+                    ScrollView {
+                        id: jiraJqlScroll
+                        objectName: "jiraFeishuJqlScroll"
                         Layout.fillWidth: true
                         Layout.preferredHeight: 104
-                        leftPadding: 14; rightPadding: 14; topPadding: 12; bottomPadding: 12
-                        color: Theme.textPrimary
-                        font.family: "Cascadia Mono"
-                        font.pixelSize: Theme.fontCode
-                        wrapMode: TextEdit.Wrap
-                        selectByMouse: true
-                        placeholderText: "status != Done ORDER BY assignee ASC, priority DESC"
-                        onTextChanged: if (activeFocus) controller.markCurrentProfileDirty()
-                        onActiveFocusChanged: if (!activeFocus) controller.updateField("jira", "jql_filter", text)
-                        background: Rectangle { radius: Theme.radiusMedium; color: Theme.surface; border.color: parent.activeFocus ? Theme.primary : Theme.outline; border.width: parent.activeFocus ? 2 : 1 }
+                        clip: true
+                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                        background: Rectangle {
+                            radius: Theme.radiusMedium
+                            color: Theme.surface
+                            border.color: jiraJql.activeFocus ? Theme.primary : Theme.outline
+                            border.width: jiraJql.activeFocus ? 2 : 1
+                        }
+
+                        TextArea {
+                            id: jiraJql
+                            objectName: "jiraFeishuJqlEditor"
+                            width: jiraJqlScroll.availableWidth
+                            leftPadding: 14
+                            rightPadding: 14
+                            topPadding: 12
+                            bottomPadding: 12
+                            color: Theme.textPrimary
+                            font.family: "Cascadia Mono"
+                            font.pixelSize: Theme.fontCode
+                            wrapMode: TextEdit.Wrap
+                            selectByMouse: true
+                            placeholderText: "status != Done ORDER BY assignee ASC, priority DESC"
+                            onTextChanged: if (activeFocus) controller.markCurrentProfileDirty()
+                            onActiveFocusChanged: if (!activeFocus) controller.updateField("jira", "jql_filter", text)
+                            background: null
+                        }
                     }
                     Item { Layout.preferredHeight: 2 }
                 }
@@ -571,7 +590,7 @@ ColumnLayout {
                 anchors.centerIn: parent
                 width: 52
                 height: 4
-                radius: 2
+                radius: Theme.radiusNone
                 color: outputToggleArea.containsMouse ? Theme.primary : Theme.outline
             }
 

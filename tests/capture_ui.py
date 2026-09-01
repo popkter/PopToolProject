@@ -139,6 +139,15 @@ def main() -> int:
     engine.rootContext().setContextProperty("androidController", android_controller)
     engine.rootContext().setContextProperty("trayController", tray_controller)
     engine.rootContext().setContextProperty("updateController", update_controller)
+    if os.environ.get("POPTOOLS_CAPTURE_JIRA_LONG_JQL") == "1":
+        jira_feishu_controller.updateField(
+            "jira",
+            "jql_filter",
+            "\n".join(
+                f'AND summary ~ "scroll verification line {index:02d}"'
+                for index in range(1, 25)
+            ),
+        )
     engine.load(QUrl.fromLocalFile(str(package_root() / "ui" / "qml" / "Main.qml")))
     if not engine.rootObjects():
         print("\n".join(qml_warnings), file=sys.stderr)

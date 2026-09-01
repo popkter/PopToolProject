@@ -21,6 +21,8 @@ Dialog {
     onOpened: {
         themeModeBox.currentIndex = Math.max(0, ["system", "light", "dark"].indexOf(
                                                  root.controller.themeMode))
+        themeStyleBox.currentIndex = Math.max(0, ["material3", "winxp"].indexOf(
+                                                 root.controller.themeStyle))
         concurrencyBox.currentIndex = Math.max(0, root.controller.customScriptConcurrency - 1)
     }
 
@@ -55,7 +57,7 @@ Dialog {
                 Rectangle {
                     Layout.preferredWidth: 42
                     Layout.preferredHeight: 42
-                    radius: 21
+                    radius: height / 2
                     color: closeMouse.containsMouse
                            ? Theme.surfaceContainerHigh : "transparent"
                     MaterialIcon {
@@ -99,7 +101,7 @@ Dialog {
                     Layout.leftMargin: 20
                     Layout.rightMargin: 20
                     implicitHeight: appearanceContent.implicitHeight + 36
-                    radius: 16
+                    radius: Theme.radiusMedium
                     color: Theme.surfaceContainerLow
                     border.color: Theme.outlineVariant
 
@@ -149,6 +151,31 @@ Dialog {
                             }
                         }
 
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 16
+                            Text {
+                                Layout.fillWidth: true
+                                text: "主题风格"
+                                color: Theme.textPrimary
+                                font.pixelSize: Theme.fontBody
+                            }
+                            AppComboBox {
+                                id: themeStyleBox
+                                objectName: "themeStyleBox"
+                                Layout.preferredWidth: 230
+                                implicitHeight: 46
+                                font.pixelSize: Theme.fontBody
+                                textRole: "label"
+                                valueRole: "value"
+                                model: [
+                                    { "label": "Material 3", "value": "material3" },
+                                    { "label": "Windows XP", "value": "winxp" }
+                                ]
+                                onActivated: root.controller.saveThemeStyle(currentValue)
+                            }
+                        }
+
                     }
                 }
 
@@ -157,7 +184,7 @@ Dialog {
                     Layout.leftMargin: 20
                     Layout.rightMargin: 20
                     implicitHeight: pythonContent.implicitHeight + 36
-                    radius: 16
+                    radius: Theme.radiusMedium
                     color: Theme.surfaceContainerLow
                     border.color: Theme.outlineVariant
 
@@ -230,7 +257,7 @@ Dialog {
                     Layout.leftMargin: 20
                     Layout.rightMargin: 20
                     implicitHeight: terminalContent.implicitHeight + 36
-                    radius: 16
+                    radius: Theme.radiusMedium
                     color: terminalSettingsMouse.containsMouse
                            ? Theme.surfaceContainerHigh : Theme.surfaceContainerLow
                     border.color: Theme.outlineVariant
@@ -294,7 +321,7 @@ Dialog {
                     Layout.leftMargin: 20
                     Layout.rightMargin: 20
                     implicitHeight: scriptsContent.implicitHeight + 36
-                    radius: 16
+                    radius: Theme.radiusMedium
                     color: Theme.surfaceContainerLow
                     border.color: Theme.outlineVariant
 

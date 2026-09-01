@@ -92,7 +92,7 @@ ScrollView {
             Rectangle {
                 Layout.preferredWidth: 48
                 Layout.preferredHeight: 48
-                radius: 12
+                radius: Theme.radiusSmall
                 color: Theme.surface
                 border.color: Theme.outline
 
@@ -152,7 +152,7 @@ ScrollView {
                     colorPreviewCanvas.requestPaint()
                 }
                 background: Rectangle {
-                    radius: 14
+                    radius: Theme.radiusMedium
                     color: Theme.surface
                     border.color: Theme.outline
                 }
@@ -212,7 +212,7 @@ ScrollView {
             Rectangle {
                 width: 18
                 height: 18
-                radius: 9
+                radius: Theme.radiusTiny
                 x: picker.selectedSaturation * (parent.width - width)
                 y: (1 - picker.selectedValue) * (parent.height - height)
                 color: "transparent"
@@ -249,7 +249,7 @@ ScrollView {
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 18
-            radius: 9
+            radius: Theme.radiusTiny
             gradient: Gradient {
                 orientation: Gradient.Horizontal
                 GradientStop { position: 0.0; color: "#FF0000" }
@@ -264,7 +264,7 @@ ScrollView {
             Rectangle {
                 width: 14
                 height: 26
-                radius: 7
+                radius: Theme.radiusTiny
                 x: picker.selectedHue * (parent.width - width)
                 anchors.verticalCenter: parent.verticalCenter
                 color: picker.hueColor()

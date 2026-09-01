@@ -41,6 +41,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 TOOL_SORT_MODES = ("added_time", "name", "usage", "custom")
 THEME_MODES = ("system", "light", "dark")
+THEME_STYLES = ("material3", "winxp")
 LOCAL_SCRIPT_ENTRIES = ("tools", "scripts")
 
 
@@ -240,6 +241,31 @@ class ConfigStore:
             app = {}
             config["app"] = app
         app["theme"] = mode
+        self.save_config(config)
+
+    def theme_style(self) -> str:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+        value = app.get("theme_style", "material3")
+        if value not in THEME_STYLES:
+            value = "material3"
+        if app.get("theme_style") != value:
+            app["theme_style"] = value
+            self.save_config(config)
+        return str(value)
+
+    def set_theme_style(self, style: str) -> None:
+        if style not in THEME_STYLES:
+            raise ValueError("未知的主题风格")
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+        app["theme_style"] = style
         self.save_config(config)
 
     def tool_sort_mode(self) -> str:

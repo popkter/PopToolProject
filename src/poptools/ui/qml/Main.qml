@@ -31,6 +31,13 @@ ApplicationWindow {
         value: settingsController.darkTheme
     }
 
+    Connections {
+        target: settingsController
+        function onThemeChanged() {
+            ThemeConfig.applyTheme(settingsController.themeStyle, settingsController.darkTheme)
+        }
+    }
+
     property var parameterValues: ({})
     property var customDrawerDisplayTool: ({})
     property string toolSearchQuery: ""
@@ -407,6 +414,7 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        ThemeConfig.applyTheme(settingsController.themeStyle, settingsController.darkTheme)
         primaryNavWidth = width < 1180 ? 86 : 262
         toolListWidth = width < 900 ? minimumToolListWidth : 286
         clampPanelWidths()
@@ -583,7 +591,7 @@ ApplicationWindow {
     Rectangle {
         anchors.fill: parent
         color: "transparent"
-        radius: window.visibility === Window.Maximized ? 0 : 10
+        radius: window.visibility === Window.Maximized ? Theme.radiusNone : Theme.radiusSmall
         border.width: 1
         border.color: Theme.outlineVariant
         z: 950
@@ -877,7 +885,7 @@ ApplicationWindow {
                                 anchors.centerIn: parent
                                 width: 48
                                 height: 48
-                                radius: 24
+                                radius: height / 2
                                 color: compactSearchMouse.containsMouse
                                     ? Theme.primaryContainerHover : Theme.surface
 
@@ -940,7 +948,7 @@ ApplicationWindow {
                                     window.toolSearchQuery = text
                             }
                             background: Rectangle {
-                                radius: 24
+                                radius: Theme.radiusMedium
                                 color: Theme.surface
                                 border.color: searchField.activeFocus ? Theme.primary : Theme.outline
                                 border.width: searchField.activeFocus ? 2 : 1
@@ -979,7 +987,7 @@ ApplicationWindow {
                                         window.toolSearchQuery = text
                                 }
                                 background: Rectangle {
-                                    radius: 24
+                                    radius: Theme.radiusMedium
                                     color: Theme.surface
                                     border.color: compactSearchField.activeFocus
                                         ? Theme.primary : Theme.outline
@@ -1111,7 +1119,7 @@ ApplicationWindow {
                                 id: gridCreateCommandButton
                                 Layout.preferredWidth: 42
                                 Layout.preferredHeight: 42
-                                radius: 21
+                                radius: height / 2
                                 color: gridCreateCommandMouse.containsMouse
                                     ? Theme.primaryContainerHover : Theme.primaryContainer
                                 MaterialIcon {
@@ -1148,7 +1156,7 @@ ApplicationWindow {
                                     window.toolSearchQuery = text
                             }
                             background: Rectangle {
-                                radius: 14
+                                radius: Theme.radiusMedium
                                 color: Theme.surfaceContainerLow
                                 border.color: customGridSearchField.activeFocus
                                     ? Theme.primary : Theme.outlineVariant
@@ -1306,7 +1314,7 @@ ApplicationWindow {
                     height: drawerMode ? parent.height - 24
                         : (presetMode ? parent.height - y : parent.height)
                     z: drawerMode ? 6 : 1
-                    radius: drawerMode ? 18 : 0
+                    radius: drawerMode ? Theme.radiusLarge : Theme.radiusNone
                     border.color: drawerMode ? Theme.outlineVariant : "transparent"
                     border.width: drawerMode ? 1 : 0
                     clip: true
@@ -1423,7 +1431,7 @@ ApplicationWindow {
                                         visible: contentPanel.drawerMode
                                         Layout.preferredWidth: 46
                                         Layout.preferredHeight: 46
-                                        radius: 23
+                                        radius: height / 2
                                         color: closeDrawerMouse.containsMouse
                                             ? Theme.surfaceContainerHigh : "transparent"
                                         MaterialIcon {
@@ -1449,7 +1457,7 @@ ApplicationWindow {
                                             && !window.scrcpySelected
                                         Layout.preferredWidth: 46
                                         Layout.preferredHeight: 46
-                                        radius: 23
+                                        radius: height / 2
                                         color: deleteMouse.containsMouse ? Theme.errorContainer : "transparent"
                                         MaterialIcon {
                                             anchors.centerIn: parent
@@ -1471,7 +1479,7 @@ ApplicationWindow {
                                     visible: !!appController.selectedTool.editable && !window.scrcpySelected
                                     Layout.preferredWidth: 46
                                     Layout.preferredHeight: 46
-                                    radius: 23
+                                    radius: height / 2
                                     color: editMouse.containsMouse ? Theme.surfaceContainer : "transparent"
                                     MaterialIcon {
                                         anchors.centerIn: parent
@@ -1498,7 +1506,7 @@ ApplicationWindow {
                                             && !window.scrcpySelected
                                         Layout.preferredWidth: 48
                                         Layout.preferredHeight: 48
-                                        radius: 24
+                                        radius: height / 2
                                         color: dependencyCheckMouse.containsMouse
                                                ? Theme.primaryContainer : Theme.surface
                                         border.color: dependencyCheckMouse.containsMouse

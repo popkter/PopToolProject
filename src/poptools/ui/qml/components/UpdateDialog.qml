@@ -34,7 +34,7 @@ Dialog {
             Rectangle {
                 Layout.preferredWidth: 48
                 Layout.preferredHeight: 48
-                radius: 24
+                radius: height / 2
                 color: Theme.primaryContainer
                 MaterialIcon {
                     anchors.centerIn: parent
@@ -133,7 +133,7 @@ Dialog {
                 indeterminate: root.controller.totalSize.length === 0
                 background: Rectangle {
                     implicitHeight: 10
-                    radius: 5
+                    radius: Theme.radiusTiny
                     color: Theme.surfaceContainerHigh
                 }
                 contentItem: Item {
@@ -187,13 +187,13 @@ Dialog {
             Item { Layout.fillWidth: true }
             PrimaryButton {
                 visible: root.controller.state === "available"
-                implicitWidth: 112; implicitHeight: 48; radius: 24
+                implicitWidth: 112; implicitHeight: 48; radius: height / 2
                 text: "下次提醒"; iconName: ""; tonal: true
                 onClicked: root.close()
             }
             PrimaryButton {
                 visible: root.controller.state === "available"
-                implicitWidth: 128; implicitHeight: 48; radius: 24
+                implicitWidth: 128; implicitHeight: 48; radius: height / 2
                 text: "跳过此版本"; iconName: ""; tonal: true
                 onClicked: {
                     root.controller.skipVersion()
@@ -202,37 +202,37 @@ Dialog {
             }
             PrimaryButton {
                 visible: root.controller.state === "available"
-                implicitWidth: 122; implicitHeight: 48; radius: 24
+                implicitWidth: 122; implicitHeight: 48; radius: height / 2
                 text: "立即更新"; iconName: "download"
                 onClicked: root.controller.downloadUpdate()
             }
             PrimaryButton {
                 visible: root.controller.state === "downloading"
-                implicitWidth: 120; implicitHeight: 48; radius: 24
+                implicitWidth: 120; implicitHeight: 48; radius: height / 2
                 text: "取消下载"; iconName: "close"; tonal: true
                 onClicked: root.controller.cancelDownload()
             }
             PrimaryButton {
                 visible: root.controller.state === "downloaded"
-                implicitWidth: 116; implicitHeight: 48; radius: 24
+                implicitWidth: 116; implicitHeight: 48; radius: height / 2
                 text: "稍后安装"; iconName: ""; tonal: true
                 onClicked: root.close()
             }
             PrimaryButton {
                 visible: root.controller.state === "downloaded"
-                implicitWidth: 150; implicitHeight: 48; radius: 24
+                implicitWidth: 150; implicitHeight: 48; radius: height / 2
                 text: "安装并重启"; iconName: "restart_alt"
                 onClicked: root.controller.installAndRestart()
             }
             PrimaryButton {
                 visible: root.controller.state === "error"
-                implicitWidth: 104; implicitHeight: 48; radius: 24
+                implicitWidth: 104; implicitHeight: 48; radius: height / 2
                 text: "关闭"; iconName: ""; tonal: true
                 onClicked: root.close()
             }
             PrimaryButton {
                 visible: root.controller.state === "error"
-                implicitWidth: 112; implicitHeight: 48; radius: 24
+                implicitWidth: 112; implicitHeight: 48; radius: height / 2
                 text: "重试"; iconName: "refresh"
                 onClicked: root.controller.downloadUpdate()
             }
