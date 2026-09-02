@@ -34,9 +34,14 @@ class FakePowerShellPlugin:
 class FakeSession:
     def __init__(self) -> None:
         self.sizes: list[tuple[int, int]] = []
+        self.writes: list[bytes] = []
 
     def resize(self, columns: int, rows: int) -> None:
         self.sizes.append((columns, rows))
+
+    def write(self, payload: bytes) -> bool:
+        self.writes.append(payload)
+        return True
 
 
 def make_controller(tmp_path: Path) -> DeveloperConsoleController:
@@ -107,3 +112,16 @@ def test_closing_tab_removes_native_terminal_session(tmp_path: Path) -> None:
     assert controller.closeTerminalTab(tab_id)
 
     assert removed == [tab_id]
+
+
+def test_interrupt_sends_ctrl_c_to_active_terminal_without_stopping_session(
+    tmp_path: Path,
+) -> None:
+    controller = make_controller(tmp_path)
+    session = FakeSession()
+    controller._tabs[0].session = session  # type: ignore[assignment]
+
+    assert controller.interrupt()
+
+    assert session.writes == [b"\x03"]
+    assert controller._tabs[0].session is session

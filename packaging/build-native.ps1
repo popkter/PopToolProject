@@ -4,8 +4,39 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$BuildDirectory = Join-Path $ProjectRoot "build\native"
+$BuildDirectory = Join-Path $ProjectRoot "build\native-windows-msvc2022"
 $InstallDirectory = Join-Path $ProjectRoot "src\poptools\native"
+$VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+$ManagedQtRoot = Join-Path $ProjectRoot "build\qt-sdk"
+
+# MSBuild adds a mixed-case `Path` entry internally. Some shells (including
+# automation hosts) expose the inherited variable as `PATH`, which causes
+# MSBuild's case-insensitive environment dictionary to reject the duplicate.
+$ProcessPath = [Environment]::GetEnvironmentVariable(
+    "PATH",
+    [EnvironmentVariableTarget]::Process
+)
+if ($ProcessPath) {
+    Remove-Item Env:PATH -ErrorAction SilentlyContinue
+    $env:Path = $ProcessPath
+}
+
+function Test-QtPrefix {
+    param([string]$Prefix)
+
+    if (-not $Prefix) { return $false }
+    $QtConfig = Join-Path $Prefix "lib\cmake\Qt6\Qt6Config.cmake"
+    return Test-Path -LiteralPath $QtConfig -PathType Leaf
+}
+
+function Find-AqtExecutable {
+    $AqtCommand = Get-Command aqt -ErrorAction SilentlyContinue
+    if ($AqtCommand) { return $AqtCommand.Source }
+
+    $VenvAqt = Join-Path $ProjectRoot ".venv\Scripts\aqt.exe"
+    if (Test-Path -LiteralPath $VenvAqt -PathType Leaf) { return $VenvAqt }
+    return ""
+}
 
 $CMakeCommand = Get-Command cmake -ErrorAction SilentlyContinue
 $CMake = if ($CMakeCommand) { $CMakeCommand.Source } else {
@@ -15,19 +46,76 @@ if (-not (Test-Path -LiteralPath $CMake -PathType Leaf)) {
     throw "CMake was not found. Install CMake and a Qt 6.10+ C++ SDK compatible with PySide6."
 }
 
-$QtPrefix = $env:QT_ROOT_DIR
+$QtPrefix = ""
+if (Test-QtPrefix $env:QT_ROOT_DIR) {
+    $QtPrefix = (Resolve-Path -LiteralPath $env:QT_ROOT_DIR).Path
+}
 if (-not $QtPrefix -and $env:Qt6_DIR) {
     # install-qt-action@v4 sets Qt6_DIR=<prefix>/lib/cmake/Qt6
-    $QtPrefix = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $env:Qt6_DIR))
-    Write-Host "Qt prefix resolved from Qt6_DIR: $QtPrefix"
+    $Candidate = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $env:Qt6_DIR))
+    if (Test-QtPrefix $Candidate) {
+        $QtPrefix = (Resolve-Path -LiteralPath $Candidate).Path
+        Write-Host "Qt prefix resolved from Qt6_DIR: $QtPrefix"
+    }
 }
 if (-not $QtPrefix) {
     $QMake = (Get-Command qmake6 -ErrorAction SilentlyContinue).Source
     if (-not $QMake) { $QMake = (Get-Command qmake -ErrorAction SilentlyContinue).Source }
-    if ($QMake) { $QtPrefix = (& $QMake -query QT_INSTALL_PREFIX).Trim() }
+    if ($QMake) {
+        $Candidate = (& $QMake -query QT_INSTALL_PREFIX).Trim()
+        if (Test-QtPrefix $Candidate) { $QtPrefix = $Candidate }
+    }
 }
 if (-not $QtPrefix) {
-    throw "Qt 6 C++ SDK was not found. Set QT_ROOT_DIR, Qt6_DIR, or add qmake to PATH."
+    if (-not (Test-Path -LiteralPath $VenvPython -PathType Leaf)) {
+        throw "Qt 6 C++ SDK was not found and the project venv is unavailable: $VenvPython"
+    }
+
+    $PySideQtVersion = (& $VenvPython -c "from PySide6.QtCore import qVersion; print(qVersion())").Trim()
+    if ($LASTEXITCODE -ne 0 -or $PySideQtVersion -notmatch '^6\.\d+\.\d+$') {
+        throw "Could not determine the Qt version used by PySide6."
+    }
+
+    # Keep local native builds aligned with the SDK used by GitHub Actions.
+    # PySide wheels can be published before the matching standalone Qt SDK is
+    # available, so its runtime version is not always downloadable by aqt.
+    $QtVersion = if ($env:POPTOOLS_QT_SDK_VERSION) {
+        $env:POPTOOLS_QT_SDK_VERSION.Trim()
+    }
+    else {
+        "6.10.3"
+    }
+    if ($QtVersion -notmatch '^6\.\d+\.\d+$') {
+        throw "POPTOOLS_QT_SDK_VERSION must use a full Qt 6 version such as 6.10.3."
+    }
+
+    $QtArch = "win64_msvc2022_64"
+    $ManagedQtPrefix = Join-Path $ManagedQtRoot "$QtVersion\msvc2022_64"
+    if (Test-QtPrefix $ManagedQtPrefix) {
+        $QtPrefix = $ManagedQtPrefix
+        Write-Host "Using cached Qt $QtVersion SDK (PySide6 runtime: $PySideQtVersion)."
+    }
+    else {
+        $Aqt = Find-AqtExecutable
+        if (-not $Aqt) {
+            throw (
+                "Qt 6 C++ SDK was not found and aqtinstall is unavailable. " +
+                "Run 'uv sync --extra dev', set QT_ROOT_DIR/Qt6_DIR, or add qmake to PATH."
+            )
+        }
+
+        Write-Host (
+            "Qt 6 C++ SDK was not found. Downloading Qt $QtVersion ($QtArch) " +
+            "to $ManagedQtRoot ..."
+        ) -ForegroundColor Yellow
+        New-Item -ItemType Directory -Path $ManagedQtRoot -Force | Out-Null
+        & $Aqt install-qt windows desktop $QtVersion $QtArch --outputdir $ManagedQtRoot
+        if ($LASTEXITCODE -ne 0) { throw "Failed to download Qt $QtVersion C++ SDK" }
+        if (-not (Test-QtPrefix $ManagedQtPrefix)) {
+            throw "Qt SDK download completed but Qt6Config.cmake was not found under $ManagedQtPrefix"
+        }
+        $QtPrefix = $ManagedQtPrefix
+    }
 }
 
 Write-Host "Using Qt prefix: $QtPrefix"
@@ -37,7 +125,8 @@ New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $InstallDirectory -Force | Out-Null
 
 & $CMake -S (Join-Path $ProjectRoot "native") -B $BuildDirectory `
-    "-DCMAKE_BUILD_TYPE=$Configuration" `
+    -G "Visual Studio 17 2022" `
+    -A x64 `
     "-DCMAKE_PREFIX_PATH=$QtPrefix"
 if ($LASTEXITCODE -ne 0) { throw "Native terminal configure failed" }
 

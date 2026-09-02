@@ -24,11 +24,11 @@ Rectangle {
     RowLayout {
         z: 1
         anchors.fill: parent
-        anchors.leftMargin: root.compact ? 8 : 20
+        anchors.leftMargin: root.compact ? 0 : Theme.pagePadding
         anchors.rightMargin: root.actionText.length > 0
-                             ? (root.compact ? 34 : actionButton.width + 20)
-                             : (root.compact ? 8 : 14)
-        spacing: root.compact ? 0 : 16
+                             ? (root.compact ? 0 : actionButton.width + Theme.pagePadding)
+                             : (root.compact ? 0 : Theme.space16)
+        spacing: root.compact ? 0 : Theme.sectionSpacing
 
         Item { visible: root.compact; Layout.fillWidth: true }
         MaterialIcon {
@@ -36,6 +36,8 @@ Rectangle {
             iconSize: 27
             color: root.selected ? Theme.primary : Theme.textPrimary
             Layout.preferredWidth: 32
+            Layout.preferredHeight: 32
+            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
         }
         Text {
             visible: !root.compact
@@ -55,7 +57,7 @@ Rectangle {
         z: 2
         visible: root.actionText.length > 0
         anchors.right: parent.right
-        anchors.rightMargin: root.compact ? 4 : 10
+        anchors.rightMargin: root.compact ? Theme.space4 : Theme.space12
         anchors.verticalCenter: parent.verticalCenter
         width: root.compact ? 28 : actionLabel.implicitWidth + 18
         height: root.compact ? 28 : 34

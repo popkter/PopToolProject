@@ -38,9 +38,9 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: root.compact ? 8 : 13
-        anchors.rightMargin: root.compact ? 8 : 10
-        spacing: root.compact ? 0 : 10
+        anchors.leftMargin: root.compact ? Theme.space8 : Theme.space12
+        anchors.rightMargin: root.compact ? Theme.space8 : Theme.space12
+        spacing: root.compact ? Theme.space0 : Theme.space12
 
         Item { visible: root.compact; Layout.fillWidth: true }
         MaterialIcon {
@@ -53,7 +53,7 @@ Rectangle {
             visible: !root.compact
             Layout.fillWidth: true
             Layout.minimumWidth: 0
-            spacing: 1
+            spacing: Theme.space4
             Text {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
@@ -97,8 +97,9 @@ Rectangle {
         id: devicePopup
         parent: Overlay.overlay
         width: root.width
-        height: Math.min(devicePopup.contentItem.implicitHeight, Overlay.overlay.height - 24)
-        padding: 0
+        height: Math.min(devicePopup.contentItem.implicitHeight,
+            Overlay.overlay.height - Theme.space24)
+        padding: Theme.space0
         modal: false
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         background: AppPopupSurface { }
@@ -110,19 +111,21 @@ Rectangle {
         }
 
         contentItem: ColumnLayout {
-            spacing: 0
+            spacing: Theme.space0
 
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: root.popupIconOnly ? 52 : 64
-                Layout.leftMargin: root.popupIconOnly ? 6 : 18
-                Layout.rightMargin: root.popupIconOnly ? 6 : 12
-                spacing: root.popupIconOnly ? 0 : 10
+                Layout.leftMargin: root.popupIconOnly
+                    ? Theme.space8 : Theme.space20
+                Layout.rightMargin: root.popupIconOnly
+                    ? Theme.space8 : Theme.space12
+                spacing: root.popupIconOnly ? Theme.space0 : Theme.space12
                 MaterialIcon { visible: !root.popupIconOnly; Layout.preferredWidth: 40; icon: "devices"; iconSize: 25; color: Theme.primary }
                 ColumnLayout {
                     visible: !root.popupIconOnly
                     Layout.fillWidth: true
-                    spacing: 2
+                    spacing: Theme.space4
                     Text {
                         Layout.fillWidth: true
                         text: "选择 Android 设备"
@@ -169,7 +172,7 @@ Rectangle {
                 Column {
                     id: emptyColumn
                     anchors.centerIn: parent
-                    spacing: 10
+                    spacing: Theme.space12
                     MaterialIcon { anchors.horizontalCenter: parent.horizontalCenter; icon: "phonelink_off"; iconSize: 34; color: Theme.textSecondary }
                     Text { visible: !root.popupIconOnly; text: root.controller.androidDeviceRefreshing ? "正在查找设备…" : "未检测到已连接设备"; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting }
                 }
@@ -180,9 +183,9 @@ Rectangle {
                 visible: root.controller.androidDevices.length > 0
                 Layout.fillWidth: true
                 Layout.preferredHeight: root.popupRowsHeight
-                Layout.margins: root.popupIconOnly ? 6 : 8
+                Layout.margins: Theme.space8
                 clip: true
-                spacing: 4
+                spacing: Theme.space4
                 model: root.controller.androidDevices
                 delegate: Rectangle {
                     id: deviceRow
@@ -196,9 +199,9 @@ Rectangle {
                     RowLayout {
                         visible: !root.popupIconOnly
                         anchors.fill: parent
-                        anchors.leftMargin: 13
-                        anchors.rightMargin: 13
-                        spacing: 11
+                        anchors.leftMargin: Theme.space12
+                        anchors.rightMargin: Theme.space12
+                        spacing: Theme.space12
                         Item {
                             Layout.preferredWidth: 22
                             Layout.preferredHeight: 22
@@ -212,7 +215,7 @@ Rectangle {
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 1
+                            spacing: Theme.space4
                             Text {
                                 Layout.fillWidth: true
                                 text: deviceRow.modelData.label

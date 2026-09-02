@@ -8,8 +8,17 @@ Dialog {
     required property var controller
     required property var parentWindow
 
+    readonly property real maximumDialogHeight: Math.min(600, parentWindow.height - 24)
+    readonly property real availableDialogChromeHeight: 176
+    readonly property real maximumReleaseCardHeight: Math.max(
+        76, maximumDialogHeight - availableDialogChromeHeight)
+
     width: Math.min(620, parentWindow.width - 24)
-    height: Math.min(300, parentWindow.height - 24)
+    height: controller.state === "available"
+            ? Math.min(maximumDialogHeight,
+                       Math.max(300, releaseCard.implicitHeight
+                                + availableDialogChromeHeight))
+            : Math.min(300, parentWindow.height - 24)
     anchors.centerIn: Overlay.overlay
     modal: true
     padding: 24
@@ -66,13 +75,17 @@ Dialog {
         }
 
         Rectangle {
+            id: releaseCard
             visible: root.controller.state === "available"
             Layout.fillWidth: true
-            Layout.preferredHeight: 76
+            Layout.preferredHeight: implicitHeight
+            implicitHeight: Math.min(root.maximumReleaseCardHeight,
+                                     releaseContent.implicitHeight + 32)
             radius: Theme.radiusMedium
             color: Theme.surfaceContainerLow
             border.color: Theme.outlineVariant
             ColumnLayout {
+                id: releaseContent
                 anchors.fill: parent
                 anchors.margins: 16
                 spacing: 8
@@ -84,9 +97,34 @@ Dialog {
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
+
+                ScrollView {
+                    id: releaseNotesScroll
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.preferredHeight: releaseNotesText.implicitHeight
+                    clip: true
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+                    Text {
+                        id: releaseNotesText
+                        width: releaseNotesScroll.availableWidth
+                        text: root.controller.releaseNotes
+                        textFormat: Text.MarkdownText
+                        wrapMode: Text.Wrap
+                        color: Theme.textPrimary
+                        linkColor: Theme.primary
+                        font.pixelSize: Theme.fontBody
+                        onLinkActivated: function(link) {
+                            Qt.openUrlExternally(link)
+                        }
+                    }
+                }
+
                 Text {
                     visible: root.controller.releasePageUrl.length > 0
-                    text: "在 GitHub 查看完整发行说明"
+                    text: "在 GitHub 查看此版本"
                     color: Theme.primary
                     font.pixelSize: Theme.fontSupporting
                     MouseArea {

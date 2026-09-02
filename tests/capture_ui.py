@@ -33,6 +33,7 @@ from poptools.viewmodels import (
 def main() -> int:
     output_path = Path(sys.argv[1] if len(sys.argv) > 1 else "implementation.png").resolve()
     os.environ.setdefault("QT_QUICK_BACKEND", "software")
+    os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
     app = QApplication(sys.argv)
     register_terminal_type()
     system_font = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "msyh.ttc"
@@ -172,6 +173,16 @@ def main() -> int:
             )
     if len(sys.argv) > 2 and sys.argv[2] == "developer":
         window.setProperty("developerSelected", True)
+        if os.environ.get("POPTOOLS_CAPTURE_TERMINAL_MENU") == "1":
+            def open_terminal_menu() -> None:
+                menu = window.findChild(QObject, "terminalContextMenu")
+                if menu is None:
+                    return
+                menu.setProperty("x", 620)
+                menu.setProperty("y", 100)
+                QMetaObject.invokeMethod(menu, "open")
+
+            QTimer.singleShot(650, open_terminal_menu)
         if os.environ.get("POPTOOLS_CAPTURE_TERMINAL_SAMPLE") == "faint":
             QTimer.singleShot(
                 400,
@@ -190,14 +201,20 @@ def main() -> int:
         window.setHeight(int(capture_height))
         window.setX(0)
         window.setY(0)
+    capture_primary_nav_width = os.environ.get("POPTOOLS_CAPTURE_PRIMARY_NAV_WIDTH", "")
+    if capture_primary_nav_width:
+        window.setProperty("primaryNavWidth", int(capture_primary_nav_width))
+        QMetaObject.invokeMethod(window, "clampPanelWidths")
     if os.environ.get("POPTOOLS_CAPTURE_CUSTOM_DRAWER") == "1":
         custom_tools = registry.for_section("custom")
         if custom_tools:
             controller.selectTool(custom_tools[0].id)
             if os.environ.get("POPTOOLS_CAPTURE_CLOSING_DRAWER") == "1":
+                custom_scripts_page = window.findChild(QObject, "customScriptsPage")
                 QTimer.singleShot(
                     1400,
-                    lambda: QMetaObject.invokeMethod(window, "closeCustomToolDrawer"),
+                    lambda: custom_scripts_page is not None
+                    and QMetaObject.invokeMethod(custom_scripts_page, "closeDrawer"),
                 )
     capture_dialog = os.environ.get("POPTOOLS_CAPTURE_DIALOG")
     if capture_dialog == "settings":
@@ -251,6 +268,8 @@ def main() -> int:
         QTimer.singleShot(250, lambda: QMetaObject.invokeMethod(window, "queueUpdateDialog"))
 
     def capture() -> None:
+        if os.environ.get("POPTOOLS_CAPTURE_QML_WARNINGS") == "1" and qml_warnings:
+            print("\n".join(qml_warnings), file=sys.stderr)
         screen = window.screen() or app.primaryScreen()
         image = screen.grabWindow(window.winId()).toImage()
         if image.isNull() or not image.save(str(output_path)):

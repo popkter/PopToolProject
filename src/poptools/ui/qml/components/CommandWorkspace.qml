@@ -25,7 +25,7 @@ ColumnLayout {
             + (parameterCount - 1) * parameterItemSpacing
         : 0
 
-    spacing: 16
+    spacing: Theme.sectionSpacing
 
     Rectangle {
         id: scrcpyHost
@@ -81,7 +81,7 @@ ColumnLayout {
 
         Column {
             anchors.centerIn: parent
-            spacing: 12
+            spacing: Theme.space12
             MaterialIcon {
                 anchors.horizontalCenter: parent.horizontalCenter
                 icon: root.controller.running ? "cast_connected" : "cast"
@@ -172,8 +172,9 @@ ColumnLayout {
                                 placeholderText: modelData.placeholder || ""
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontBody
-                                leftPadding: 16
-                                rightPadding: defaultButtonVisible ? 126 : 16
+                                leftPadding: Theme.space16
+                                rightPadding: defaultButtonVisible
+                                    ? Theme.space40 : Theme.space16
                                 echoMode: modelData.kind === "secret"
                                           ? TextInput.Password : TextInput.Normal
                                 background: Rectangle {
@@ -212,23 +213,26 @@ ColumnLayout {
 
                                 Rectangle {
                                     anchors.right: parent.right
-                                    anchors.rightMargin: 9
+                                    anchors.rightMargin: Theme.space8
                                     anchors.verticalCenter: parent.verticalCenter
                                     visible: normalTextField.defaultButtonVisible
-                                    width: 108
-                                    height: 36
+                                    width: 32
+                                    height: 32
                                     radius: Theme.radiusSmall
                                     color: defaultValueMouse.containsMouse
                                         ? Theme.primaryContainerHover
                                         : Theme.primaryContainer
 
-                                    Text {
+                                    MaterialIcon {
                                         anchors.centerIn: parent
-                                        text: "设为默认值"
+                                        icon: "save"
+                                        iconSize: 20
                                         color: Theme.primaryText
-                                        font.pixelSize: Theme.fontCaption
-                                        font.weight: Font.DemiBold
                                     }
+
+                                    ToolTip.visible: defaultValueMouse.containsMouse
+                                    ToolTip.text: "设为默认值"
+                                    ToolTip.delay: 450
 
                                     MouseArea {
                                         id: defaultValueMouse
@@ -250,10 +254,10 @@ ColumnLayout {
                                 placeholderText: modelData.placeholder || ""
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontBody
-                                leftPadding: 16
-                                rightPadding: 16
-                                topPadding: 14
-                                bottomPadding: 14
+                                leftPadding: Theme.space16
+                                rightPadding: Theme.space16
+                                topPadding: Theme.space16
+                                bottomPadding: Theme.space16
                                 wrapMode: TextEdit.Wrap
                                 background: Rectangle {
                                     radius: Theme.radiusMedium
@@ -288,8 +292,8 @@ ColumnLayout {
                                     }
                                     return count > 0 ? 0 : -1
                                 }
-                                leftPadding: 16
-                                rightPadding: 42
+                                leftPadding: Theme.space16
+                                rightPadding: Theme.space40
                                 font.pixelSize: Theme.fontBody
                                 onCurrentIndexChanged: {
                                     if (currentIndex >= 0)
@@ -307,8 +311,8 @@ ColumnLayout {
                                 border.color: Theme.outline
                                 Switch {
                                     anchors.fill: parent
-                                    anchors.leftMargin: 10
-                                    anchors.rightMargin: 12
+                                    anchors.leftMargin: Theme.space12
+                                    anchors.rightMargin: Theme.space12
                                     text: checked ? "已启用" : "未启用"
                                     checked: Boolean(modelData.default)
                                     onToggled: root.parameterValues[modelData.id] = checked

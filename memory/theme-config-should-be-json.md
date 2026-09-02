@@ -7,6 +7,6 @@ metadata:
 
 Theme palettes must be defined as JSON files under `src/poptools/ui/qml/theme/configs/<style>.json`, not hardcoded inline in `ThemeConfig.qml`.
 
-**Why:** The user set up the `configs/` pattern (material3.json, winxp.json) specifically so theme data lives in JSON. Inlining a new theme's colors in ThemeConfig.qml was rejected as the wrong place.
+**Why:** The `configs/` pattern keeps theme data separate from the generic QML theme applicator and from business settings.
 
-**How to apply:** When adding a theme, create a `configs/<style>.json` and load it at runtime. The mario theme is wired via `SettingsController.themeConfigJson(style)` (synchronous JSON read + cache) → `Main.qml.applyThemeFromConfig()` → `ThemeConfig._applyConfig(cfg, isDark)`. Note: material3/winxp still use inline palettes in ThemeConfig.qml (their JSON files are currently unused); migrate them to the same JSON-driven path only if asked.
+**How to apply:** Add `configs/<style>.json` with a name, complete `colors`, `darkColors`, and `radius` sections. `ThemeCatalog` scans and validates the directory at startup and whenever settings opens. `SettingsController.themeConfigJson(style)` exposes only validated JSON, `Main.qml.applyThemeFromConfig()` selects light or dark mode, and `ThemeConfig.applyTheme()` writes the shared `Theme` tokens. Material 3 is the fallback when a saved theme is unavailable. Current packaged themes are Material 3, Windows XP, and Mario.

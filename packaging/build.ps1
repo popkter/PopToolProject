@@ -1,6 +1,7 @@
 ﻿param(
     [switch]$SkipTests,
     [switch]$SkipInstaller,
+    [switch]$KeepRunningApp,
     [string]$VersionOverride = ""
 )
 
@@ -26,6 +27,61 @@ function Find-UvExecutable {
         (Join-Path $env:LOCALAPPDATA "Programs\uv\uv.exe")
     )
     return $Candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+}
+
+function Remove-SingleFileOutput {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return }
+
+    try {
+        Remove-Item -LiteralPath $Path -Force
+        return
+    }
+    catch {
+        $NormalizedPath = [IO.Path]::GetFullPath($Path)
+        $LockingProcesses = @(
+            Get-Process | ForEach-Object {
+                try {
+                    if ([string]::Equals(
+                        [IO.Path]::GetFullPath($_.Path),
+                        $NormalizedPath,
+                        [StringComparison]::OrdinalIgnoreCase
+                    )) {
+                        $_
+                    }
+                }
+                catch {
+                    # Access to unrelated system process paths can be denied.
+                }
+            }
+        )
+
+        if ($LockingProcesses.Count -eq 0) { throw }
+        $ProcessSummary = ($LockingProcesses | ForEach-Object {
+            "$($_.ProcessName) (PID $($_.Id))"
+        }) -join ", "
+        if ($KeepRunningApp) {
+            throw (
+                "The previous build is still running: $ProcessSummary. " +
+                "Close it or omit -KeepRunningApp so the build can stop it automatically."
+            )
+        }
+
+        Write-Host "Stopping previous build: $ProcessSummary" -ForegroundColor Yellow
+        $LockingProcesses | Stop-Process -Force
+        $LockingProcesses | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+        for ($Attempt = 1; $Attempt -le 20; $Attempt++) {
+            try {
+                Remove-Item -LiteralPath $Path -Force
+                return
+            }
+            catch {
+                if ($Attempt -eq 20) { throw }
+                Start-Sleep -Milliseconds 250
+            }
+        }
+    }
 }
 
 if (-not (Test-Path -LiteralPath $PythonRuntimePackage)) {
@@ -69,7 +125,7 @@ try {
         }
 
         # Ensure dev dependencies (pytest, pyinstaller, etc.) are installed.
-        & $VenvPython -c "import pytest, PyInstaller" 2>$null
+        & $VenvPython -c "import aqt, pytest, PyInstaller" 2>$null
         $DevMissing = ($LASTEXITCODE -ne 0)
 
         if ($DevMissing) {
@@ -120,9 +176,7 @@ try {
     if (Test-Path -LiteralPath $LegacyOutput) {
         Remove-Item -LiteralPath $LegacyOutput -Recurse -Force
     }
-    if (Test-Path -LiteralPath $SingleFileOutput) {
-        Remove-Item -LiteralPath $SingleFileOutput -Force
-    }
+    Remove-SingleFileOutput $SingleFileOutput
 
     if (-not $SkipTests) {
         $PytestBaseTemp = Join-Path $TestWorkspace "tmp"

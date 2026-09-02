@@ -16,7 +16,7 @@ ColumnLayout {
         recordingWorkspace.openSaveDialog()
     }
 
-    spacing: 14
+    spacing: Theme.sectionSpacing
 
     StackLayout {
         Layout.fillWidth: true

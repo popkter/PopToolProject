@@ -11,6 +11,18 @@ QtObject {
     property color primaryContainer: darkMode ? "#34316E" : "#E7E4FF"
     property color primaryContainerHover: darkMode ? "#423F80" : "#DBD7FF"
     property color primaryText: darkMode ? "#E7E4FF" : "#34319E"
+    property color secondary: darkMode ? "#C8C5DC" : "#5F5D72"
+    property color secondaryForeground: darkMode ? "#302E41" : "#FFFFFF"
+    property color secondaryHover: darkMode ? "#DBD8EF" : "#504E63"
+    property color secondaryContainer: darkMode ? "#464457" : "#E4E1F9"
+    property color secondaryContainerHover: darkMode ? "#535064" : "#D8D5ED"
+    property color secondaryText: darkMode ? "#E4E1F9" : "#1B1A2C"
+    property color tertiary: darkMode ? "#EAB9D8" : "#77536D"
+    property color tertiaryForeground: darkMode ? "#45163B" : "#FFFFFF"
+    property color tertiaryHover: darkMode ? "#F5CBE4" : "#65445C"
+    property color tertiaryContainer: darkMode ? "#5C3D54" : "#FFD8EE"
+    property color tertiaryContainerHover: darkMode ? "#6B4A63" : "#F2CBE1"
+    property color tertiaryText: darkMode ? "#FFD8EE" : "#2D1227"
     property color surface: darkMode ? "#211F26" : "#FCF9FF"
     property color surfaceContainerLow: darkMode ? "#1D1B20" : "#F8F5FC"
     property color surfaceContainer: darkMode ? "#211F26" : "#F2EFF8"
@@ -61,6 +73,37 @@ QtObject {
     property int radiusTiny: 4
     property int radiusXLarge: 24
     property int radiusFull: 9999
+    // Matches the native rounded main-window frame and is intentionally not
+    // replaced by theme JSON radius values.
+    readonly property int applicationRadius: 8
+
+    // Shared layout scale. Page-level margins, padding and gaps must use these
+    // tokens so every workspace follows the same 4 px rhythm.
+    property int space0: 0
+    property int space4: 4
+    property int space8: 8
+    property int space12: 12
+    property int space16: 16
+    property int space20: 20
+    property int space24: 24
+    property int space28: 28
+    property int space32: 32
+    property int space36: 36
+    property int space40: 40
+    property int pagePadding: space20
+    property int pagePaddingCompact: space12
+    property int panelPadding: space16
+    property int panelPaddingCompact: space8
+    property int sectionSpacing: space16
+    property int controlSpacing: space8
+    property int terminalContentPadding: Math.min(
+        space40,
+        Math.max(space8,
+            Math.ceil(radiusLarge * 0.4 / space4) * space4))
+
+    // Vertical navigation panels may be resized, but should never consume an
+    // excessive share of the workspace on wide windows.
+    property int navigationMaximumWidth: 288
 
     // Border widths
     property int borderWidthThin: 1

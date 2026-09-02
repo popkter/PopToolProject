@@ -386,6 +386,11 @@ class DeveloperConsoleController(QObject):
     def clear(self) -> None:
         self.writeInput("\x0c")
 
+    @Slot(result=bool)
+    def interrupt(self) -> bool:
+        """Send Ctrl+C to stop the foreground command without closing the session."""
+        return self.writeInput("\x03")
+
     @Slot()
     def restart(self) -> None:
         tab = self._active_tab()

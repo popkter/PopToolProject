@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import time
 from datetime import datetime
@@ -43,7 +44,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 TOOL_SORT_MODES = ("added_time", "name", "usage", "custom")
 THEME_MODES = ("system", "light", "dark")
-THEME_STYLES = ("material3", "winxp", "mario")
+THEME_STYLE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 LOCAL_SCRIPT_ENTRIES = ("tools", "scripts")
 
 
@@ -289,7 +290,7 @@ class ConfigStore:
             app = {}
             config["app"] = app
         value = app.get("theme_style", "material3")
-        if value not in THEME_STYLES:
+        if not isinstance(value, str) or THEME_STYLE_PATTERN.fullmatch(value) is None:
             value = "material3"
         if app.get("theme_style") != value:
             app["theme_style"] = value
@@ -297,7 +298,7 @@ class ConfigStore:
         return str(value)
 
     def set_theme_style(self, style: str) -> None:
-        if style not in THEME_STYLES:
+        if THEME_STYLE_PATTERN.fullmatch(style) is None:
             raise ValueError("未知的主题风格")
         config = self.load_config()
         app = config.get("app")

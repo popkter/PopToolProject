@@ -34,11 +34,11 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 12
-        anchors.rightMargin: 10
-        anchors.topMargin: 10
-        anchors.bottomMargin: 10
-        spacing: 10
+        anchors.leftMargin: Theme.space12
+        anchors.rightMargin: Theme.space12
+        anchors.topMargin: Theme.space12
+        anchors.bottomMargin: Theme.space12
+        spacing: Theme.space12
 
         Rectangle {
             Layout.preferredWidth: 40
@@ -58,8 +58,8 @@ Rectangle {
                 visible: root.running
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.rightMargin: -3
-                anchors.topMargin: -3
+                anchors.rightMargin: -Theme.space4
+                anchors.topMargin: -Theme.space4
                 width: 10
                 height: 10
                 radius: height / 2
@@ -73,7 +73,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.minimumWidth: 0
             Layout.alignment: Qt.AlignVCenter
-            spacing: 5
+            spacing: Theme.space4
 
             Text {
                 Layout.fillWidth: true
@@ -87,7 +87,7 @@ Rectangle {
             RowLayout {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
-                spacing: 7
+                spacing: Theme.controlSpacing
 
                 Rectangle {
                     Layout.preferredWidth: kindText.implicitWidth + 12

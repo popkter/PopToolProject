@@ -221,7 +221,7 @@ Dialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "进入“设置 → 外观”，可选择跟随系统、浅色或深色模式，并在 Material 3 与 Windows XP 两种主题风格间切换。修改会立即生效并在下次启动时保留，不会影响脚本和推送方案。"
+                            text: "进入“设置 → 外观”，可选择跟随系统、浅色或深色模式。主题风格从应用主题目录动态加载，当前包含 Material 3、Windows XP 和 Mario；每次打开设置都会刷新列表。修改会立即生效并在下次启动时保留，不会影响脚本和推送方案。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap
@@ -291,7 +291,7 @@ Dialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "终端功能默认关闭。请先在“设置”中开启；如果尚未安装应用专用的 PowerShell 7 插件，确认并安装成功后，主界面才会显示“终端”Tab。拒绝安装会保持关闭，再次关闭终端功能会隐藏 Tab 并停止会话。终端中可执行 python --version、pip list、pip install 包名等命令，这里的 python 和 pip 与客制 Python 脚本使用同一个应用专属环境。"
+                            text: "终端功能默认关闭。Windows 首次开启时需确认安装应用专用 PowerShell 7，macOS 使用系统 Shell；运行环境就绪后主界面显示“终端”。终端最多支持 7 个独立会话，并与客制 Python 脚本共用应用专属 python 和 pip。Ctrl+C 有选区时复制、无选区时停止当前命令，Ctrl+V 粘贴，Ctrl+L 清屏。再次关闭终端功能会隐藏入口并停止全部会话。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap

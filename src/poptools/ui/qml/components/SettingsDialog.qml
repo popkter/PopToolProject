@@ -28,9 +28,10 @@ Dialog {
     closePolicy: Popup.CloseOnEscape
 
     onOpened: {
+        root.controller.refreshThemeCatalog()
         themeModeBox.currentIndex = Math.max(0, ["system", "light", "dark"].indexOf(
                                                  root.controller.themeMode))
-        themeStyleBox.currentIndex = Math.max(0, ["material3", "winxp", "mario"].indexOf(
+        themeStyleBox.currentIndex = Math.max(0, themeStyleBox.indexOfValue(
                                                  root.controller.themeStyle))
         concurrencyBox.currentIndex = Math.max(0, root.controller.customScriptConcurrency - 1)
     }
@@ -188,11 +189,7 @@ Dialog {
                                 font.pixelSize: Theme.fontBody
                                 textRole: "label"
                                 valueRole: "value"
-                                model: [
-                                    { "label": "Material 3", "value": "material3" },
-                                    { "label": "Windows XP", "value": "winxp" },
-                                    { "label": "Mario", "value": "mario" }
-                                ]
+                                model: root.controller.themeStyles
                                 onActivated: root.controller.saveThemeStyle(currentValue)
                             }
                         }

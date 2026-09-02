@@ -74,7 +74,7 @@ ScrollView {
 
     ColumnLayout {
         width: picker.availableWidth
-        spacing: 14
+        spacing: Theme.sectionSpacing
 
         Item { Layout.preferredHeight: 2 }
 
@@ -87,7 +87,7 @@ ScrollView {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 10
+            spacing: Theme.space12
 
             Rectangle {
                 Layout.preferredWidth: 48
@@ -99,7 +99,7 @@ ScrollView {
                 Canvas {
                     id: colorPreviewCanvas
                     anchors.fill: parent
-                    anchors.margins: 3
+                    anchors.margins: Theme.space4
                     onPaint: {
                         const ctx = getContext("2d")
                         const cornerRadius = Math.min(
@@ -250,7 +250,7 @@ ScrollView {
 
                 Rectangle {
                     anchors.fill: parent
-                    anchors.margins: 2
+                    anchors.margins: Theme.space4
                     radius: width / 2
                     color: "transparent"
                     border.color: "#66000000"
@@ -320,7 +320,7 @@ ScrollView {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 12
+            spacing: Theme.space12
 
             Text {
                 text: "透明度"

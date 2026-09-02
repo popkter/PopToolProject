@@ -15,7 +15,7 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
-from PySide6.QtGui import QWindow
+from PySide6.QtGui import QGuiApplication, QWindow
 
 from poptools.domain.models import (
     ExecutorKind,
@@ -25,6 +25,10 @@ from poptools.domain.models import (
 )
 from poptools.infrastructure.background_process import BackgroundProcess
 from poptools.infrastructure.config_store import ConfigStore
+from poptools.infrastructure.custom_tool_transfer import (
+    decode_custom_tool,
+    encode_custom_tool,
+)
 from poptools.infrastructure.python_doctor import (
     PythonDoctor,
     PythonDoctorResult,
@@ -96,6 +100,7 @@ class AppController(QObject):
         self._python_doctor_command = ""
         self._python_doctor_process: BackgroundProcess | None = None
         self._python_package_install: BackgroundProcess | None = None
+        self._pending_import_tool: ToolDefinition | None = None
         self.execution_coordinator.output.connect(self._queue_console)
         self.execution_coordinator.started.connect(self._on_execution_started)
         self.execution_coordinator.runningChanged.connect(self._on_execution_running_changed)
@@ -475,6 +480,79 @@ class AppController(QObject):
         except Exception as exc:
             self._append_console(f"新建失败：{exc}\n")
             return False
+
+    @Slot(result=bool)
+    def exportSelectedScriptToClipboard(self) -> bool:
+        tool = self._selected
+        if tool is None or tool.section != ToolSection.CUSTOM:
+            return False
+        try:
+            QGuiApplication.clipboard().setText(encode_custom_tool(tool))
+            self._append_console(f"已将客制脚本“{tool.title}”复制到剪贴板。\n")
+            return True
+        except Exception as exc:
+            self._append_console(f"脚本分享失败：{exc}\n")
+            return False
+
+    @Slot(result="QVariantMap")
+    def importScriptFromClipboard(self) -> dict[str, Any]:
+        self._pending_import_tool = None
+        try:
+            tool = decode_custom_tool(QGuiApplication.clipboard().text())
+        except Exception as exc:
+            message = str(exc)
+            self._append_console(f"脚本导入失败：{message}\n")
+            return {"status": "error", "message": message}
+
+        existing = self.registry.get(tool.id)
+        if existing is not None:
+            if existing.section != ToolSection.CUSTOM:
+                message = "脚本 ID 与内置功能冲突，无法导入"
+                self._append_console(f"脚本导入失败：{message}\n")
+                return {"status": "error", "message": message}
+            self._pending_import_tool = tool
+            return {
+                "status": "duplicate",
+                "toolId": tool.id,
+                "title": tool.title,
+                "existingTitle": existing.title,
+            }
+        return self._finish_script_import(tool, replaced=False)
+
+    @Slot(result="QVariantMap")
+    def confirmScriptImportReplacement(self) -> dict[str, Any]:
+        tool = self._pending_import_tool
+        self._pending_import_tool = None
+        if tool is None:
+            return {"status": "error", "message": "没有等待替换的脚本"}
+        if self.execution_coordinator.running(tool.id):
+            message = "该脚本正在运行，请停止后再替换"
+            self._append_console(f"脚本导入失败：{message}\n")
+            return {"status": "error", "message": message}
+        return self._finish_script_import(tool, replaced=True)
+
+    @Slot()
+    def cancelScriptImportReplacement(self) -> None:
+        self._pending_import_tool = None
+
+    def _finish_script_import(
+        self, tool: ToolDefinition, *, replaced: bool
+    ) -> dict[str, Any]:
+        try:
+            imported = self.registry.import_custom(tool)
+            selected_id = self._selected.id if self._selected is not None else ""
+            self._refresh(select_id=selected_id)
+            action = "替换" if replaced else "导入"
+            self._append_console(f"已{action}客制脚本“{imported.title}”。\n")
+            return {
+                "status": "replaced" if replaced else "imported",
+                "toolId": imported.id,
+                "title": imported.title,
+            }
+        except Exception as exc:
+            message = str(exc)
+            self._append_console(f"脚本导入失败：{message}\n")
+            return {"status": "error", "message": message}
 
     @Slot(result=bool)
     def checkSelectedPythonDependencies(self) -> bool:

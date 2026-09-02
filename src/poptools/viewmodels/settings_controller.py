@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from typing import cast
@@ -21,6 +20,7 @@ from PySide6.QtWidgets import QFileDialog
 
 from poptools.infrastructure.config_store import ConfigStore
 from poptools.infrastructure.python_environment import PythonEnvironment
+from poptools.infrastructure.theme_catalog import ThemeCatalog
 from poptools.paths import package_root
 from poptools.runners import ExecutionCoordinator
 
@@ -32,6 +32,7 @@ class SettingsController(QObject):
     meritCountChanged = Signal()
     customScriptConcurrencyChanged = Signal()
     themeChanged = Signal()
+    themeStylesChanged = Signal()
     terminalEnabledChanged = Signal()
     userGuideSeenChanged = Signal()
     scriptsImported = Signal()
@@ -43,6 +44,7 @@ class SettingsController(QObject):
         python_environment: PythonEnvironment,
         execution_coordinator: ExecutionCoordinator | None = None,
         parent: QObject | None = None,
+        theme_catalog: ThemeCatalog | None = None,
     ) -> None:
         super().__init__(parent)
         self.config_store = config_store
@@ -52,10 +54,16 @@ class SettingsController(QObject):
         self._merit_count = config_store.merit_count()
         self._custom_script_concurrency = config_store.custom_script_concurrency()
         self._theme_mode = config_store.theme_mode()
-        self._theme_style = config_store.theme_style()
+        self._theme_catalog = theme_catalog or ThemeCatalog(
+            package_root() / "ui" / "qml" / "theme" / "configs"
+        )
+        self._theme_catalog.refresh()
+        stored_theme_style = config_store.theme_style()
+        self._theme_style = self._theme_catalog.resolve(stored_theme_style)
+        if self._theme_style != stored_theme_style:
+            config_store.set_theme_style(self._theme_style)
         self._terminal_enabled = config_store.terminal_enabled()
         self._system_dark_theme = False
-        self._theme_config_cache: dict[str, str] = {}
 
         application = cast(QGuiApplication | None, QGuiApplication.instance())
         if application is not None:
@@ -94,6 +102,10 @@ class SettingsController(QObject):
     @Property(str, notify=themeChanged)
     def themeStyle(self) -> str:
         return self._theme_style
+
+    @Property(list, notify=themeStylesChanged)
+    def themeStyles(self) -> list[dict[str, str]]:
+        return self._theme_catalog.theme_items()
 
     @Property(bool, notify=terminalEnabledChanged)
     def terminalEnabled(self) -> bool:
@@ -211,6 +223,8 @@ class SettingsController(QObject):
 
     @Slot(str, result=bool)
     def saveThemeStyle(self, style: str) -> bool:
+        if not self._theme_catalog.contains(style):
+            return False
         try:
             self.config_store.set_theme_style(style)
         except (OSError, ValueError):
@@ -220,26 +234,27 @@ class SettingsController(QObject):
             self.themeChanged.emit()
         return True
 
+    @Slot(result=bool)
+    def refreshThemeCatalog(self) -> bool:
+        changed = self._theme_catalog.refresh()
+        resolved_style = self._theme_catalog.resolve(self._theme_style)
+        style_changed = resolved_style != self._theme_style
+        if style_changed:
+            try:
+                self.config_store.set_theme_style(resolved_style)
+            except (OSError, ValueError):
+                return False
+            self._theme_style = resolved_style
+        if changed:
+            self.themeStylesChanged.emit()
+        if changed or style_changed:
+            self.themeChanged.emit()
+        return True
+
     @Slot(str, result=str)
     def themeConfigJson(self, style: str) -> str:
-        """Return the raw JSON text of a theme config file (configs/<style>.json).
-
-        JSON-driven themes (e.g. mario) read their palette from these files so
-        theme colors stay out of ThemeConfig.qml. Cached in memory after first
-        read. Returns an empty string if the file is missing or unreadable.
-        """
-        cached = self._theme_config_cache.get(style)
-        if cached is not None:
-            return cached
-        path = package_root() / "ui" / "qml" / "theme" / "configs" / f"{style}.json"
-        if not path.is_file():
-            return ""
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            return ""
-        self._theme_config_cache[style] = text
-        return text
+        """Return a validated theme config, or an empty string for an unknown id."""
+        return self._theme_catalog.config_json(style)
 
     @Slot(bool, result=bool)
     def saveTerminalEnabled(self, enabled: bool) -> bool:

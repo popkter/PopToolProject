@@ -6,8 +6,8 @@ ComboBox {
     id: control
 
     implicitHeight: 46
-    leftPadding: 14
-    rightPadding: 42
+    leftPadding: Theme.space16
+    rightPadding: Theme.space40
     font.pixelSize: Theme.fontBody
 
     contentItem: Text {
@@ -21,7 +21,7 @@ ComboBox {
     }
 
     indicator: MaterialIcon {
-        x: control.width - width - 14
+        x: control.width - width - Theme.space16
         y: (control.height - height) / 2
         icon: control.popup.visible ? "expand_less" : "expand_more"
         iconSize: 20
@@ -45,8 +45,8 @@ ComboBox {
         highlighted: control.highlightedIndex === index
 
         contentItem: Text {
-            leftPadding: 12
-            rightPadding: 12
+            leftPadding: Theme.space12
+            rightPadding: Theme.space12
             text: control.textAt(index)
             color: control.currentIndex === index
                    ? Theme.primaryText : Theme.textPrimary
@@ -63,9 +63,9 @@ ComboBox {
     }
 
     popup: Popup {
-        y: control.height + 6
+        y: control.height + Theme.space8
         width: Math.max(control.width, 160)
-        padding: 6
+        padding: Theme.space8
         implicitHeight: Math.min(contentItem.implicitHeight + topPadding + bottomPadding, 280)
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 

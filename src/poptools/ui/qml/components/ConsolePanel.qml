@@ -15,12 +15,12 @@ Item {
     property bool userResized: false
     property real resizeStartSceneY: 0
     property real resizeStartHeight: 0
-    property real panelMargin: 0
+    property real panelMargin: Theme.space0
     readonly property real separatorHeight: 8
     readonly property real headerHeight: 62
-    readonly property real outputOuterMargin: 16
-    readonly property real outputViewportMargin: 14
-    readonly property real outputTextVerticalPadding: 12
+    readonly property real outputOuterMargin: Theme.space16
+    readonly property real outputViewportMargin: Theme.space16
+    readonly property real outputTextVerticalPadding: Theme.space12
     readonly property real minimumExpandedHeight:
         separatorHeight + headerHeight + outputOuterMargin
             + outputViewportMargin * 2 + outputTextVerticalPadding
@@ -124,14 +124,14 @@ Item {
         anchors.fill: parent
         anchors.topMargin: root.separatorHeight
 
-        spacing: 0
+        spacing: Theme.space0
 
         RowLayout {
             Layout.fillWidth: true
             Layout.preferredHeight: root.headerHeight
-            Layout.leftMargin: 18
-            Layout.rightMargin: 14
-            spacing: 10
+            Layout.leftMargin: Theme.space20
+            Layout.rightMargin: Theme.space16
+            spacing: Theme.space12
 
             Text {
                 text: "控制台输出"
@@ -153,7 +153,7 @@ Item {
                 border.color: Theme.outlineVariant
                 Row {
                     anchors.centerIn: parent
-                    spacing: 7
+                    spacing: Theme.controlSpacing
                     MaterialIcon { icon: "delete"; iconSize: 19; color: Theme.textSecondary }
                     Text { text: "清空"; font.pixelSize: Theme.fontBody; color: Theme.textSecondary }
                 }
@@ -195,7 +195,7 @@ Item {
             Layout.leftMargin: root.outputOuterMargin
             Layout.rightMargin: root.outputOuterMargin
             Layout.bottomMargin: root.outputOuterMargin
-            Layout.topMargin: 0
+            Layout.topMargin: Theme.space0
             radius: Theme.radiusMedium
             color: Theme.consoleBackground
 

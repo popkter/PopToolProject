@@ -138,6 +138,13 @@ class ToolRegistry:
         self.reload()
         return self._tools[tool_id]
 
+    def import_custom(self, tool: ToolDefinition) -> ToolDefinition:
+        if tool.origin != ToolOrigin.CUSTOM or tool.section != ToolSection.CUSTOM:
+            raise ValueError("只能导入客制脚本")
+        self.repository.save_tool(tool)
+        self.reload()
+        return self._tools[tool.id]
+
     def set_parameter_default(
         self, tool_id: str, parameter_id: str, default: str
     ) -> ToolDefinition:

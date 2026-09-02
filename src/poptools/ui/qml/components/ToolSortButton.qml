@@ -7,6 +7,7 @@ Rectangle {
     id: root
     required property var controller
     property color foregroundColor: Theme.primary
+    property color backgroundColor: "transparent"
     property color hoverColor: Theme.primaryContainerHover
     readonly property var options: [
         { "label": "按添加时间", "value": "added_time", "icon": "schedule" },
@@ -17,9 +18,9 @@ Rectangle {
 
     implicitWidth: 40
     implicitHeight: 40
-    radius: Theme.radiusLarge
+    radius: Theme.radiusMedium
     color: buttonMouse.containsMouse || sortPopup.opened
-           ? root.hoverColor : "transparent"
+           ? root.hoverColor : root.backgroundColor
 
     function openMenu() {
         var point = root.mapToItem(Overlay.overlay, 0, root.height)
@@ -54,14 +55,14 @@ Rectangle {
         parent: Overlay.overlay
         width: 188
         height: contentColumn.implicitHeight + 16
-        padding: 8
+        padding: Theme.space8
         modal: false
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         background: AppPopupSurface { }
 
         contentItem: ColumnLayout {
             id: contentColumn
-            spacing: 3
+            spacing: Theme.space4
             Repeater {
                 model: root.options
                 delegate: Rectangle {
@@ -75,9 +76,9 @@ Rectangle {
                            : (optionMouse.containsMouse ? Theme.surfaceContainerHigh : "transparent")
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 10
-                        spacing: 10
+                        anchors.leftMargin: Theme.space12
+                        anchors.rightMargin: Theme.space12
+                        spacing: Theme.space12
                         MaterialIcon {
                             icon: optionRow.modelData.icon
                             iconSize: 20

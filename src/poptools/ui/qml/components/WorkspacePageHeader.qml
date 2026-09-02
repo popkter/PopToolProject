@@ -15,12 +15,12 @@ Item {
 
     RowLayout {
         anchors.fill: parent
-        spacing: 12
+        spacing: Theme.space12
 
         ColumnLayout {
             Layout.fillWidth: true
             Layout.minimumWidth: 0
-            spacing: 3
+            spacing: Theme.space4
 
             Text {
                 Layout.fillWidth: true
@@ -48,7 +48,7 @@ Item {
             Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
             Layout.preferredWidth: root.actionWidth
             Layout.minimumWidth: root.actionWidth
-            spacing: 8
+            spacing: Theme.controlSpacing
         }
     }
 }

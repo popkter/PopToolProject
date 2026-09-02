@@ -10,6 +10,155 @@ Item {
     id: root
     required property var controller
 
+    component TerminalContextMenuItem: MenuItem {
+        id: menuItem
+        property string shortcutText: ""
+        property bool destructive: false
+
+        implicitWidth: 252
+        implicitHeight: 40
+        leftPadding: Theme.space12
+        rightPadding: Theme.space12
+
+        contentItem: RowLayout {
+            spacing: Theme.space20
+
+            Text {
+                Layout.fillWidth: true
+                text: menuItem.text
+                color: !menuItem.enabled
+                       ? Theme.textSecondary
+                       : (menuItem.destructive
+                          ? Theme.errorColor : Theme.textPrimary)
+                opacity: menuItem.enabled ? 1 : 0.5
+                font.pixelSize: Theme.fontBody
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            Text {
+                text: menuItem.shortcutText
+                color: menuItem.destructive && menuItem.enabled
+                       ? Theme.errorColor : Theme.textSecondary
+                opacity: menuItem.enabled ? 1 : 0.5
+                font.pixelSize: Theme.fontCaption
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+
+        background: Rectangle {
+            radius: Theme.radiusSmall
+            color: menuItem.down
+                   ? (menuItem.destructive
+                      ? Theme.errorContainer : Theme.primaryContainer)
+                   : (menuItem.highlighted
+                      ? Theme.surfaceContainerHigh : "transparent")
+            border.width: menuItem.activeFocus ? Theme.borderWidthThin : 0
+            border.color: Theme.primary
+        }
+    }
+
+    function copyTerminalSelection() {
+        if (terminalView.hasSelection)
+            terminalView.copySelection()
+        terminalView.forceActiveFocus()
+    }
+
+    function copySelectionOrInterrupt() {
+        if (terminalView.hasSelection)
+            terminalView.copySelection()
+        else
+            root.controller.interrupt()
+        terminalView.forceActiveFocus()
+    }
+
+    function cutTerminalSelection() {
+        if (terminalView.hasSelection) {
+            terminalView.copySelection()
+            terminalView.clearSelection()
+        }
+        terminalView.forceActiveFocus()
+    }
+
+    function pasteTerminalClipboard() {
+        terminalView.pasteClipboard()
+        terminalView.forceActiveFocus()
+    }
+
+    function clearTerminal() {
+        root.controller.clear()
+        terminalView.forceActiveFocus()
+    }
+
+    function interruptTerminal() {
+        root.controller.interrupt()
+        terminalView.forceActiveFocus()
+    }
+
+    Shortcut {
+        sequence: "Ctrl+Shift+C"
+        context: Qt.WindowShortcut
+        enabled: root.visible
+        autoRepeat: false
+        onActivated: root.copyTerminalSelection()
+    }
+    Shortcut {
+        sequence: "Ctrl+Insert"
+        context: Qt.WindowShortcut
+        enabled: root.visible
+        autoRepeat: false
+        onActivated: root.copyTerminalSelection()
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+V"
+        context: Qt.WindowShortcut
+        enabled: root.visible
+        autoRepeat: false
+        onActivated: root.pasteTerminalClipboard()
+    }
+    Shortcut {
+        sequence: "Ctrl+V"
+        context: Qt.WindowShortcut
+        enabled: root.visible
+        autoRepeat: false
+        onActivated: root.pasteTerminalClipboard()
+    }
+    Shortcut {
+        sequence: "Shift+Insert"
+        context: Qt.WindowShortcut
+        enabled: root.visible
+        autoRepeat: false
+        onActivated: root.pasteTerminalClipboard()
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+X"
+        context: Qt.WindowShortcut
+        enabled: root.visible
+        autoRepeat: false
+        onActivated: root.cutTerminalSelection()
+    }
+    Shortcut {
+        sequence: "Ctrl+X"
+        context: Qt.WindowShortcut
+        // Preserve Ctrl+X for terminal applications unless text is selected.
+        enabled: root.visible && terminalView.hasSelection
+        autoRepeat: false
+        onActivated: root.cutTerminalSelection()
+    }
+    Shortcut {
+        sequence: "Ctrl+L"
+        context: Qt.WindowShortcut
+        enabled: root.visible
+        autoRepeat: false
+        onActivated: root.clearTerminal()
+    }
+    Shortcut {
+        sequence: "Ctrl+C"
+        context: Qt.WindowShortcut
+        enabled: root.visible
+        autoRepeat: false
+        onActivated: root.copySelectionOrInterrupt()
+    }
+
     Component.onDestruction: root.controller.terminalDetached()
 
     Connections {
@@ -29,8 +178,11 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 20
-        spacing: 14
+        anchors.leftMargin: Theme.space12
+        anchors.rightMargin: Theme.pagePadding
+        anchors.topMargin: Theme.pagePadding
+        anchors.bottomMargin: Theme.pagePadding
+        spacing: Theme.sectionSpacing
 
         WorkspacePageHeader {
             Layout.fillWidth: true
@@ -47,7 +199,7 @@ Item {
                 color: root.controller.running ? Theme.successContainer : Theme.errorContainer
                 RowLayout {
                     anchors.centerIn: parent
-                    spacing: 7
+                    spacing: Theme.controlSpacing
                     Rectangle {
                         Layout.preferredWidth: 8
                         Layout.preferredHeight: 8
@@ -69,7 +221,7 @@ Item {
             Layout.minimumHeight: 42
             Layout.preferredHeight: 42
             Layout.maximumHeight: 42
-            spacing: 8
+            spacing: Theme.controlSpacing
 
             Flickable {
                 Layout.fillWidth: true
@@ -82,7 +234,7 @@ Item {
                 Row {
                     id: terminalTabRow
                     height: parent.height
-                    spacing: 6
+                    spacing: Theme.controlSpacing
 
                     Repeater {
                         model: root.controller.terminalTabs
@@ -101,9 +253,9 @@ Item {
                             RowLayout {
                                 z: 1
                                 anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 7
-                                spacing: 6
+                                anchors.leftMargin: Theme.space12
+                                anchors.rightMargin: Theme.space8
+                                spacing: Theme.controlSpacing
 
                                 Rectangle {
                                     Layout.preferredWidth: 7
@@ -175,9 +327,9 @@ Item {
             color: Theme.tealContainer
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: 14
-                spacing: 10
+                anchors.leftMargin: Theme.space16
+                anchors.rightMargin: Theme.space16
+                spacing: Theme.space12
                 MaterialIcon {
                     icon: "terminal"
                     iconSize: 21
@@ -204,16 +356,13 @@ Item {
             TerminalView {
                 id: terminalView
                 anchors.fill: parent
-                anchors.margins: Math.max(
-                    6,
-                    Math.ceil(Theme.radiusLarge * 0.3)
-                )
+                anchors.margins: Theme.terminalContentPadding
                 sessionId: root.controller.activeTerminalTabId
                 fontSize: 14
                 focus: true
                 Accessible.role: Accessible.EditableText
                 Accessible.name: "开发者终端"
-                Accessible.description: "可交互命令行终端；使用 Ctrl+Shift+C 复制，Ctrl+Shift+V 粘贴"
+                Accessible.description: "可交互命令行终端；Ctrl+C 有选区时复制、无选区时停止当前命令，Ctrl+V 粘贴"
 
                 Component.onCompleted: {
                     root.controller.terminalReady()
@@ -232,9 +381,9 @@ Item {
 
             ScrollBar {
                 id: terminalScrollBar
-                anchors.top: parent.top
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
+                anchors.top: terminalView.top
+                anchors.right: terminalView.right
+                anchors.bottom: terminalView.bottom
                 orientation: Qt.Vertical
                 policy: terminalView.scrollbackLineCount > 0
                         ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
@@ -255,19 +404,61 @@ Item {
 
             Menu {
                 id: terminalContextMenu
-                MenuItem {
+                objectName: "terminalContextMenu"
+                width: 252
+                topPadding: Theme.space8
+                bottomPadding: Theme.space8
+                leftPadding: Theme.space8
+                rightPadding: Theme.space8
+                background: AppPopupSurface {
+                    cornerRadius: Theme.radiusLarge
+                    fillColor: Theme.surfaceContainer
+                    outlineColor: Theme.outlineVariant
+                }
+                onClosed: terminalView.forceActiveFocus()
+
+                TerminalContextMenuItem {
                     text: "复制"
+                    shortcutText: "Ctrl+C"
                     enabled: terminalView.hasSelection
-                    onTriggered: terminalView.copySelection()
+                    onTriggered: root.copyTerminalSelection()
                 }
-                MenuItem {
+                TerminalContextMenuItem {
+                    text: "剪切"
+                    shortcutText: "Ctrl+X"
+                    enabled: terminalView.hasSelection
+                    onTriggered: root.cutTerminalSelection()
+                }
+                TerminalContextMenuItem {
                     text: "粘贴"
-                    onTriggered: terminalView.pasteClipboard()
+                    shortcutText: "Ctrl+V"
+                    onTriggered: root.pasteTerminalClipboard()
                 }
-                MenuSeparator {}
-                MenuItem {
+                MenuSeparator {
+                    topPadding: Theme.space4
+                    bottomPadding: Theme.space4
+                    leftPadding: Theme.space12
+                    rightPadding: Theme.space12
+                    contentItem: Rectangle {
+                        implicitHeight: Theme.borderWidthThin
+                        color: Theme.outlineVariant
+                    }
+                }
+                TerminalContextMenuItem {
                     text: "全选"
                     onTriggered: terminalView.selectAll()
+                }
+                TerminalContextMenuItem {
+                    text: "清屏"
+                    shortcutText: "Ctrl+L"
+                    onTriggered: root.clearTerminal()
+                }
+                TerminalContextMenuItem {
+                    text: "停止当前命令"
+                    shortcutText: "Ctrl+C"
+                    destructive: true
+                    enabled: root.controller.running
+                    onTriggered: root.interruptTerminal()
                 }
             }
         }
@@ -277,20 +468,17 @@ Item {
             Layout.preferredHeight: 40
             Layout.minimumHeight: 40
             Layout.maximumHeight: 40
-            spacing: 8
+            spacing: Theme.controlSpacing
             Text {
                 Layout.fillWidth: true
-                text: "PSReadLine 历史预测 · Tab 补全 · ↑↓ 历史命令 · Ctrl+R 搜索 · Ctrl+L 清屏"
+                text: "Ctrl+C 复制/停止 · Ctrl+V 粘贴 · Ctrl+X 剪切 · Ctrl+L 清屏"
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontCaption
             }
             Button {
                 text: "清屏"
                 flat: true
-                onClicked: {
-                    root.controller.clear()
-                    terminalView.forceActiveFocus()
-                }
+                onClicked: root.clearTerminal()
             }
             Button {
                 text: "重启会话"

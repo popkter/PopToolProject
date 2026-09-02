@@ -9,7 +9,7 @@ ColumnLayout {
     required property var androidController
     property string statusMessage: ""
     property bool statusError: false
-    spacing: 18
+    spacing: Theme.space20
 
     function openSaveDialog() {
         root.controller.chooseRecordingDirectory()
@@ -37,7 +37,7 @@ ColumnLayout {
 
         ColumnLayout {
             anchors.centerIn: parent
-            spacing: 12
+            spacing: Theme.space12
             MaterialIcon {
                 Layout.alignment: Qt.AlignHCenter
                 icon: root.controller.recording ? "radio_button_checked" : "videocam"

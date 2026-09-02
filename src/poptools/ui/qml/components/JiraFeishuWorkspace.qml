@@ -19,7 +19,7 @@ ColumnLayout {
         height - headerCard.height - outputPanelCollapsedHeight - root.spacing
     )
 
-    spacing: 8
+    spacing: Theme.controlSpacing
 
     Behavior on outputReveal {
         NumberAnimation { duration: 220; easing.type: Easing.InOutCubic }
@@ -85,8 +85,8 @@ ColumnLayout {
     component AppField: TextField {
         Layout.fillWidth: true
         Layout.preferredHeight: 46
-        leftPadding: 14
-        rightPadding: 14
+        leftPadding: Theme.space16
+        rightPadding: Theme.space16
         color: Theme.textPrimary
         placeholderTextColor: Theme.textSecondary
         selectByMouse: true
@@ -112,7 +112,7 @@ ColumnLayout {
                       : (hover.containsMouse ? Theme.primaryContainerHover : Theme.primaryContainer)
         RowLayout {
             anchors.centerIn: parent
-            spacing: 6
+            spacing: Theme.space8
             MaterialIcon {
                 Layout.alignment: Qt.AlignVCenter
                 icon: mini.iconName
@@ -181,9 +181,9 @@ ColumnLayout {
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
-                    spacing: 7
+                    anchors.leftMargin: Theme.space12
+                    anchors.rightMargin: Theme.space12
+                    spacing: Theme.space8
                     Rectangle {
                         Layout.preferredWidth: 8
                         Layout.preferredHeight: 8
@@ -237,11 +237,11 @@ ColumnLayout {
 
         ColumnLayout {
             anchors.fill: parent
-            spacing: 8
+            spacing: Theme.controlSpacing
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 12
+                spacing: Theme.space12
 
         Rectangle {
             Layout.fillWidth: true
@@ -251,9 +251,9 @@ ColumnLayout {
             border.color: Theme.outlineVariant
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: 14
-                spacing: 10
+                anchors.leftMargin: Theme.space16
+                anchors.rightMargin: Theme.space16
+                spacing: Theme.space12
                 FieldLabel { text: "方案名称" }
                 AppField {
                     id: profileName
@@ -291,8 +291,8 @@ ColumnLayout {
 
             RowLayout {
                 anchors.fill: parent
-                anchors.margins: 4
-                spacing: 4
+                anchors.margins: Theme.space4
+                spacing: Theme.space4
 
                 Repeater {
                     model: ["Jira", "飞书", "定时"]
@@ -334,7 +334,7 @@ ColumnLayout {
 
                 StackLayout {
                     anchors.fill: parent
-                    anchors.margins: 16
+                    anchors.margins: Theme.space16
                     currentIndex: tabs.currentIndex
 
             Flickable {
@@ -345,7 +345,7 @@ ColumnLayout {
                 ColumnLayout {
                     id: jiraForm
                     width: parent.width
-                    spacing: 12
+                    spacing: Theme.space12
                     Text { text: "Jira 数据源"; color: Theme.textPrimary; font.pixelSize: Theme.fontSectionTitle; font.weight: Font.DemiBold }
                     Text { text: "使用 JQL 获取议题与变更记录，Token 仅保存在本机。"; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting }
                     GridLayout {
@@ -354,17 +354,17 @@ ColumnLayout {
                         columnSpacing: 14
                         rowSpacing: 10
                         ColumnLayout {
-                            Layout.fillWidth: true; spacing: 5
+                            Layout.fillWidth: true; spacing: Theme.space4
                             FieldLabel { text: "Jira 地址 *" }
                             AppField { id: jiraUrl; placeholderText: "https://jira.example.com"; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("jira", "base_url", text.trim()) }
                         }
                         ColumnLayout {
-                            Layout.fillWidth: true; spacing: 5
+                            Layout.fillWidth: true; spacing: Theme.space4
                             FieldLabel { text: "Token / PAT *" }
                             AppField { id: jiraToken; echoMode: TextInput.Password; placeholderText: "输入访问令牌"; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("jira", "token", text) }
                         }
                         ColumnLayout {
-                            spacing: 5
+                            spacing: Theme.space4
 
                             FieldLabel {
                                 text: "最多获取数"
@@ -380,8 +380,8 @@ ColumnLayout {
                                 to: 1000
                                 editable: true
 
-                                leftPadding: 48
-                                rightPadding: 48
+                                leftPadding: Theme.space40
+                                rightPadding: Theme.space40
 
                                 background: Rectangle {
                                     radius: Theme.radiusSmall
@@ -483,10 +483,10 @@ ColumnLayout {
                             id: jiraJql
                             objectName: "jiraFeishuJqlEditor"
                             width: jiraJqlScroll.availableWidth
-                            leftPadding: 14
-                            rightPadding: 14
-                            topPadding: 12
-                            bottomPadding: 12
+                            leftPadding: Theme.space16
+                            rightPadding: Theme.space16
+                            topPadding: Theme.space12
+                            bottomPadding: Theme.space12
                             color: Theme.textPrimary
                             font.family: "Cascadia Mono"
                             font.pixelSize: Theme.fontCode
@@ -510,7 +510,7 @@ ColumnLayout {
                 ColumnLayout {
                     id: feishuForm
                     width: parent.width
-                    spacing: 12
+                    spacing: Theme.space12
                     Text { text: "飞书机器人"; color: Theme.textPrimary; font.pixelSize: Theme.fontSectionTitle; font.weight: Font.DemiBold }
                     Text { text: "配置群机器人安全校验；自建应用凭据仅用于将邮箱解析为 open_id。"; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                     GridLayout {
@@ -519,37 +519,37 @@ ColumnLayout {
                         columnSpacing: 14; rowSpacing: 10
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 5
+                            spacing: Theme.space4
                             FieldLabel { text: "Webhook URL *" }
                             AppField { id: webhook; placeholderText: "https://open.feishu.cn/open-apis/bot/v2/hook/..."; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "webhook_url", text.trim()) }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 5
+                            spacing: Theme.space4
                             FieldLabel { text: "安全关键词" }
                             AppField { id: keyword; placeholderText: "与机器人安全设置保持一致"; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "keyword", text.trim()) }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 5
+                            spacing: Theme.space4
                             FieldLabel { text: "签名 Secret（可选）" }
                             AppField { id: signSecret; echoMode: TextInput.Password; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "secret", text) }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 5
+                            spacing: Theme.space4
                             FieldLabel { text: "邮箱域名" }
                             AppField { id: emailDomain; placeholderText: "@geely.com"; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("message", "email_domain", text.trim() || "@geely.com") }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 5
+                            spacing: Theme.space4
                             FieldLabel { text: "App ID（可选）" }
                             AppField { id: appId; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "app_id", text.trim()) }
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 5
+                            spacing: Theme.space4
                             FieldLabel { text: "App Secret（可选）" }
                             AppField { id: appSecret; echoMode: TextInput.Password; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "app_secret", text) }
                         }
@@ -563,7 +563,7 @@ ColumnLayout {
                     }
                     Rectangle {
                         Layout.fillWidth: true; Layout.preferredHeight: 54; radius: Theme.radiusMedium; color: Theme.tealContainer
-                        RowLayout { anchors.fill: parent; anchors.margins: 12; spacing: 10
+                        RowLayout { anchors.fill: parent; anchors.margins: Theme.space12; spacing: Theme.space12
                             MaterialIcon { icon: "info"; iconSize: 20; color: Theme.teal }
                             Text { Layout.fillWidth: true; text: "未解析到 open_id 时只显示负责人姓名，不会发送无效 @。"; color: Theme.teal; font.pixelSize: Theme.fontSupporting; wrapMode: Text.WordWrap }
                         }
@@ -580,10 +580,10 @@ ColumnLayout {
                 ColumnLayout {
                     id: scheduleForm
                     width: parent.width
-                    spacing: 14
+                    spacing: Theme.sectionSpacing
                     RowLayout {
                         Layout.fillWidth: true
-                        ColumnLayout { Layout.fillWidth: true; spacing: 3
+                        ColumnLayout { Layout.fillWidth: true; spacing: Theme.space4
                             Text { text: "定时推送"; color: Theme.textPrimary; font.pixelSize: Theme.fontSectionTitle; font.weight: Font.DemiBold }
                             Text { text: "应用运行期间，每 30 秒检查一次到点方案。"; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting }
                         }
@@ -599,7 +599,7 @@ ColumnLayout {
                         columns: root.narrow ? 1 : 2
                         columnSpacing: 14; rowSpacing: 10
                         ColumnLayout {
-                            Layout.fillWidth: true; spacing: 5
+                            Layout.fillWidth: true; spacing: Theme.space4
                             FieldLabel { text: "触发方式" }
                             AppComboBox {
                                 id: scheduleMode
@@ -609,7 +609,7 @@ ColumnLayout {
                             }
                         }
                         ColumnLayout {
-                            Layout.fillWidth: true; spacing: 5
+                            Layout.fillWidth: true; spacing: Theme.space4
                             FieldLabel { text: "间隔分钟数" }
                             SpinBox {
                                 id: intervalMinutes
@@ -621,8 +621,8 @@ ColumnLayout {
                                 editable: true
                                 enabled: scheduleMode.currentIndex === 0
 
-                                leftPadding: 48
-                                rightPadding: 48
+                                leftPadding: Theme.space40
+                                rightPadding: Theme.space40
 
                                 background: Rectangle {
                                     radius: Theme.radiusSmall
@@ -722,9 +722,9 @@ ColumnLayout {
                     Rectangle {
                         Layout.fillWidth: true; Layout.preferredHeight: 76; radius: Theme.radiusMedium; color: Theme.surface
                         border.color: Theme.outlineVariant
-                        RowLayout { anchors.fill: parent; anchors.margins: 14; spacing: 12
+                        RowLayout { anchors.fill: parent; anchors.margins: Theme.space16; spacing: Theme.space12
                             MaterialIcon { icon: controller.scheduleRunning ? "schedule" : "schedule_send"; iconSize: 26; color: controller.scheduleRunning ? Theme.success : Theme.textSecondary }
-                            ColumnLayout { Layout.fillWidth: true; spacing: 2
+                            ColumnLayout { Layout.fillWidth: true; spacing: Theme.space4
                                 Text { text: controller.scheduleRunning ? "调度器正在运行" : "调度器尚未启动"; color: Theme.textPrimary; font.pixelSize: Theme.fontComponentTitle; font.weight: Font.DemiBold }
                                 Text { text: "启动后会同时管理所有已启用的推送方案"; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting }
                             }
@@ -793,9 +793,9 @@ ColumnLayout {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: outputToggle.bottom
-            anchors.topMargin: 6
+            anchors.topMargin: Theme.space8
             height: 44
-            spacing: 10
+            spacing: Theme.space12
             PrimaryButton {
                 Layout.fillWidth: true
                 Layout.preferredWidth: 150
@@ -844,7 +844,7 @@ ColumnLayout {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: actionRow.bottom
-            anchors.topMargin: 6
+            anchors.topMargin: Theme.space8
             anchors.bottom: parent.bottom
             radius: Theme.radiusLarge
             color: Theme.consoleBackground
@@ -854,9 +854,9 @@ ColumnLayout {
             opacity: root.outputReveal
             ColumnLayout {
                 anchors.fill: parent
-                spacing: 0
+                spacing: Theme.space0
                 RowLayout {
-                    Layout.fillWidth: true; Layout.preferredHeight: 32; Layout.leftMargin: 12; Layout.rightMargin: 8
+                    Layout.fillWidth: true; Layout.preferredHeight: 32; Layout.leftMargin: Theme.space12; Layout.rightMargin: Theme.space8
                     Text { text: "运行记录"; color: Theme.consoleText; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold; Layout.fillWidth: true }
                     MiniButton { text: "清空"; iconName: "delete_sweep"; implicitWidth: 78; implicitHeight: 30; onClicked: controller.clearLog() }
                 }
