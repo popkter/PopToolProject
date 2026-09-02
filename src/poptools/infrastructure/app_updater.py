@@ -113,7 +113,16 @@ class GitHubReleaseClient:
         self.releases_url = releases_url
         self.latest_release_url = latest_release_url
 
-    def latest_release(self, include_prereleases: bool = False) -> UpdateRelease | None:
+    def latest_release(
+        self,
+        include_prereleases: bool = False,
+        *,
+        include_prerelease: bool | None = None,
+    ) -> UpdateRelease | None:
+        # Keep the original plural argument for positional/backward-compatible
+        # callers while accepting the public singular spelling used by tests.
+        if include_prerelease is not None:
+            include_prereleases = include_prerelease
         releases_url = self.releases_url if include_prereleases else self.latest_release_url
         request = urllib.request.Request(
             releases_url,
