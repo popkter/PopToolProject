@@ -16,14 +16,22 @@ if (-not (Test-Path -LiteralPath $CMake -PathType Leaf)) {
 }
 
 $QtPrefix = $env:QT_ROOT_DIR
+if (-not $QtPrefix -and $env:Qt6_DIR) {
+    # install-qt-action@v4 sets Qt6_DIR=<prefix>/lib/cmake/Qt6
+    $QtPrefix = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $env:Qt6_DIR))
+    Write-Host "Qt prefix resolved from Qt6_DIR: $QtPrefix"
+}
 if (-not $QtPrefix) {
     $QMake = (Get-Command qmake6 -ErrorAction SilentlyContinue).Source
     if (-not $QMake) { $QMake = (Get-Command qmake -ErrorAction SilentlyContinue).Source }
     if ($QMake) { $QtPrefix = (& $QMake -query QT_INSTALL_PREFIX).Trim() }
 }
 if (-not $QtPrefix) {
-    throw "Qt 6 C++ SDK was not found. Set QT_ROOT_DIR or add qmake to PATH."
+    throw "Qt 6 C++ SDK was not found. Set QT_ROOT_DIR, Qt6_DIR, or add qmake to PATH."
 }
+
+Write-Host "Using Qt prefix: $QtPrefix"
+Write-Host "CMake: $CMake"
 
 New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $InstallDirectory -Force | Out-Null

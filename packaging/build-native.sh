@@ -12,14 +12,21 @@ command -v cmake >/dev/null 2>&1 || {
 }
 
 QT_PREFIX="${QT_ROOT_DIR:-}"
+if [[ -z "$QT_PREFIX" && -n "${Qt6_DIR:-}" ]]; then
+    # install-qt-action@v4 sets Qt6_DIR=<prefix>/lib/cmake/Qt6
+    QT_PREFIX="$(dirname "$(dirname "$(dirname "$Qt6_DIR")")")"
+    echo "Qt prefix resolved from Qt6_DIR: $QT_PREFIX"
+fi
 if [[ -z "$QT_PREFIX" ]]; then
     QMAKE="$(command -v qmake6 || command -v qmake || true)"
     [[ -n "$QMAKE" ]] && QT_PREFIX="$($QMAKE -query QT_INSTALL_PREFIX)"
 fi
 [[ -n "$QT_PREFIX" ]] || {
-    echo "Qt 6 C++ SDK was not found. Set QT_ROOT_DIR or add qmake to PATH." >&2
+    echo "Qt 6 C++ SDK was not found. Set QT_ROOT_DIR, Qt6_DIR, or add qmake to PATH." >&2
     exit 1
 }
+
+echo "Using Qt prefix: $QT_PREFIX"
 
 mkdir -p "$BUILD_DIRECTORY" "$INSTALL_DIRECTORY"
 cmake -S "$PROJECT_ROOT/native" -B "$BUILD_DIRECTORY" \
