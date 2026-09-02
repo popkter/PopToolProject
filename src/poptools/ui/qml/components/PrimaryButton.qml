@@ -10,6 +10,7 @@ Rectangle {
     property bool tonal: false
     property bool compact: false
     property bool successStyle: false
+    property bool iconSpinning: false
     readonly property color contentColor: !enabled ? Theme.textSecondary
                                           : successStyle ? Theme.successForeground
                                           : tonal ? Theme.primaryText : Theme.primaryForeground
@@ -43,6 +44,7 @@ Rectangle {
         anchors.centerIn: parent
         spacing: root.compact ? 0 : 10
         MaterialIcon {
+            id: buttonIcon
             visible: root.iconName.length > 0
             icon: root.iconName
             iconSize: 25
@@ -54,6 +56,19 @@ Rectangle {
             color: root.contentColor
             font.pixelSize: Theme.fontButton
             font.weight: Font.DemiBold
+        }
+    }
+
+    RotationAnimator {
+        target: buttonIcon
+        from: 0
+        to: 360
+        duration: 750
+        loops: Animation.Infinite
+        running: root.iconSpinning && buttonIcon.visible
+        onRunningChanged: {
+            if (!running)
+                buttonIcon.rotation = 0
         }
     }
 

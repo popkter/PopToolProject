@@ -9,10 +9,16 @@ annotated-types==0.8.0
     # via pydantic
 ast-serialize==0.6.0
     # via mypy
+certifi==2026.7.22
+    # via requests
+charset-normalizer==3.5.1
+    # via requests
 colorama==0.4.6 ; sys_platform == 'win32'
     # via pytest
 coverage==7.15.2
     # via pytest-cov
+idna==3.19
+    # via requests
 iniconfig==2.3.0
     # via pytest
 librt==0.13.0 ; platform_python_implementation != 'PyPy'
@@ -32,6 +38,8 @@ pathspec==1.1.1
     # via mypy
 pefile==2024.8.26 ; sys_platform == 'win32'
     # via pyinstaller
+pillow==12.3.0
+    # via poptools
 platformdirs==4.11.0
     # via poptools
 pluggy==1.6.0
@@ -55,12 +63,8 @@ pyinstaller-hooks-contrib==2026.6
     # via pyinstaller
 pypinyin==0.55.0
     # via poptools
-pyside6-addons==6.11.1
-    # via poptools
 pyside6-essentials==6.11.1
-    # via
-    #   poptools
-    #   pyside6-addons
+    # via poptools
 pytest==9.1.1
     # via
     #   poptools
@@ -70,20 +74,20 @@ pytest-cov==7.1.0
     # via poptools
 pytest-qt==4.5.0
     # via poptools
-pywin32==312
+pywin32==312 ; sys_platform == 'win32'
     # via wexpect
 pywin32-ctypes==0.2.3 ; sys_platform == 'win32'
     # via pyinstaller
-pywinpty==3.0.5
+requests==2.34.2
     # via poptools
 ruff==0.16.0
     # via poptools
-setuptools==83.0.0
-    # via pyinstaller
-shiboken6==6.11.1
+setuptools==69.5.1
     # via
-    #   pyside6-addons
-    #   pyside6-essentials
+    #   poptools
+    #   pyinstaller
+shiboken6==6.11.1
+    # via pyside6-essentials
 tomli==2.4.1 ; python_full_version <= '3.11'
     # via coverage
 typing-extensions==4.16.0
@@ -95,5 +99,7 @@ typing-extensions==4.16.0
     #   typing-inspection
 typing-inspection==0.4.2
     # via pydantic
-wexpect==4.0.0
+urllib3==2.7.0
+    # via requests
+wexpect==4.0.0 ; sys_platform == 'win32'
     # via poptools

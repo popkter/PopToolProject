@@ -438,7 +438,7 @@ ApplicationWindow {
             settingsController.saveTerminalEnabled(false)
         if (!settingsController.userGuideSeen)
             window.openUserGuideDialog()
-        updateController.checkForUpdates()
+        updateController.checkForUpdatesAutomatically()
     }
 
     component ResizeHandle: MouseArea {
@@ -1332,6 +1332,19 @@ ApplicationWindow {
                     clip: true
                     color: Theme.surface
 
+                    // Keep the drawer modal even when one of its action controls is
+                    // disabled. A disabled MouseArea does not consume events, so
+                    // without this fallback they reach the scrim or controls behind
+                    // the drawer and can close it or show an unrelated tooltip.
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: contentPanel.drawerMode
+                        hoverEnabled: true
+                        acceptedButtons: Qt.AllButtons
+                        preventStealing: true
+                        onWheel: function(wheel) { wheel.accepted = true }
+                    }
+
                     state: drawerMode
                         ? (window.customToolDrawerVisible ? "drawerOpen" : "drawerClosed")
                         : ""
@@ -1779,6 +1792,7 @@ ApplicationWindow {
         sourceComponent: SettingsDialog {
             objectName: "settingsDialog"
             controller: settingsController
+            updateBackend: updateController
             parentWindow: window
             onTerminalEnableRequested: window.requestTerminalEnable()
             onClosed: settingsDialogLoader.active = false

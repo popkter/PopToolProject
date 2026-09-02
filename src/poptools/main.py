@@ -10,7 +10,6 @@ from typing import cast
 from PySide6.QtCore import QCoreApplication, QUrl
 from PySide6.QtGui import QFont, QFontDatabase, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
-from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication
 
 from poptools import __version__
@@ -24,6 +23,7 @@ from poptools.infrastructure.windows_integration import (
     apply_windows_window_icon,
     configure_windows_app_identity,
 )
+from poptools.native_terminal import register_terminal_type
 from poptools.paths import AppPaths, package_root, prepare_bundled_android_tools, resource_path
 
 
@@ -86,8 +86,8 @@ def main() -> int:
         return 0
 
     try:
-        QtWebEngineQuick.initialize()
         app = QApplication(sys.argv)
+        register_terminal_type()
         if not instance_lock.start_activation_server():
             logger.error("无法启动单实例激活服务")
             return 1

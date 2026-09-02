@@ -1,5 +1,17 @@
 # Third-party notices
 
+## libvterm 0.3.3
+
+泡泡工具箱 embeds libvterm as the terminal emulation state machine used by
+the native Qt Quick developer console.
+
+- Source: https://www.leonerd.org.uk/code/libvterm/
+- Vendored revision: 0.3.3
+- License: MIT License
+- Copyright: Paul Evans and libvterm contributors
+
+The complete license is distributed in `native/third_party/libvterm/LICENSE`.
+
 ## Requests
 
 泡泡工具箱 uses the Requests HTTP library for the Jira and Feishu preset,

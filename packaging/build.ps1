@@ -112,6 +112,9 @@ try {
         $ErrorActionPreference = $PrevEAP
     }
 
+    & (Join-Path $PSScriptRoot "build-native.ps1")
+    if ($LASTEXITCODE -ne 0) { throw "Failed to build the native terminal component" }
+
     $LegacyOutput = Join-Path $ProjectRoot "dist\泡泡工具箱"
     $SingleFileOutput = Join-Path $ProjectRoot "dist\泡泡工具箱.exe"
     if (Test-Path -LiteralPath $LegacyOutput) {

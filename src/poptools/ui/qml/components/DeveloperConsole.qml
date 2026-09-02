@@ -3,77 +3,27 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtWebChannel
-import QtWebEngine
+import PopTools.Terminal 1.0
 import "../theme"
 
 Item {
     id: root
     required property var controller
-    property bool terminalSurfaceRevealed: false
 
     Component.onDestruction: root.controller.terminalDetached()
 
-    Timer {
-        id: terminalRevealTimer
-        interval: 1200
-        repeat: false
-        onTriggered: {
-            root.terminalSurfaceRevealed = true
-            if (root.visible)
-                terminalView.forceActiveFocus()
-        }
-    }
-
-    QtObject {
-        id: terminalBridge
-        WebChannel.id: "terminalBridge"
-        readonly property int windowsBuildNumber: root.controller.windowsBuildNumber
-        signal dataReceived(string data)
-        signal snapshotReceived(string data)
-        signal resetRequested()
-
-        function writeInput(data) {
-            root.controller.writeInput(data)
-        }
-        function resizeTerminal(columns, rows) {
-            root.controller.resizeTerminal(columns, rows)
-        }
-        function terminalReady() {
-            root.controller.terminalReady()
-        }
-    }
-
-    WebChannel {
-        id: terminalChannel
-        registeredObjects: [terminalBridge]
-    }
-
     Connections {
         target: root.controller
-        function onTerminalData(data) { terminalBridge.dataReceived(data) }
-        function onTerminalSnapshotData(data) { terminalBridge.snapshotReceived(data) }
-        function onTerminalResetRequested() { terminalBridge.resetRequested() }
-    }
-
-    Connections {
-        target: Theme
-
-        function onRadiusLargeChanged() {
-            root.terminalSurfaceRevealed = false
-            terminalRevealTimer.stop()
-            if (root.visible)
-                terminalRevealTimer.start()
-        }
+        function onTerminalData(tabId, data) { terminalView.feed(tabId, data) }
+        function onTerminalSnapshotData(tabId, data) { terminalView.feed(tabId, data) }
+        function onTerminalResetRequested(tabId) { terminalView.resetSession(tabId) }
+        function onTerminalSessionRemoved(tabId) { terminalView.removeSession(tabId) }
     }
 
     onVisibleChanged: {
         if (visible) {
             root.controller.ensureStarted()
-            if (root.terminalSurfaceRevealed)
-                terminalView.forceActiveFocus()
-            else
-                terminalRevealTimer.start()
+            terminalView.forceActiveFocus()
         }
     }
 
@@ -251,26 +201,74 @@ Item {
             color: "#141A20"
             clip: true
 
-            WebEngineView {
+            TerminalView {
                 id: terminalView
                 anchors.fill: parent
-                // WebEngineView is rectangular and is not clipped by the
-                // Rectangle's rounded outline. Keep its corners inside the
-                // rounded area, with a larger inset for rounder themes.
                 anchors.margins: Math.max(
                     6,
                     Math.ceil(Theme.radiusLarge * 0.3)
                 )
-                // Keep the WebEngine surface transparent while the page is
-                // loading so its temporary rectangular clear does not flash
-                // outside the rounded QML background.
-                backgroundColor: "transparent"
-                // A tiny non-zero opacity keeps the WebEngine compositor
-                // active while making its unstable first frame imperceptible.
-                opacity: root.terminalSurfaceRevealed ? 1 : 0.001
-                webChannel: terminalChannel
-                url: Qt.resolvedUrl("../../terminal/index.html")
+                sessionId: root.controller.activeTerminalTabId
+                fontSize: 14
                 focus: true
+                Accessible.role: Accessible.EditableText
+                Accessible.name: "开发者终端"
+                Accessible.description: "可交互命令行终端；使用 Ctrl+Shift+C 复制，Ctrl+Shift+V 粘贴"
+
+                Component.onCompleted: {
+                    root.controller.terminalReady()
+                    forceActiveFocus()
+                }
+                onInputGenerated: function(tabId, data) {
+                    root.controller.writeInputToTab(tabId, data)
+                }
+                onTerminalSizeChanged: function(columns, rows) {
+                    root.controller.resizeTerminal(columns, rows)
+                }
+                onContextMenuRequested: function(x, y) {
+                    terminalContextMenu.popup(x, y)
+                }
+            }
+
+            ScrollBar {
+                id: terminalScrollBar
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                orientation: Qt.Vertical
+                policy: terminalView.scrollbackLineCount > 0
+                        ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                size: terminalView.rows / Math.max(
+                    terminalView.rows,
+                    terminalView.rows + terminalView.scrollbackLineCount)
+                position: terminalView.scrollbackLineCount > 0
+                    ? (terminalView.scrollbackLineCount - terminalView.scrollOffset)
+                        / (terminalView.rows + terminalView.scrollbackLineCount)
+                    : 0
+                onPositionChanged: {
+                    if (pressed)
+                        terminalView.scrollOffset = terminalView.scrollbackLineCount
+                            - Math.round(position
+                                * (terminalView.rows + terminalView.scrollbackLineCount))
+                }
+            }
+
+            Menu {
+                id: terminalContextMenu
+                MenuItem {
+                    text: "复制"
+                    enabled: terminalView.hasSelection
+                    onTriggered: terminalView.copySelection()
+                }
+                MenuItem {
+                    text: "粘贴"
+                    onTriggered: terminalView.pasteClipboard()
+                }
+                MenuSeparator {}
+                MenuItem {
+                    text: "全选"
+                    onTriggered: terminalView.selectAll()
+                }
             }
         }
 

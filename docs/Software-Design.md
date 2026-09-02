@@ -33,7 +33,7 @@ PopTools 是单机、单用户的 Android 开发与测试工具箱。所有工�
 - 外部进程、文件、网络和平台 API 收敛在基础设施或运行子系统。
 - 所有具体对象只在组合根装配，入口文件只管理桌面生命周期。
 - 用实际重复和替换需求驱动抽象，避免为假设场景增加空接口或空泛 Service 层。
-- 长任务不得阻塞 UI；进程、线程、原生窗口和 WebEngine 资源必须可确定回收。
+- 长任务不得阻塞 UI；进程、线程、原生窗口和终端会话资源必须可确定回收。
 
 ## 4. 总体架构
 
@@ -78,7 +78,7 @@ flowchart TB
 - `DeveloperConsoleController`
 - `UpdateController`
 
-`poptools.main` 仅处理命令行兼容入口、日志、单实例、Qt/WebEngine 初始化、内置运行时准备、系统托盘、QML 上下文绑定和退出清理。构造依赖不得重新散落回 `main` 或 QML。
+`poptools.main` 仅处理命令行兼容入口、日志、单实例、Qt 与原生终端类型初始化、内置运行时准备、系统托盘、QML 上下文绑定和退出清理。构造依赖不得重新散落回 `main` 或 QML。
 
 ## 5. 界面设计
 
@@ -91,7 +91,7 @@ src/poptools/ui/qml/
 │  ├─ CommandWorkspace.qml        # 客制脚本参数与运行区
 │  ├─ PresetWorkspace.qml         # JSON、时间戳、调色盘
 │  ├─ RecordingWorkspace.qml      # Android 录制状态与保存
-│  ├─ DeveloperConsole.qml        # xterm.js 终端承载
+│  ├─ DeveloperConsole.qml        # 原生 QQuickItem 终端承载
 │  ├─ SettingsDialog.qml
 │  ├─ CommandEditorDialog.qml
 │  ├─ PythonDoctorDialog.qml
@@ -212,21 +212,23 @@ Python Doctor 在新建、编辑和运行时分析 `import`：
 
 终端由持久化设置 `app.terminal_enabled` 控制，默认关闭。首次开启时按清单下载固定版本的微软官方 PowerShell 7 ZIP，校验 SHA-256、检查解压路径并原子安装；失败、拒绝或取消均不保存开启状态。运行时不回退到系统 `pwsh.exe` 或 Windows PowerShell。
 
-`DeveloperConsole` 使用 Qt WebEngine 加载离线 xterm.js，逐键把输入发送给终端会话。Windows 后端通过 pywinpty 驱动 ConPTY 并使用 Job Object 管理进程树；macOS 后端使用原生 PTY 与用户系统 Shell。PowerShell 插件和 pywinpty 不进入 macOS 包。
+`DeveloperConsole` 使用基于 libvterm 的原生 `QQuickItem` 渲染终端网格并直接处理键盘、输入法、鼠标、选择、剪贴板和滚动。Windows 后端通过 `ctypes` 直接驱动系统 ConPTY 并使用 Job Object 管理进程树；macOS 后端使用原生 PTY 与用户系统 Shell。PowerShell 插件不进入 macOS 包。libvterm 随源码构建为小型本机动态库，不再携带 Chromium、Qt WebEngine、Qt WebChannel 或 xterm.js。
 
 生命周期约束：
 
 - 终端组件在应用生命周期内保持稳定，切换分区不重建页面或会话；
-- 关闭功能、重启会话或真正退出应用时回收 `pwsh.exe`、`OpenConsole.exe`、PTY、Qt 工作线程和 WebEngine 订阅；
-- 页面卸载前断开输入与尺寸监听并调用 xterm `dispose()`；
-- 控制器最多保存最近 131,072 字符，xterm 最多保留 10,000 行；
+- 关闭功能、重启会话或真正退出应用时回收 `pwsh.exe`、`OpenConsole.exe`、PTY、Qt 工作线程和 libvterm 会话；
+- 页面卸载前断开输入与尺寸监听，原生终端对象析构时释放全部 libvterm 状态；
+- 控制器最多保存最近 131,072 字符，原生终端每个会话最多保留 10,000 行；
 - PTY 空闲读取不得被误判为进程退出，也不得自动重启异常会话。
 
 ## 11. 更新、单实例与托盘
 
 - `SingleInstanceLock` 确保同一数据目录只运行一个主实例，并把后续启动请求转为激活现有窗口。
 - 窗口关闭默认隐藏到托盘；托盘提供显示、退出、预设与最近使用快捷入口。
-- 发布版启动后异步读取公开 GitHub Release。更新包下载到用户 `updates` 目录并按配套 SHA-256 校验，再启动外部替换流程。
+- 发布版启动后异步读取公开 GitHub Release，成功检查后 24 小时内不重复自动请求；用户可在设置页强制检查。正式渠道读取 `/releases/latest`；测试渠道读取 `/releases?per_page=5`，并按语义版本号从最近 5 条（包括 prerelease）中选择最高版本，不依赖发布时间顺序。
+- 正式渠道排除 prerelease；用户显式开启“接收测试版本”后接受最新发布的正式版或 prerelease。渠道偏好和最近成功检查时间保存在 `config.json`，切换渠道会清除检查时间但保留跳过版本。
+- 更新包下载到用户 `updates` 目录并按 Release digest 或配套 SHA-256 校验，再启动外部替换流程；版本比较禁止从较新的测试版自动降级到较旧正式版。
 - 客户端不包含私有仓库令牌。网络失败不影响本地工具使用，也不应弹出阻断式启动错误。
 
 ## 12. 已完成的架构重构
@@ -273,8 +275,8 @@ Python Doctor 在新建、编辑和运行时分析 `import`：
 - 脚本导入的校验、备份、合并与损坏配置隔离；
 - 深浅色及自定义中栏颜色下的文本对比度；
 - QML 组件加载、紧凑布局和最小窗口可操作性；
-- 终端反复启停、大输出上限和进程/线程/WebEngine 资源回收；
-- 更新版本比较、下载校验、取消与安装重启；
+- 终端反复启停、大输出上限和进程/线程/libvterm 资源回收；
+- 正式版/测试版更新渠道、24 小时节流、版本比较、下载校验、取消与安装重启；
 - 安装包不包含已删除功能、重复资源或开发构建产物。
 
 ## 15. 开发、构建与发布

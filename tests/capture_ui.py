@@ -8,7 +8,6 @@ from typing import cast
 from PySide6.QtCore import QMetaObject, QObject, QTimer, QUrl
 from PySide6.QtGui import QFont, QFontDatabase, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
-from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication
 
 from poptools.infrastructure.app_updater import UpdateRelease
@@ -17,6 +16,7 @@ from poptools.infrastructure.json_tool_repository import JsonToolRepository
 from poptools.infrastructure.python_environment import PythonEnvironment
 from poptools.infrastructure.system_tray import SystemTrayController
 from poptools.infrastructure.tool_registry import ToolRegistry
+from poptools.native_terminal import register_terminal_type
 from poptools.paths import AppPaths, package_root, resource_path
 from poptools.runners import ExecutionCoordinator, ExecutionManager
 from poptools.viewmodels import (
@@ -33,8 +33,8 @@ from poptools.viewmodels import (
 def main() -> int:
     output_path = Path(sys.argv[1] if len(sys.argv) > 1 else "implementation.png").resolve()
     os.environ.setdefault("QT_QUICK_BACKEND", "software")
-    QtWebEngineQuick.initialize()
     app = QApplication(sys.argv)
+    register_terminal_type()
     system_font = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "msyh.ttc"
     if system_font.exists():
         QFontDatabase.addApplicationFont(str(system_font))
@@ -76,6 +76,8 @@ def main() -> int:
     android_controller = AndroidController(config_store)
     controller = AppController(registry, coordinator, config_store, android_controller)
     settings_controller = SettingsController(config_store, python_environment, coordinator)
+    if os.environ.get("POPTOOLS_CAPTURE_DIALOG") == "settings":
+        settings_controller.markUserGuideSeen()
     if os.environ.get("POPTOOLS_CAPTURE_GRID_SAMPLE") == "1":
         settings_controller.markUserGuideSeen()
     preset_controller = PresetController()
@@ -87,6 +89,11 @@ def main() -> int:
     for _ in range(max(1, min(capture_terminal_tabs, 7)) - 1):
         developer_console_controller.createTerminalTab()
     update_controller = UpdateController(config_store, auto_check_enabled=False)
+    capture_update_status = os.environ.get("POPTOOLS_CAPTURE_UPDATE_STATUS")
+    if capture_update_status == "latest":
+        update_controller._set_state("idle", "当前已是最新版本")
+    elif capture_update_status == "checking":
+        update_controller._set_state("checking", "正在检查更新…")
     if len(sys.argv) > 2 and sys.argv[2] in {"developer", "powershell-plugin", "update"}:
         settings_controller.markUserGuideSeen()
     if len(sys.argv) > 2 and sys.argv[2] == "update":
@@ -106,6 +113,9 @@ def main() -> int:
     capture_theme = os.environ.get("POPTOOLS_CAPTURE_THEME", "").strip()
     if capture_theme:
         settings_controller.saveThemeMode(capture_theme)
+    capture_theme_style = os.environ.get("POPTOOLS_CAPTURE_THEME_STYLE", "").strip()
+    if capture_theme_style:
+        settings_controller.saveThemeStyle(capture_theme_style)
     settings_controller.scriptsImported.connect(controller.reloadImportedScripts)
     settings_controller.consoleMessage.connect(controller.appendConsoleMessage)
     tray_controller = SystemTrayController(app)
@@ -162,6 +172,13 @@ def main() -> int:
             )
     if len(sys.argv) > 2 and sys.argv[2] == "developer":
         window.setProperty("developerSelected", True)
+        if os.environ.get("POPTOOLS_CAPTURE_TERMINAL_SAMPLE") == "faint":
+            QTimer.singleShot(
+                400,
+                lambda: developer_console_controller._append(
+                    "\r\nnormal text  \x1b[97;2;3mhint: adb shell\x1b[0m\r\n"
+                ),
+            )
     elif len(sys.argv) > 2 and sys.argv[2] == "powershell-plugin":
         QTimer.singleShot(100, developer_console_controller.requestTerminalAccess)
     tray_controller.attach_window(window)
@@ -185,6 +202,51 @@ def main() -> int:
     capture_dialog = os.environ.get("POPTOOLS_CAPTURE_DIALOG")
     if capture_dialog == "settings":
         window.openSettingsDialog()
+        if os.environ.get("POPTOOLS_CAPTURE_SETTINGS_BOTTOM") == "1":
+            def scroll_settings_to_bottom() -> None:
+                settings_dialog = window.findChild(QObject, "settingsDialog")
+                if settings_dialog is None:
+                    return
+                QMetaObject.invokeMethod(settings_dialog, "scrollToBottom")
+                if os.environ.get("POPTOOLS_CAPTURE_UPDATE_DEBUG") == "1":
+                    update_button = settings_dialog.findChild(
+                        QObject, "updateCheckButton"
+                    )
+                    if update_button is not None:
+                        print(
+                            "update-button:",
+                            update_button.property("text"),
+                            update_button.property("latestState"),
+                            update_button.property("iconSpinning"),
+                            update_controller.state,
+                            update_controller.status,
+                        )
+                    if qml_warnings:
+                        print("\n".join(qml_warnings))
+
+            QTimer.singleShot(300, scroll_settings_to_bottom)
+        if os.environ.get("POPTOOLS_CAPTURE_SETTINGS_UPDATE_AVAILABLE") == "1":
+            def complete_manual_update_check() -> None:
+                settings_dialog = window.findChild(QObject, "settingsDialog")
+                if settings_dialog is None:
+                    return
+                settings_dialog.setProperty("manualUpdateCheckPending", True)
+                update_controller._check_is_manual = True
+                update_controller._on_check_completed(
+                    UpdateRelease(
+                        version="99.0.0",
+                        tag="v99.0.0",
+                        name="泡泡工具箱 99.0.0",
+                        notes="用于界面验证的更新说明。",
+                        page_url="https://example.test/release",
+                        asset_url="https://example.test/PopTools.exe",
+                        asset_name="PopTools.exe",
+                        asset_size=100,
+                    ),
+                    "",
+                )
+
+            QTimer.singleShot(350, complete_manual_update_check)
     if capture_dialog == "update":
         QTimer.singleShot(250, lambda: QMetaObject.invokeMethod(window, "queueUpdateDialog"))
 

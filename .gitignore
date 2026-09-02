@@ -20,6 +20,10 @@ src/poptools/resources/vendor/python/*.nupkg
 src/poptools/resources/vendor/python/*.tar.gz
 src/poptools/resources/vendor/scrcpy-macos-*.tar.gz
 src/poptools/_build_version.py
+src/poptools/native/*.dll
+src/poptools/native/*.dylib
+src/poptools/native/*.so
 .tmp*
 change.patch
 .claude
+.bzrignore

@@ -71,6 +71,18 @@ UNUSED_CONTROL_STYLE_BINARIES = (
 def keep_qt_entry(entry):
     destination = entry[0].replace("\\", "/").lower()
     destination = destination.replace("pyside6/qt/qml/", "pyside6/qml/")
+    if destination.startswith(
+        (
+            "pyside6/qt6webengine",
+            "pyside6/qtwebengine",
+            "pyside6/qt6webchannel",
+            "pyside6/qtwebchannel",
+            "pyside6/qtwebengineprocess",
+            "pyside6/qml/qtwebengine/",
+            "pyside6/qml/qtwebchannel/",
+        )
+    ):
+        return False
     if destination.startswith(UNUSED_QT_QML_PREFIXES + UNUSED_CONTROL_STYLE_PREFIXES):
         return False
     if destination.startswith(UNUSED_QT_BINARY_PREFIXES + UNUSED_CONTROL_STYLE_BINARIES):
@@ -83,17 +95,24 @@ def keep_qt_entry(entry):
         return False
     if destination.startswith("pyside6/resources/"):
         filename = destination.rsplit("/", 1)[-1]
-        if "devtools_resources" in filename or ".debug." in filename:
+        if (
+            filename.startswith("qtwebengine_")
+            or filename.startswith("v8_context_snapshot")
+            or filename == "icudtl.dat"
+            or "devtools_resources" in filename
+            or ".debug." in filename
+        ):
             return False
-    if destination.startswith("pyside6/translations/qtwebengine_locales/"):
-        return destination.endswith(("/en-us.pak", "/zh-cn.pak"))
+    if destination.startswith("pyside6/translations/qtwebengine"):
+        return False
     if destination.startswith("pyside6/translations/"):
         return destination.endswith(("_en.qm", "_zh_cn.qm"))
     return True
 
 common_datas = [
+    (str(ROOT / "THIRD_PARTY_NOTICES.md"), "."),
+    (str(ROOT / "native" / "third_party" / "libvterm" / "LICENSE"), "licenses/libvterm"),
     (str(PACKAGE / "ui" / "qml"), "poptools/ui/qml"),
-    (str(PACKAGE / "ui" / "terminal"), "poptools/ui/terminal"),
     (str(PACKAGE / "resources" / "tools"), "poptools/resources/tools"),
     (str(PACKAGE / "resources" / "python"), "poptools/resources/python"),
     (str(PACKAGE / "resources" / "fonts"), "poptools/resources/fonts"),
@@ -110,14 +129,18 @@ if sys.platform == "darwin":
     icon_file = PACKAGE / "resources" / "icons" / "app-icon.png"
     runtime_icon_file = icon_file
     hiddenimports = []
-    platform_binaries = []
+    platform_binaries = [
+        (str(PACKAGE / "native" / "libpoptools_terminal.dylib"), "poptools/native"),
+    ]
 else:
     scrcpy_manifest = vendor / "scrcpy-manifest.json"
     python_manifest = python_vendor / "python-runtime.json"
     icon_file = PACKAGE / "resources" / "icons" / "app-icon.ico"
     runtime_icon_file = icon_file
     hiddenimports = collect_submodules("wexpect")
-    platform_binaries = []
+    platform_binaries = [
+        (str(PACKAGE / "native" / "poptools_terminal.dll"), "poptools/native"),
+    ]
 
 import json
 
@@ -150,7 +173,17 @@ analysis = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["mypy", "pytest", "ruff", "PIL", "PyInstaller"],
+    excludes=[
+        "mypy",
+        "pytest",
+        "ruff",
+        "PIL",
+        "PyInstaller",
+        "PySide6.QtWebChannel",
+        "PySide6.QtWebEngineCore",
+        "PySide6.QtWebEngineQuick",
+        "PySide6.QtWebEngineWidgets",
+    ],
     noarchive=False,
     optimize=1,
 )

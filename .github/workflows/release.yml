@@ -48,6 +48,11 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v6.0.2
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.10.0"
+          arch: win64_msvc2022_64
+          cache: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
           version: "0.12.3"
@@ -105,6 +110,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6.0.2
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.10.0"
+          cache: true
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
           version: "0.12.3"

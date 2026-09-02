@@ -6,6 +6,7 @@ import os
 import platform
 import re
 import sys
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -14,7 +15,10 @@ from typing import Any
 
 from PySide6.QtCore import QProcess
 
-GITHUB_RELEASES_URL = "https://api.github.com/repos/popkter/PopToolProject/releases?per_page=20"
+GITHUB_RELEASES_URL = "https://api.github.com/repos/popkter/PopToolProject/releases?per_page=5"
+GITHUB_LATEST_RELEASE_URL = (
+    "https://api.github.com/repos/popkter/PopToolProject/releases/latest"
+)
 # GitHub normalizes non-ASCII release asset filenames. Keep the actual OTA
 # filename ASCII-only and use a Chinese display label in the release workflow.
 
@@ -99,22 +103,33 @@ def is_newer_version(candidate: str, current: str) -> bool:
 
 
 class GitHubReleaseClient:
-    """Read public GitHub releases and download the single-file application."""
+    """Read public GitHub releases and download the selected application asset."""
 
-    def __init__(self, releases_url: str = GITHUB_RELEASES_URL) -> None:
+    def __init__(
+        self,
+        releases_url: str = GITHUB_RELEASES_URL,
+        latest_release_url: str = GITHUB_LATEST_RELEASE_URL,
+    ) -> None:
         self.releases_url = releases_url
+        self.latest_release_url = latest_release_url
 
-    def latest_release(self) -> UpdateRelease | None:
+    def latest_release(self, include_prereleases: bool = False) -> UpdateRelease | None:
+        releases_url = self.releases_url if include_prereleases else self.latest_release_url
         request = urllib.request.Request(
-            self.releases_url,
+            releases_url,
             headers={
                 "Accept": "application/vnd.github+json",
                 "User-Agent": "PopTools-Updater",
                 "X-GitHub-Api-Version": "2022-11-28",
             },
         )
-        with urllib.request.urlopen(request, timeout=NETWORK_TIMEOUT_SECONDS) as response:
-            payload: Any = json.load(response)
+        try:
+            with urllib.request.urlopen(request, timeout=NETWORK_TIMEOUT_SECONDS) as response:
+                payload: Any = json.load(response)
+        except urllib.error.HTTPError as exc:
+            if not include_prereleases and exc.code == 404:
+                return None
+            raise
         release = self.select_latest_release(payload)
         if release is None or release.sha256 or not release.checksum_url:
             return release
@@ -136,6 +151,8 @@ class GitHubReleaseClient:
     def select_latest_release(
         payload: Any, asset_name: str | None = None
     ) -> UpdateRelease | None:
+        if isinstance(payload, dict):
+            payload = [payload]
         if not isinstance(payload, list):
             raise ValueError("GitHub Release 返回格式不正确")
 

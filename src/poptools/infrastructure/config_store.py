@@ -21,6 +21,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "user_guide_seen": False,
         "merit_count": 0,
         "skipped_update_version": "",
+        "prerelease_updates_enabled": False,
+        "last_update_check_at": 0.0,
     },
     "execution": {
         "max_parallel": 3,
@@ -144,6 +146,43 @@ class ConfigStore:
             app = {}
             config["app"] = app
         app["skipped_update_version"] = version.strip()
+        self.save_config(config)
+
+    def prerelease_updates_enabled(self) -> bool:
+        config = self.load_config()
+        app = config.get("app")
+        return (
+            bool(app.get("prerelease_updates_enabled", False))
+            if isinstance(app, dict)
+            else False
+        )
+
+    def set_prerelease_updates_enabled(self, enabled: bool) -> None:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+        app["prerelease_updates_enabled"] = bool(enabled)
+        self.save_config(config)
+
+    def last_update_check_at(self) -> float:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            return 0.0
+        value = app.get("last_update_check_at", 0.0)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+            return 0.0
+        return float(value)
+
+    def set_last_update_check_at(self, value: float) -> None:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+        app["last_update_check_at"] = max(0.0, float(value))
         self.save_config(config)
 
     def terminal_enabled(self) -> bool:

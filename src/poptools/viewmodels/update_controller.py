@@ -3,7 +3,9 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import time
 import urllib.error
+from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import Property, QCoreApplication, QObject, QThread, Signal, Slot
@@ -18,6 +20,7 @@ from poptools.infrastructure.app_updater import (
 from poptools.infrastructure.config_store import ConfigStore
 
 logger = logging.getLogger(__name__)
+AUTO_CHECK_INTERVAL_SECONDS = 24 * 60 * 60
 
 
 class UpdateCheckThread(QThread):
@@ -26,14 +29,18 @@ class UpdateCheckThread(QThread):
     def __init__(
         self,
         client: GitHubReleaseClient,
+        include_prereleases: bool,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self.client = client
+        self.include_prereleases = include_prereleases
 
     def run(self) -> None:
         try:
-            self.completed.emit(self.client.latest_release(), "")
+            self.completed.emit(
+                self.client.latest_release(self.include_prereleases), ""
+            )
         except urllib.error.HTTPError as exc:
             self.completed.emit(None, f"检查更新失败：GitHub 返回 HTTP {exc.code}")
         except urllib.error.URLError as exc:
@@ -89,12 +96,14 @@ class UpdateController(QObject):
         client: GitHubReleaseClient | None = None,
         current_version: str = __version__,
         auto_check_enabled: bool | None = None,
+        clock: Callable[[], float] = time.time,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self.config_store = config_store
         self.client = client or GitHubReleaseClient()
         self._current_version = current_version
+        self._clock = clock
         self._auto_check_enabled = (
             getattr(sys, "frozen", False)
             or os.environ.get("POPTOOLS_ENABLE_UPDATE_CHECK") == "1"
@@ -110,6 +119,7 @@ class UpdateController(QObject):
         self._downloaded_path = ""
         self._check_thread: UpdateCheckThread | None = None
         self._download_thread: UpdateDownloadThread | None = None
+        self._check_is_manual = False
 
     @Property(str, constant=True)
     def currentVersion(self) -> str:
@@ -151,14 +161,59 @@ class UpdateController(QObject):
     def totalSize(self) -> str:
         return self._format_size(self._total_bytes)
 
+    @Property(bool, notify=stateChanged)
+    def prereleaseUpdatesEnabled(self) -> bool:
+        return bool(self.config_store.prerelease_updates_enabled())
+
+    @Property(bool, notify=stateChanged)
+    def canChangeUpdateChannel(self) -> bool:
+        return self._check_thread is None and self._state not in {
+            "checking",
+            "downloading",
+            "downloaded",
+            "installing",
+        }
+
     @Slot(result=bool)
     def checkForUpdates(self) -> bool:
-        if not self._auto_check_enabled or self._check_thread is not None:
+        return self._start_check(manual=True)
+
+    @Slot(result=bool)
+    def checkForUpdatesAutomatically(self) -> bool:
+        if not self._auto_check_enabled:
             return False
-        if self._download_thread is not None:
+        elapsed = self._clock() - self.config_store.last_update_check_at()
+        if 0 <= elapsed < AUTO_CHECK_INTERVAL_SECONDS:
             return False
+        return self._start_check(manual=False)
+
+    @Slot(bool, result=bool)
+    def setPrereleaseUpdatesEnabled(self, enabled: bool) -> bool:
+        if not self.canChangeUpdateChannel:
+            return False
+        enabled = bool(enabled)
+        if enabled == self.config_store.prerelease_updates_enabled():
+            return True
+        self.config_store.set_prerelease_updates_enabled(enabled)
+        self.config_store.set_last_update_check_at(0.0)
+        self._release = None
+        channel = "测试版本" if enabled else "正式版本"
+        self._set_state("idle", f"已切换为接收{channel}，可立即检查更新。")
+        return True
+
+    def _start_check(self, manual: bool) -> bool:
+        if self._check_thread is not None or self._download_thread is not None:
+            return False
+        if self._state in {"downloaded", "installing"}:
+            return False
+        self._check_is_manual = manual
+        self._release = None
         self._set_state("checking", "正在检查更新…")
-        thread = UpdateCheckThread(self.client, self)
+        thread = UpdateCheckThread(
+            self.client,
+            self.config_store.prerelease_updates_enabled(),
+            self,
+        )
         self._check_thread = thread
         thread.completed.connect(self._on_check_completed)
         thread.finished.connect(thread.deleteLater)
@@ -228,17 +283,20 @@ class UpdateController(QObject):
     @Slot(object, str)
     def _on_check_completed(self, release: object, error: str) -> None:
         self._check_thread = None
+        manual = self._check_is_manual
+        self._check_is_manual = False
         if error:
             logger.warning("%s", error)
-            self._set_state("idle", "")
+            self._set_state("error" if manual else "idle", error if manual else "")
             return
+        self.config_store.set_last_update_check_at(self._clock())
         if not isinstance(release, UpdateRelease):
-            self._set_state("idle", "")
+            self._set_state("idle", "当前已是最新版本" if manual else "")
             return
         if not is_newer_version(release.version, self._current_version):
-            self._set_state("idle", "")
+            self._set_state("idle", "当前已是最新版本" if manual else "")
             return
-        if release.version == self.config_store.skipped_update_version():
+        if not manual and release.version == self.config_store.skipped_update_version():
             self._set_state("idle", "")
             return
         self._release = release

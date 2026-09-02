@@ -70,9 +70,10 @@ class DeveloperConsoleController(QObject):
     OUTPUT_HISTORY_LIMIT = 131_072
 
     outputChanged = Signal()
-    terminalData = Signal(str)
-    terminalSnapshotData = Signal(str)
-    terminalResetRequested = Signal()
+    terminalData = Signal(str, str)
+    terminalSnapshotData = Signal(str, str)
+    terminalResetRequested = Signal(str)
+    terminalSessionRemoved = Signal(str)
     runningChanged = Signal()
     pluginStateChanged = Signal()
     pluginInstallPromptRequested = Signal(str, str)
@@ -118,7 +119,7 @@ class DeveloperConsoleController(QObject):
         tab = self._active_tab()
         return tab is not None and tab.session is not None
 
-    @Property("QVariantList", notify=terminalTabsChanged)
+    @Property(list, notify=terminalTabsChanged)
     def terminalTabs(self) -> list[dict[str, object]]:
         return [
             {
@@ -129,6 +130,10 @@ class DeveloperConsoleController(QObject):
             }
             for tab in self._tabs
         ]
+
+    @Property(str, notify=terminalTabsChanged)
+    def activeTerminalTabId(self) -> str:
+        return self._active_tab_id
 
     @Property(bool, notify=terminalTabsChanged)
     def canCreateTerminalTab(self) -> bool:
@@ -168,6 +173,10 @@ class DeveloperConsoleController(QObject):
 
     @Property(str, constant=True)
     def terminalName(self) -> str:
+        return self._terminal_name()
+
+    @staticmethod
+    def _terminal_name() -> str:
         return "PowerShell 7" if sys.platform == "win32" else "macOS Shell"
 
     @Property(int, constant=True)
@@ -235,7 +244,9 @@ class DeveloperConsoleController(QObject):
         if tab.session is not None:
             return True
         if not self.pluginInstalled:
-            self._append_to_tab(tab, "请先安装应用内 PowerShell 7 插件。\n")
+            message = "请先安装应用内 PowerShell 7 插件。\n"
+            if not tab.output.endswith(message):
+                self._append_to_tab(tab, message)
             return False
         python_executable = self.python_environment.execution_executable()
         pip_executable = self.python_environment.executable()
@@ -245,7 +256,9 @@ class DeveloperConsoleController(QObject):
         else:
             shell = self._plugin.executable
             if not python_executable or not pip_executable:
-                self._append_to_tab(tab, "Python 环境不可用，请重新启动应用完成初始化。\n")
+                message = "Python 环境不可用，请重新启动应用完成初始化。\n"
+                if not tab.output.endswith(message):
+                    self._append_to_tab(tab, message)
                 return False
             arguments = [
                 "-NoLogo",
@@ -257,7 +270,9 @@ class DeveloperConsoleController(QObject):
                 str(resource_path("tools", "powershell-terminal-profile.ps1")),
             ]
         if not python_executable or not pip_executable:
-            self._append_to_tab(tab, "Python 环境不可用，请重新启动应用完成初始化。\n")
+            message = "Python 环境不可用，请重新启动应用完成初始化。\n"
+            if not tab.output.endswith(message):
+                self._append_to_tab(tab, message)
             return False
         environment = self._terminal_environment()
         environment.update(
@@ -330,6 +345,18 @@ class DeveloperConsoleController(QObject):
     @Slot(str, result=bool)
     def writeInput(self, data: str) -> bool:
         tab = self._active_tab()
+        if tab is None:
+            return False
+        return self._write_input_to_tab(tab, data)
+
+    @Slot(str, str, result=bool)
+    def writeInputToTab(self, tab_id: str, data: str) -> bool:
+        tab = self._tab_by_id(tab_id)
+        if tab is None:
+            return False
+        return self._write_input_to_tab(tab, data)
+
+    def _write_input_to_tab(self, tab: TerminalTabState, data: str) -> bool:
         if tab is None or not self._ensure_tab_started(tab) or tab.session is None:
             return False
         return tab.session.write(data.encode("utf-8"))
@@ -338,14 +365,17 @@ class DeveloperConsoleController(QObject):
     def resizeTerminal(self, columns: int, rows: int) -> None:
         self._terminal_columns = max(2, columns)
         self._terminal_rows = max(1, rows)
-        tab = self._active_tab()
-        if tab is not None and tab.session is not None:
-            tab.session.resize(self._terminal_columns, self._terminal_rows)
+        for tab in self._tabs:
+            if tab.session is not None:
+                tab.session.resize(self._terminal_columns, self._terminal_rows)
 
     @Slot()
     def terminalReady(self) -> None:
         self._terminal_ready = True
-        self._display_active_tab()
+        for tab in self._tabs:
+            self.terminalResetRequested.emit(tab.tab_id)
+            if tab.output:
+                self.terminalSnapshotData.emit(tab.tab_id, tab.output)
         self.ensureStarted()
 
     @Slot()
@@ -430,6 +460,8 @@ class DeveloperConsoleController(QObject):
         index = self._tabs.index(tab)
         was_active = tab.tab_id == self._active_tab_id
         self._tabs.remove(tab)
+        if self._terminal_ready:
+            self.terminalSessionRemoved.emit(tab.tab_id)
         if tab.session is not None:
             tab.intentional_stop = True
             tab.restart_pending = False
@@ -494,7 +526,7 @@ class DeveloperConsoleController(QObject):
         if restart_pending and not self._shutdown_pending:
             tab.output = ""
             if tab.tab_id == self._active_tab_id:
-                self.terminalResetRequested.emit()
+                self.terminalResetRequested.emit(tab.tab_id)
                 self.outputChanged.emit()
             QTimer.singleShot(0, lambda: self._ensure_tab_started(tab))
 
@@ -507,15 +539,15 @@ class DeveloperConsoleController(QObject):
         if not text:
             return
         tab.output = (tab.output + text)[-self.OUTPUT_HISTORY_LIMIT :]
-        if self._terminal_ready and tab.tab_id == self._active_tab_id:
-            self.terminalData.emit(text)
+        if self._terminal_ready:
+            self.terminalData.emit(tab.tab_id, text)
 
     def _create_tab(self, *, activate: bool, emit: bool = True) -> TerminalTabState:
         tab_number = self._next_tab_number
         self._next_tab_number += 1
         tab = TerminalTabState(
             tab_id=f"terminal-{tab_number}",
-            title=self.terminalName,
+            title=self._terminal_name(),
         )
         self._tabs.append(tab)
         if activate:
@@ -539,9 +571,7 @@ class DeveloperConsoleController(QObject):
         )
 
     def _display_active_tab(self) -> None:
-        if not self._terminal_ready:
-            return
-        self.terminalResetRequested.emit()
-        tab = self._active_tab()
-        if tab is not None and tab.output:
-            self.terminalSnapshotData.emit(tab.output)
+        # The native terminal keeps an independent libvterm screen for every
+        # tab, so switching tabs only changes the visible session. Replaying a
+        # truncated ANSI byte stream here would corrupt terminal state.
+        return

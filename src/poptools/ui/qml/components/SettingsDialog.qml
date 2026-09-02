@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -8,8 +10,15 @@ Dialog {
     objectName: "settingsDialog"
 
     required property var controller
+    required property var updateBackend
     required property var parentWindow
+    property bool manualUpdateCheckPending: false
     signal terminalEnableRequested()
+
+    QtObject {
+        id: updateUi
+        readonly property var controller: root.updateBackend
+    }
 
     width: Math.min(680, root.parentWindow.width - 24)
     height: Math.min(600, root.parentWindow.height - 24)
@@ -25,6 +34,15 @@ Dialog {
                                                  root.controller.themeStyle))
         concurrencyBox.currentIndex = Math.max(0, root.controller.customScriptConcurrency - 1)
     }
+    onClosed: manualUpdateCheckPending = false
+
+    // qmllint disable missing-property
+    function scrollToBottom() {
+        var flickable = settingsScroll.contentItem
+        flickable["contentY"] = Math.max(
+            0, flickable["contentHeight"] - settingsScroll.availableHeight)
+    }
+    // qmllint enable missing-property
 
     background: Rectangle {
         radius: Theme.radiusLarge
@@ -85,6 +103,7 @@ Dialog {
 
         ScrollView {
             id: settingsScroll
+            objectName: "settingsScroll"
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.bottomMargin: Theme.radiusLarge
@@ -472,6 +491,121 @@ Dialog {
                     }
                 }
 
+                Rectangle {
+                    objectName: "applicationUpdateSection"
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 20
+                    Layout.rightMargin: 20
+                    implicitHeight: updateContent.implicitHeight + 36
+                    radius: Theme.radiusMedium
+                    color: Theme.surfaceContainerLow
+                    border.color: Theme.outlineVariant
+
+                    ColumnLayout {
+                        id: updateContent
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 18
+                        spacing: 12
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 12
+                            MaterialIcon {
+                                icon: "system_update"
+                                iconSize: 22
+                                color: Theme.primary
+                            }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+                                Text {
+                                    text: "应用更新"
+                                    color: Theme.textPrimary
+                                    font.pixelSize: Theme.fontComponentTitle
+                                    font.weight: Font.DemiBold
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "当前版本 " + updateUi.controller.currentVersion
+                                    color: Theme.textSecondary
+                                    font.pixelSize: Theme.fontCaption
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 12
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+                                Text {
+                                    text: "接收测试版本"
+                                    color: Theme.textPrimary
+                                    font.pixelSize: Theme.fontBody
+                                    font.weight: Font.DemiBold
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "测试版本包含尚未正式发布的功能，可能不稳定。"
+                                    color: Theme.textSecondary
+                                    font.pixelSize: Theme.fontCaption
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+                            Switch {
+                                checked: updateUi.controller.prereleaseUpdatesEnabled
+                                enabled: updateUi.controller.canChangeUpdateChannel
+                                onToggled: {
+                                    if (checked !== updateUi.controller.prereleaseUpdatesEnabled)
+                                        updateUi.controller.setPrereleaseUpdatesEnabled(checked)
+                                }
+                            }
+                        }
+
+                        PrimaryButton {
+                            id: updateCheckButton
+                            objectName: "updateCheckButton"
+                            readonly property bool latestState:
+                                updateUi.controller.state === "idle"
+                                && updateUi.controller.status === "当前已是最新版本"
+                            Layout.fillWidth: true
+                            implicitHeight: 48
+                            tonal: !updateCheckButton.latestState
+                            successStyle: updateCheckButton.latestState
+                            enabled: updateUi.controller.state !== "checking"
+                                     && updateUi.controller.state !== "downloading"
+                                     && updateUi.controller.state !== "downloaded"
+                                     && updateUi.controller.state !== "installing"
+                            text: updateUi.controller.state === "checking"
+                                  ? "正在检查更新…"
+                                  : updateCheckButton.latestState
+                                    ? "已是最新版本" : "检查更新"
+                            iconName: updateCheckButton.latestState
+                                      ? "check_circle" : "refresh"
+                            iconSpinning: updateUi.controller.state === "checking"
+                            onClicked: {
+                                root.manualUpdateCheckPending =
+                                    updateUi.controller.checkForUpdates()
+                            }
+                        }
+
+                        Text {
+                            visible: updateUi.controller.status.length > 0
+                                     && updateUi.controller.status !== "当前已是最新版本"
+                                     && updateUi.controller.state !== "checking"
+                            Layout.fillWidth: true
+                            text: updateUi.controller.status
+                            wrapMode: Text.WordWrap
+                            color: updateUi.controller.state === "error"
+                                   ? Theme.errorColor : Theme.textSecondary
+                            font.pixelSize: Theme.fontCaption
+                        }
+                    }
+                }
+
                 Item { Layout.preferredHeight: 6 }
 
                 Text {
@@ -489,6 +623,20 @@ Dialog {
                         onClicked: Qt.openUrlExternally(root.controller.appInfoUrl)
                     }
                 }
+            }
+        }
+    }
+
+    Connections {
+        target: updateUi.controller
+        function onStateChanged() {
+            if (!root.manualUpdateCheckPending)
+                return
+            if (updateUi.controller.state === "available") {
+                root.manualUpdateCheckPending = false
+                root.close()
+            } else if (updateUi.controller.state !== "checking") {
+                root.manualUpdateCheckPending = false
             }
         }
     }
