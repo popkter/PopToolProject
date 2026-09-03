@@ -34,7 +34,7 @@
     "revision": 1,
     "origin": "builtin",
     "section": "preset",
-    "title": "记录案发现场",
+    "title": "记录日志与视频",
     "description": "同时录制 Android 设备画面、系统声音、麦克风并截取 logcat 日志，结束后保存到指定文件夹",
     "tags": ["Android", "录屏", "日志", "ADB"],
     "editable": false,

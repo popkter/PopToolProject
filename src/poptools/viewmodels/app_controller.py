@@ -11,6 +11,7 @@ from PySide6.QtCore import (
     QObject,
     QRect,
     QTimer,
+    QUrl,
     Signal,
     Slot,
 )
@@ -42,6 +43,13 @@ SECTION_TITLES = {
 CONSOLE_REFRESH_INTERVAL_MS = 50
 CONSOLE_MAX_CHARS = 200_000
 CONSOLE_RETAINED_CHARS = 150_000
+
+
+def _local_path_from_url(url: str) -> str:
+    dropped_url = QUrl(url)
+    if not dropped_url.isLocalFile():
+        return ""
+    return dropped_url.toLocalFile()
 
 
 class AppController(QObject):
@@ -431,6 +439,11 @@ class AppController(QObject):
         except (KeyError, OSError, ValueError) as exc:
             self._append_console(f"默认值保存失败：{exc}\n")
             return False
+
+    @Slot(str, result=str)
+    def localPathFromUrl(self, url: str) -> str:
+        """Convert a dropped local-file URL into the native path shown to users."""
+        return _local_path_from_url(url)
 
     @Slot(str, str, str, str, result=bool)
     @Slot(str, str, str, str, str, result=bool)

@@ -179,10 +179,36 @@ ColumnLayout {
                                 background: Rectangle {
                                     radius: Theme.radiusMedium
                                     color: Theme.surface
-                                    border.color: parent.activeFocus ? Theme.primary : Theme.outline
-                                    border.width: parent.activeFocus ? 2 : 1
+                                    border.color: parent.activeFocus || fileDropArea.containsDrag
+                                        ? Theme.primary : Theme.outline
+                                    border.width: parent.activeFocus || fileDropArea.containsDrag ? 2 : 1
                                 }
                                 onTextChanged: root.parameterValues[modelData.id] = text
+
+                                DropArea {
+                                    id: fileDropArea
+                                    anchors.fill: parent
+                                    enabled: modelData.kind === "text"
+
+                                    onEntered: function(drag) {
+                                        if (!drag.hasUrls || drag.urls.length === 0
+                                                || root.controller.localPathFromUrl(
+                                                    String(drag.urls[0])).length === 0) {
+                                            drag.accepted = false
+                                        }
+                                    }
+                                    onDropped: function(drop) {
+                                        if (!drop.hasUrls || drop.urls.length === 0)
+                                            return
+                                        const localPath = root.controller.localPathFromUrl(
+                                            String(drop.urls[0]))
+                                        if (localPath.length === 0)
+                                            return
+                                        normalTextField.text = localPath
+                                        normalTextField.forceActiveFocus()
+                                        drop.acceptProposedAction()
+                                    }
+                                }
 
                                 Rectangle {
                                     anchors.right: parent.right

@@ -33,6 +33,11 @@ from poptools.paths import (
 )
 
 
+def _recording_logcat_arguments(serial: str, remote_log: str) -> list[str]:
+    command = f"logcat -c && exec logcat -v threadtime -f {remote_log}"
+    return ["-s", serial, "shell", command]
+
+
 class PresetController(QObject):
     """Local preset operations and Android recording workflow."""
 
@@ -196,9 +201,7 @@ class PresetController(QObject):
         video.errorOccurred.connect(self._on_video_process_error)
         log = QProcess(self)
         log.setProgram(adb)
-        log.setArguments([
-            "-s", serial, "shell", "logcat", "-v", "threadtime", "-f", self._remote_log
-        ])
+        log.setArguments(_recording_logcat_arguments(serial, self._remote_log))
         log.finished.connect(lambda _code, _status: self._on_log_finished())
         self._video_process = video
         self._log_process = log
