@@ -227,11 +227,11 @@ Python Doctor 支持内联源码和 `.py` 文件路径，解析 import、排除�
 
 ## 12. 动态主题
 
-主题定义位于 `ui/qml/theme/configs/*.json`。主题 ID 是文件名，显示名称来自 JSON 的 `name`。当前包内提供 `material3`、`winxp` 和 `mario`。
+内置主题定义位于 `ui/qml/theme/configs/*.json`，用户主题位于 `AppPaths.themes_dir`（Windows 默认为 `%LOCALAPPDATA%\PopTools\themes`）。主题 ID 是文件名，显示名称来自 JSON 的 `name`。当前包内提供 `material3`、`winxp` 和 `mario`；用户主题与内置主题 ID 重名时，用户主题优先。
 
 `ThemeCatalog` 独立于 `ConfigStore`：
 
-1. 应用启动时扫描主题目录；
+1. 应用启动时依次扫描内置主题目录和用户主题目录；
 2. 每次设置弹窗打开时重新扫描；
 3. 校验主题 ID、名称、浅色颜色、深色颜色和完整圆角字段；
 4. 无效主题不进入列表；

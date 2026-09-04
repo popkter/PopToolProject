@@ -221,7 +221,7 @@ Dialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "进入“设置 → 外观”，可选择跟随系统、浅色或深色模式。主题风格从应用主题目录动态加载，当前包含 Material 3、Windows XP 和 Mario；每次打开设置都会刷新列表。修改会立即生效并在下次启动时保留，不会影响脚本和推送方案。"
+                            text: "进入“设置 → 外观”，可选择跟随系统、浅色或深色模式。主题风格会从内置目录和用户数据目录下的 themes 目录动态加载；每次打开设置都会刷新列表，用户主题可覆盖同名内置主题。修改会立即生效并在下次启动时保留，不会影响脚本和推送方案。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap

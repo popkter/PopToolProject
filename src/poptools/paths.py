@@ -181,6 +181,10 @@ class AppPaths:
         return self.data_dir / "scripts"
 
     @property
+    def themes_dir(self) -> Path:
+        return self.data_dir / "themes"
+
+    @property
     def outputs_dir(self) -> Path:
         return self.data_dir / "outputs"
 
@@ -226,6 +230,7 @@ class AppPaths:
             self.overrides_dir,
             self.custom_dir,
             self.scripts_dir,
+            self.themes_dir,
             self.outputs_dir,
             self.backups_dir,
             self.logs_dir,

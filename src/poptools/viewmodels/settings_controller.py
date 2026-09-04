@@ -55,7 +55,8 @@ class SettingsController(QObject):
         self._custom_script_concurrency = config_store.custom_script_concurrency()
         self._theme_mode = config_store.theme_mode()
         self._theme_catalog = theme_catalog or ThemeCatalog(
-            package_root() / "ui" / "qml" / "theme" / "configs"
+            package_root() / "ui" / "qml" / "theme" / "configs",
+            config_store.paths.themes_dir,
         )
         self._theme_catalog.refresh()
         stored_theme_style = config_store.theme_style()

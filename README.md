@@ -195,6 +195,8 @@ adb devices
 - Windows XP
 - Mario
 
+应用会同时扫描内置主题目录和用户数据目录下的 `themes` 目录。在 Windows 上，默认用户主题目录为 `%LOCALAPPDATA%\PopTools\themes`；设置 `POPTOOLS_DATA_DIR` 时则使用该目录下的 `themes`。用户主题可覆盖同 ID 的内置主题。
+
 应用启动时扫描一次主题目录，每次打开设置弹窗时重新扫描。有效主题必须同时提供浅色颜色、深色颜色和圆角配置；无效文件不会进入列表，已保存主题不可用时回退到 Material 3。主题切换立即作用于主界面、弹窗、菜单、颜色和圆角，不会修改业务数据。
 
 ## 应用更新

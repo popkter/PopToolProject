@@ -81,20 +81,26 @@ class ThemeEntry:
 class ThemeCatalog:
     """Discover and validate UI themes without coupling them to app settings."""
 
-    def __init__(self, config_dir: Path) -> None:
+    def __init__(self, config_dir: Path, user_config_dir: Path | None = None) -> None:
         self.config_dir = config_dir
+        self.user_config_dir = user_config_dir
         self._entries: dict[str, ThemeEntry] = {}
 
     def refresh(self) -> bool:
         entries: dict[str, ThemeEntry] = {}
-        if self.config_dir.is_dir():
+        config_dirs = (self.config_dir, self.user_config_dir)
+        for config_dir in config_dirs:
+            if config_dir is None or not config_dir.is_dir():
+                continue
             paths = sorted(
-                self.config_dir.glob("*.json"),
+                config_dir.glob("*.json"),
                 key=lambda path: (path.stem != DEFAULT_THEME_ID, path.stem.casefold()),
             )
             for path in paths:
                 entry = self._load_entry(path)
                 if entry is not None:
+                    # User themes are scanned last and intentionally override a
+                    # bundled theme with the same ID.
                     entries[entry.theme_id] = entry
         changed = entries != self._entries
         self._entries = entries
@@ -102,8 +108,11 @@ class ThemeCatalog:
 
     def theme_items(self) -> list[dict[str, str]]:
         return [
-            {"label": entry.name, "value": entry.theme_id}
-            for entry in self._entries.values()
+            {"label": self._entries[theme_id].name, "value": theme_id}
+            for theme_id in sorted(
+                self._entries,
+                key=lambda value: (value != DEFAULT_THEME_ID, value.casefold()),
+            )
         ]
 
     def contains(self, theme_id: str) -> bool:
