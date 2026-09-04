@@ -125,8 +125,7 @@ New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $InstallDirectory -Force | Out-Null
 
 & $CMake -S (Join-Path $ProjectRoot "native") -B $BuildDirectory `
-    -G "Visual Studio 17 2022" `
-    -A x64 `
+    "-DCMAKE_BUILD_TYPE=$Configuration" `
     "-DCMAKE_PREFIX_PATH=$QtPrefix"
 if ($LASTEXITCODE -ne 0) { throw "Native terminal configure failed" }
 
