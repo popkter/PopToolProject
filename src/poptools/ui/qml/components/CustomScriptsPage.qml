@@ -128,9 +128,11 @@ Item {
                         iconSize: 24
                         color: Theme.secondary
                     }
-                    ToolTip.visible: importMouse.containsMouse
-                    ToolTip.text: "从剪贴板导入脚本"
-                    ToolTip.delay: 450
+                    AppToolTip {
+                        visible: importMouse.containsMouse
+                        text: "从剪贴板导入脚本"
+                        delay: 450
+                    }
                     MouseArea {
                         id: importMouse
                         anchors.fill: parent
@@ -152,9 +154,11 @@ Item {
                         iconSize: 24
                         color: Theme.primary
                     }
-                    ToolTip.visible: createMouse.containsMouse
-                    ToolTip.text: "新建命令"
-                    ToolTip.delay: 450
+                    AppToolTip {
+                        visible: createMouse.containsMouse
+                        text: "新建命令"
+                        delay: 450
+                    }
                     MouseArea {
                         id: createMouse
                         anchors.fill: parent

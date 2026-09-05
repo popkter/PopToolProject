@@ -20,6 +20,7 @@ from poptools.viewmodels import (
     AppController,
     DeveloperConsoleController,
     JiraFeishuController,
+    PlatformUiController,
     PresetController,
     SettingsController,
     UpdateController,
@@ -45,6 +46,7 @@ class ApplicationComponents:
     settings_controller: SettingsController
     preset_controller: PresetController
     jira_feishu_controller: JiraFeishuController
+    platform_ui_controller: PlatformUiController
     developer_console_controller: DeveloperConsoleController
     update_controller: UpdateController
 
@@ -75,6 +77,7 @@ def build_components(paths: AppPaths) -> ApplicationComponents:
     )
     preset_controller = PresetController(paths)
     jira_feishu_controller = JiraFeishuController(paths.data_dir)
+    platform_ui_controller = PlatformUiController()
     developer_console_controller = DeveloperConsoleController(python_environment, paths.data_dir)
     update_controller = UpdateController(config_store)
     settings_controller.scriptsImported.connect(app_controller.reloadImportedScripts)
@@ -90,6 +93,7 @@ def build_components(paths: AppPaths) -> ApplicationComponents:
         settings_controller=settings_controller,
         preset_controller=preset_controller,
         jira_feishu_controller=jira_feishu_controller,
+        platform_ui_controller=platform_ui_controller,
         developer_console_controller=developer_console_controller,
         update_controller=update_controller,
     )

@@ -17,9 +17,15 @@ from PySide6.QtCore import (
 )
 
 from poptools.infrastructure.conpty import ConPtySession
+from poptools.infrastructure.macos_terminal import MacOSTerminalLauncher
 from poptools.infrastructure.powershell_plugin import PowerShellPlugin
 from poptools.infrastructure.python_environment import PythonEnvironment
-from poptools.paths import bundled_adb_path, resource_path
+from poptools.paths import (
+    bundled_adb_path,
+    bundled_android_tools_dir,
+    bundled_scrcpy_path,
+    resource_path,
+)
 
 
 class PowerShellPluginInstallThread(QThread):
@@ -65,7 +71,7 @@ class TerminalTabState:
 
 
 class DeveloperConsoleController(QObject):
-    """Native terminal backed by Windows ConPTY or a macOS POSIX PTY."""
+    """Coordinate Windows ConPTY sessions or launch macOS Terminal.app."""
 
     OUTPUT_HISTORY_LIMIT = 131_072
 
@@ -79,6 +85,8 @@ class DeveloperConsoleController(QObject):
     pluginInstallPromptRequested = Signal(str, str)
     pluginInstallFinished = Signal(bool, str)
     terminalAccessGranted = Signal()
+    externalTerminalOpened = Signal()
+    externalTerminalOpenFailed = Signal(str)
     terminalTabsChanged = Signal()
 
     MAX_TERMINAL_TABS = 7
@@ -107,6 +115,12 @@ class DeveloperConsoleController(QObject):
         self._plugin_install_thread: PowerShellPluginInstallThread | None = None
         self._plugin_install_progress = 0
         self._plugin_install_status = ""
+        runtime_dir = getattr(
+            python_environment.paths,
+            "runtime_dir",
+            python_environment.paths.data_dir / "runtime",
+        )
+        self._macos_terminal = MacOSTerminalLauncher(runtime_dir)
         self._create_tab(activate=True)
 
     @Property(str, notify=outputChanged)
@@ -165,7 +179,7 @@ class DeveloperConsoleController(QObject):
 
     @Property(str, constant=True)
     def pluginVersion(self) -> str:
-        return self._plugin.package.version if self._plugin is not None else "macOS Shell"
+        return self._plugin.package.version if self._plugin is not None else "系统 Terminal"
 
     @Property(str, constant=True)
     def pluginDirectory(self) -> str:
@@ -175,9 +189,13 @@ class DeveloperConsoleController(QObject):
     def terminalName(self) -> str:
         return self._terminal_name()
 
+    @Property(bool, constant=True)
+    def externalTerminal(self) -> bool:
+        return sys.platform == "darwin" and self._plugin is None
+
     @staticmethod
     def _terminal_name() -> str:
-        return "PowerShell 7" if sys.platform == "win32" else "macOS Shell"
+        return "PowerShell 7" if sys.platform == "win32" else "macOS 系统 Terminal"
 
     @Property(int, constant=True)
     def windowsBuildNumber(self) -> int:
@@ -187,6 +205,11 @@ class DeveloperConsoleController(QObject):
 
     @Slot(result=bool)
     def requestTerminalAccess(self) -> bool:
+        if self.externalTerminal and not self.python_environment.execution_executable():
+            self.externalTerminalOpenFailed.emit(
+                "Python 环境不可用，请重新启动应用完成初始化。"
+            )
+            return False
         if self._plugin is None:
             self.terminalAccessGranted.emit()
             return True
@@ -233,6 +256,8 @@ class DeveloperConsoleController(QObject):
 
     @Slot(result=bool)
     def ensureStarted(self) -> bool:
+        if self.externalTerminal:
+            return self.openTerminal()
         tab = self._active_tab()
         if tab is None:
             tab = self._create_tab(activate=True)
@@ -323,7 +348,43 @@ class DeveloperConsoleController(QObject):
             environment["PATH"] = os.pathsep.join(
                 (str(adb_executable.parent), environment.get("PATH", ""))
             )
+        scrcpy_executable = bundled_scrcpy_path()
+        if scrcpy_executable.is_file():
+            environment["POPTOOLS_SCRCPY"] = str(scrcpy_executable)
+            environment["SCRCPY_SERVER_PATH"] = str(
+                bundled_android_tools_dir() / "scrcpy-server"
+            )
         return environment
+
+    @Slot(result=bool)
+    def openTerminal(self) -> bool:
+        """Open the platform terminal while preserving the existing Windows flow."""
+        if not self.externalTerminal:
+            return self.ensureStarted()
+        python_executable = self.python_environment.execution_executable()
+        pip_executable = self.python_environment.executable()
+        if not python_executable or not pip_executable:
+            self.externalTerminalOpenFailed.emit(
+                "Python 环境不可用，请重新启动应用完成初始化。"
+            )
+            return False
+        environment = self._terminal_environment()
+        environment.update(
+            {
+                "POPTOOLS_PYTHON": python_executable,
+                "POPTOOLS_PIP": pip_executable,
+                "PYTHONUTF8": "1",
+                "PYTHONIOENCODING": "utf-8",
+                "PYTHONUNBUFFERED": "1",
+            }
+        )
+        try:
+            self._macos_terminal.open(self.working_directory, environment)
+        except (OSError, RuntimeError) as exc:
+            self.externalTerminalOpenFailed.emit(f"系统终端启动失败：{exc}")
+            return False
+        self.externalTerminalOpened.emit()
+        return True
 
     @Slot(int)
     def _on_plugin_install_progress(self, progress: int) -> None:

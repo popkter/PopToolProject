@@ -81,9 +81,11 @@ Rectangle {
         Item { visible: root.compact; Layout.fillWidth: true }
     }
 
-    ToolTip.visible: root.compact && selectorMouse.containsMouse
-    ToolTip.text: root.controller.selectedAndroidDeviceLabel
-    ToolTip.delay: 400
+    AppToolTip {
+        visible: root.compact && selectorMouse.containsMouse
+        text: root.controller.selectedAndroidDeviceLabel
+        delay: 400
+    }
 
     MouseArea {
         id: selectorMouse
@@ -255,11 +257,13 @@ Rectangle {
                                ? Theme.primary : Theme.success
                     }
                     property bool revealClickedName: false
-                    ToolTip.visible: root.popupIconOnly
-                                     && (rowMouse.containsMouse || deviceRow.revealClickedName)
-                    ToolTip.text: deviceRow.modelData.label + "\n" + deviceRow.modelData.status
-                    ToolTip.delay: rowMouse.containsMouse ? 300 : 0
-                    ToolTip.timeout: 1800
+                    AppToolTip {
+                        visible: root.popupIconOnly
+                                 && (rowMouse.containsMouse || deviceRow.revealClickedName)
+                        text: deviceRow.modelData.label + "\n" + deviceRow.modelData.status
+                        delay: rowMouse.containsMouse ? 300 : 0
+                        timeout: 1800
+                    }
                     Timer {
                         id: clickedNameTimer
                         interval: 1500

@@ -783,9 +783,11 @@ ColumnLayout {
                 onClicked: root.outputExpanded = !root.outputExpanded
             }
 
-            ToolTip.visible: outputToggleArea.containsMouse
-            ToolTip.text: root.outputExpanded ? "隐藏运行记录" : "显示运行记录"
-            ToolTip.delay: 450
+            AppToolTip {
+                visible: outputToggleArea.containsMouse
+                text: root.outputExpanded ? "隐藏运行记录" : "显示运行记录"
+                delay: 450
+            }
         }
 
         RowLayout {

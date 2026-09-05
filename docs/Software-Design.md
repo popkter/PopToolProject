@@ -8,7 +8,7 @@
 | 基线日期 | 2026-09-03 |
 | 目标平台 | Windows 10/11 x64、macOS 12+ arm64/x64 |
 | 开发环境 | Python 3.11、PySide6、Qt Quick/QML |
-| 运行基础 | Windows ConPTY / macOS PTY、ADB、scrcpy、应用专属 Python |
+| 运行基础 | Windows ConPTY / macOS Terminal.app、ADB、scrcpy、应用专属 Python |
 
 本文描述 1.0.9 当前实现，是功能边界、运行链路、数据所有权、主题、终端、更新与发布的设计依据。
 
@@ -70,6 +70,7 @@ flowchart TB
 - `SettingsController`
 - `PresetController`
 - `JiraFeishuController`
+- `PlatformUiController`
 - `DeveloperConsoleController`
 - `UpdateController`
 
@@ -85,18 +86,19 @@ src/poptools/ui/qml/
 ├─ components/
 │  ├─ CustomScriptsPage.qml         # 客制脚本网格、搜索和详情抽屉
 │  ├─ PresetFunctionsPage.qml       # 预设侧栏、搜索和预设工作区
-│  ├─ TerminalPage.qml              # 终端页面边界
+│  ├─ TerminalPage.qml              # Windows 内置终端页面边界
 │  ├─ ToolDetailPanel.qml           # 客制与预设共用的工具详情区域
 │  ├─ CommandWorkspace.qml          # 客制脚本参数和运行内容
 │  ├─ PresetWorkspace.qml           # 预设工作区路由
 │  ├─ RecordingWorkspace.qml        # Android 联合录制
 │  ├─ InteractiveColorPicker.qml    # 调色盘和系统取色
 │  ├─ JiraFeishuWorkspace.qml       # Jira 飞书配置与调度
-│  ├─ DeveloperConsole.qml          # 原生终端界面
+│  ├─ DeveloperConsole.qml          # Windows 原生终端界面
 │  ├─ SettingsDialog.qml            # 设置与手动更新检查
 │  ├─ UpdateDialog.qml              # Release Notes、下载与安装
 │  ├─ CommandEditorDialog.qml       # 客制脚本编辑器
 │  ├─ CustomScriptImportDialog.qml  # 单脚本重复 ID 确认
+│  ├─ AppToolTip.qml                # 平台分流的统一悬浮提示
 │  ├─ AppPopupSurface.qml           # 主题化弹层表面与阴影
 │  └─ 其他通用按钮、列表和确认弹窗
 └─ theme/
@@ -105,7 +107,9 @@ src/poptools/ui/qml/
    └─ configs/*.json                # 可发现的主题定义
 ```
 
-主窗口使用无边框窗口和自定义标题栏。左侧导航切换三个独立页面组件，页面根节点占满工作区且不设置外边距；页面内容统一使用 `Theme` 中以 4 像素为步进、最大 40 像素的间距令牌。客制脚本详情显示为右侧抽屉；运行按钮、操作按钮、主页工具按钮和弹层圆角均从主题令牌读取。
+主窗口按平台选择窗口框架：Windows 使用既有无边框窗口、自定义标题栏、手动缩放热区和 DWM 圆角；macOS 使用系统窗口框架提供标题栏、圆角、阴影、交通灯按钮以及最小化、缩放和全屏行为。两端都保留最小窗口尺寸与关闭到托盘策略。左侧导航切换三个独立页面组件，页面根节点占满工作区且不设置外边距；页面内容统一使用 `Theme` 中以 4 像素为步进、最大 40 像素的间距令牌。客制脚本详情显示为右侧抽屉；运行按钮、操作按钮、主页工具按钮和弹层圆角均从主题令牌读取。
+
+QML 继续全局使用 `Basic` Controls 风格，以免平台风格限制现有控件定制。全部按钮提示通过 `AppToolTip` 统一接入：Windows 沿用主题化 QML `ToolTip`，macOS 则由组合根持有的 `PlatformUiController` 转发给 Qt Widgets `QToolTip`，使用系统调色板并保留各入口的延迟、超时和多行文本。
 
 ## 6. 工具模型与存储
 
@@ -203,19 +207,21 @@ ADB 与 scrcpy 从经过清单和 SHA-256 校验的包内归档准备到版本�
 - 客制 Python 脚本；
 - Python Doctor；
 - 自动依赖安装；
-- 内置终端中的 `python` 与 `pip`。
+- Windows 内置终端或 macOS 系统 Terminal 中的 `python` 与 `pip`。
 
 Python Doctor 支持内联源码和 `.py` 文件路径，解析 import、排除标准库与脚本同目录模块、探测已安装模块，并将常见导入名映射到 pip 包名。安装必须由用户确认，过程异步输出到控制台，完成后重新检查。
 
-## 11. 内置终端
+## 11. 终端集成
 
 终端由 `app.terminal_enabled` 控制，默认关闭。Windows 首次启用时，`PowerShellPlugin` 根据架构清单下载官方 PowerShell ZIP，校验 SHA-256、安全解压并写入安装清单；macOS 直接使用用户系统 Shell。
 
-`DeveloperConsoleController` 最多维护 7 个 `TerminalTabState`，每个标签页独立持有 Shell 会话、解码器、输出快照和退出状态。切换应用页面不会销毁会话；关闭标签、重启当前会话、关闭终端功能或退出应用时按作用域回收资源。
+Windows 下，`DeveloperConsoleController` 最多维护 7 个 `TerminalTabState`，每个标签页独立持有 PowerShell 会话、解码器、输出快照和退出状态。切换应用页面不会销毁会话；关闭标签、重启当前会话、关闭终端功能或退出应用时按作用域回收资源。
 
-`TerminalItem` 基于 libvterm 渲染字符网格并处理键盘、输入法、鼠标、选区、剪贴板和滚动。Windows 使用 ConPTY 与 Job Object，macOS 使用 POSIX PTY。控制器输出快照上限为 131,072 字符，原生终端每个会话保留最多 10,000 行回滚记录。
+`TerminalItem` 基于 libvterm 渲染字符网格并处理键盘、输入法、鼠标、选区、剪贴板和滚动；它只在 Windows 构建中打包，并使用 ConPTY 与 Job Object。控制器输出快照上限为 131,072 字符，原生终端每个会话保留最多 10,000 行回滚记录。
 
-快捷键策略：
+macOS 下不注册、不打包 `TerminalItem`，也不创建 POSIX PTY。主导航的终端入口调用基础设施层 `MacOSTerminalLauncher`，以一次性 `.command` 文件打开 Terminal.app。文件只导出白名单环境变量，将应用专属 Python/venv、ADB、scrcpy 和 venv 中已安装的 Scrapy 暴露给新会话，然后自删除并进入用户的交互式 Shell；不会修改用户的 Shell 配置。系统 Terminal 生命周期不归应用所有。
+
+以下快捷键策略仅属于 Windows 内置终端；macOS 交由 Terminal.app 处理：
 
 - `Ctrl+C` 有选区时复制，无选区时向当前会话发送 `0x03`；
 - `Ctrl+V` 粘贴剪贴板；
@@ -306,7 +312,7 @@ QML 变更还需执行 `pyside6-qmllint`，并通过 `tests/capture_ui.py` 做�
 - Python 环境、Doctor 与依赖安装；
 - Jira 飞书配置、卡片生成和调度；
 - 动态主题扫描、校验、回退以及浅色/深色应用；
-- 终端多标签、输入输出、中断和会话回收；
+- Windows 终端多标签、输入输出、中断和会话回收；macOS 系统 Terminal 启动与临时环境脚本；
 - 正式/测试更新渠道、Release Notes、下载校验和安装；
 - QML 最小窗口、紧凑布局、抽屉和弹窗。
 

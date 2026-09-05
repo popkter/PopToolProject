@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from poptools.viewmodels import developer_console_controller as controller_module
 from poptools.viewmodels.developer_console_controller import DeveloperConsoleController
 
 
@@ -42,6 +43,15 @@ class FakeSession:
     def write(self, payload: bytes) -> bool:
         self.writes.append(payload)
         return True
+
+
+class FakeMacOSTerminalLauncher:
+    def __init__(self) -> None:
+        self.calls: list[tuple[Path, dict[str, str]]] = []
+
+    def open(self, working_directory: Path, environment: dict[str, str]) -> Path:
+        self.calls.append((working_directory, environment))
+        return working_directory / "temporary.command"
 
 
 def make_controller(tmp_path: Path) -> DeveloperConsoleController:
@@ -125,3 +135,38 @@ def test_interrupt_sends_ctrl_c_to_active_terminal_without_stopping_session(
 
     assert session.writes == [b"\x03"]
     assert controller._tabs[0].session is session
+
+
+def test_macos_console_opens_system_terminal_with_managed_environment(
+    monkeypatch, tmp_path: Path
+) -> None:
+    environment = FakePythonEnvironment(tmp_path)
+    launcher = FakeMacOSTerminalLauncher()
+    android_dir = tmp_path / "android"
+    monkeypatch.setattr(controller_module.sys, "platform", "darwin")
+    monkeypatch.setattr(controller_module, "bundled_adb_path", lambda: android_dir / "adb")
+    monkeypatch.setattr(
+        controller_module, "bundled_scrcpy_path", lambda: android_dir / "scrcpy"
+    )
+    monkeypatch.setattr(
+        controller_module, "bundled_android_tools_dir", lambda: android_dir
+    )
+    available_tools = {android_dir / "adb", android_dir / "scrcpy"}
+    monkeypatch.setattr(Path, "is_file", lambda self: self in available_tools)
+    controller = DeveloperConsoleController(
+        environment,  # type: ignore[arg-type]
+        tmp_path,
+    )
+    controller._macos_terminal = launcher  # type: ignore[assignment]
+
+    assert controller.externalTerminal
+    assert controller.openTerminal()
+    assert len(launcher.calls) == 1
+    working_directory, injected = launcher.calls[0]
+    assert working_directory == tmp_path
+    assert injected["POPTOOLS_ADB"] == str(android_dir / "adb")
+    assert injected["POPTOOLS_SCRCPY"] == str(android_dir / "scrcpy")
+    assert injected["SCRCPY_SERVER_PATH"] == str(android_dir / "scrcpy-server")
+    assert injected["POPTOOLS_PYTHON"] == environment.execution_executable()
+    assert injected["POPTOOLS_PIP"] == environment.executable()
+    assert all(tab.session is None for tab in controller._tabs)

@@ -111,7 +111,6 @@ def keep_qt_entry(entry):
 
 common_datas = [
     (str(ROOT / "THIRD_PARTY_NOTICES.md"), "."),
-    (str(ROOT / "native" / "third_party" / "libvterm" / "LICENSE"), "licenses/libvterm"),
     (str(PACKAGE / "ui" / "qml"), "poptools/ui/qml"),
     (str(PACKAGE / "resources" / "tools"), "poptools/resources/tools"),
     (str(PACKAGE / "resources" / "python"), "poptools/resources/python"),
@@ -129,9 +128,7 @@ if sys.platform == "darwin":
     icon_file = PACKAGE / "resources" / "icons" / "app-icon.png"
     runtime_icon_file = icon_file
     hiddenimports = []
-    platform_binaries = [
-        (str(PACKAGE / "native" / "libpoptools_terminal.dylib"), "poptools/native"),
-    ]
+    platform_binaries = []
 else:
     scrcpy_manifest = vendor / "scrcpy-manifest.json"
     python_manifest = python_vendor / "python-runtime.json"
@@ -141,6 +138,9 @@ else:
     platform_binaries = [
         (str(PACKAGE / "native" / "poptools_terminal.dll"), "poptools/native"),
     ]
+    common_datas.append(
+        (str(ROOT / "native" / "third_party" / "libvterm" / "LICENSE"), "licenses/libvterm")
+    )
 
 import json
 

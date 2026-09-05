@@ -72,9 +72,11 @@ Rectangle {
         }
     }
 
-    ToolTip.visible: root.compact && mouseArea.containsMouse
-    ToolTip.text: root.text
-    ToolTip.delay: 450
+    AppToolTip {
+        visible: root.compact && mouseArea.containsMouse
+        text: root.text
+        delay: 450
+    }
 
     MouseArea {
         id: mouseArea

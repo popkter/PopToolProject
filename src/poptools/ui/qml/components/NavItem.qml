@@ -81,9 +81,11 @@ Rectangle {
             font.pixelSize: Theme.fontCaption
             font.weight: Font.DemiBold
         }
-        ToolTip.visible: root.compact && actionMouse.containsMouse
-        ToolTip.text: root.actionText
-        ToolTip.delay: 450
+        AppToolTip {
+            visible: root.compact && actionMouse.containsMouse
+            text: root.actionText
+            delay: 450
+        }
         MouseArea {
             id: actionMouse
             anchors.fill: parent
@@ -93,9 +95,11 @@ Rectangle {
         }
     }
 
-    ToolTip.visible: root.compact && mouseArea.containsMouse
-    ToolTip.text: root.label
-    ToolTip.delay: 450
+    AppToolTip {
+        visible: root.compact && mouseArea.containsMouse
+        text: root.label
+        delay: 450
+    }
 
     MouseArea {
         id: mouseArea

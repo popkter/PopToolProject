@@ -305,9 +305,11 @@ Dialog {
                             Text {
                                 Layout.fillWidth: true
                                 text: root.controller.terminalEnabled
-                                    ? "已开启，主界面显示终端 Tab"
+                                    ? (developerConsoleController.externalTerminal
+                                        ? "已开启，主界面终端按钮将打开系统 Terminal"
+                                        : "已开启，主界面显示终端 Tab")
                                     : "开启后可使用应用专属 "
-                                      + developerConsoleController.terminalName + " 终端"
+                                      + developerConsoleController.terminalName
                                 color: Theme.textSecondary
                                 font.pixelSize: Theme.fontCaption
                                 wrapMode: Text.WordWrap

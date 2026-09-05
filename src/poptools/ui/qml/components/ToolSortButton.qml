@@ -38,9 +38,11 @@ Rectangle {
         color: root.foregroundColor
     }
 
-    ToolTip.visible: buttonMouse.containsMouse
-    ToolTip.text: "排序：" + root.controller.toolSortModeLabel
-    ToolTip.delay: 450
+    AppToolTip {
+        visible: buttonMouse.containsMouse
+        text: "排序：" + root.controller.toolSortModeLabel
+        delay: 450
+    }
 
     MouseArea {
         id: buttonMouse

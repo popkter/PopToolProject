@@ -5,7 +5,7 @@ import json
 import urllib.request
 from typing import Any
 
-from poptools.infrastructure.app_updater import GitHubReleaseClient
+from poptools.infrastructure.app_updater import UPDATE_ASSET_NAME, GitHubReleaseClient
 
 
 def release_payload(version: str) -> dict[str, Any]:
@@ -18,8 +18,8 @@ def release_payload(version: str) -> dict[str, Any]:
         "draft": False,
         "assets": [
             {
-                "name": "PopTools.exe",
-                "browser_download_url": f"https://example.com/{tag}/PopTools.exe",
+                "name": UPDATE_ASSET_NAME,
+                "browser_download_url": f"https://example.com/{tag}/{UPDATE_ASSET_NAME}",
                 "size": 10,
                 "digest": f"sha256:{'a' * 64}",
             }

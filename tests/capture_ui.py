@@ -24,6 +24,7 @@ from poptools.viewmodels import (
     AppController,
     DeveloperConsoleController,
     JiraFeishuController,
+    PlatformUiController,
     PresetController,
     SettingsController,
     UpdateController,
@@ -35,7 +36,8 @@ def main() -> int:
     os.environ.setdefault("QT_QUICK_BACKEND", "software")
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
     app = QApplication(sys.argv)
-    register_terminal_type()
+    if sys.platform == "win32":
+        register_terminal_type()
     system_font = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "msyh.ttc"
     if system_font.exists():
         QFontDatabase.addApplicationFont(str(system_font))
@@ -83,6 +85,7 @@ def main() -> int:
         settings_controller.markUserGuideSeen()
     preset_controller = PresetController()
     jira_feishu_controller = JiraFeishuController(paths.data_dir)
+    platform_ui_controller = PlatformUiController()
     developer_console_controller = DeveloperConsoleController(python_environment, paths.data_dir)
     app.aboutToQuit.connect(developer_console_controller.shutdown)
     app.aboutToQuit.connect(jira_feishu_controller.shutdown)
@@ -150,6 +153,9 @@ def main() -> int:
     engine.rootContext().setContextProperty("androidController", android_controller)
     engine.rootContext().setContextProperty("trayController", tray_controller)
     engine.rootContext().setContextProperty("updateController", update_controller)
+    engine.rootContext().setContextProperty(
+        "platformUiController", platform_ui_controller
+    )
     if os.environ.get("POPTOOLS_CAPTURE_JIRA_LONG_JQL") == "1":
         jira_feishu_controller.updateField(
             "jira",

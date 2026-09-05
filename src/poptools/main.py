@@ -87,7 +87,8 @@ def main() -> int:
 
     try:
         app = QApplication(sys.argv)
-        register_terminal_type()
+        if sys.platform == "win32":
+            register_terminal_type()
         if not instance_lock.start_activation_server():
             logger.error("无法启动单实例激活服务")
             return 1
@@ -118,6 +119,7 @@ def main() -> int:
         preset_controller = components.preset_controller
         jira_feishu_controller = components.jira_feishu_controller
         developer_console_controller = components.developer_console_controller
+        platform_ui_controller = components.platform_ui_controller
         update_controller = components.update_controller
         app.aboutToQuit.connect(developer_console_controller.shutdown)
         app.aboutToQuit.connect(update_controller.shutdown)
@@ -139,6 +141,9 @@ def main() -> int:
         engine.rootContext().setContextProperty("androidController", android_controller)
         engine.rootContext().setContextProperty("trayController", tray_controller)
         engine.rootContext().setContextProperty("updateController", update_controller)
+        engine.rootContext().setContextProperty(
+            "platformUiController", platform_ui_controller
+        )
         qml_file = package_root() / "ui" / "qml" / "Main.qml"
         engine.load(QUrl.fromLocalFile(str(qml_file)))
         if not engine.rootObjects():

@@ -102,9 +102,11 @@ Item {
                         iconSize: 24
                         color: Theme.primary
                     }
-                    ToolTip.visible: compactSearchMouse.containsMouse
-                    ToolTip.text: "搜索工具"
-                    ToolTip.delay: 450
+                    AppToolTip {
+                        visible: compactSearchMouse.containsMouse
+                        text: "搜索工具"
+                        delay: 450
+                    }
                     MouseArea {
                         id: compactSearchMouse
                         anchors.fill: parent

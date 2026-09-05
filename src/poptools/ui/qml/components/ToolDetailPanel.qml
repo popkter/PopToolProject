@@ -154,9 +154,11 @@ Rectangle {
                             iconSize: 24
                             color: Theme.textSecondary
                         }
-                        ToolTip.visible: closeMouse.containsMouse
-                        ToolTip.text: "关闭详情"
-                        ToolTip.delay: 450
+                        AppToolTip {
+                            visible: closeMouse.containsMouse
+                            text: "关闭详情"
+                            delay: 450
+                        }
                         MouseArea {
                             id: closeMouse
                             anchors.fill: parent
@@ -180,9 +182,11 @@ Rectangle {
                             iconSize: 28
                             color: Theme.secondary
                         }
-                        ToolTip.visible: shareMouse.containsMouse
-                        ToolTip.text: "分享脚本到剪贴板"
-                        ToolTip.delay: 450
+                        AppToolTip {
+                            visible: shareMouse.containsMouse
+                            text: "分享脚本到剪贴板"
+                            delay: 450
+                        }
                         MouseArea {
                             id: shareMouse
                             anchors.fill: parent
@@ -269,9 +273,11 @@ Rectangle {
                             iconSize: 24
                             color: Theme.primary
                         }
-                        ToolTip.visible: dependencyMouse.containsMouse
-                        ToolTip.text: "检查 Python 依赖"
-                        ToolTip.delay: 450
+                        AppToolTip {
+                            visible: dependencyMouse.containsMouse
+                            text: "检查 Python 依赖"
+                            delay: 450
+                        }
                         MouseArea {
                             id: dependencyMouse
                             anchors.fill: parent

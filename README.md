@@ -14,10 +14,11 @@
 - **预设功能**：Android 设备投屏、画面/音频/logcat 联合录制、调色盘、Jira 飞书推送。
 - **Android 设备**：自动扫描和选择设备，预设与客制 ADB 命令共用当前设备。
 - **Python 环境**：应用维护独立 Python 运行时和虚拟环境，并通过 Python Doctor 检查、安装脚本依赖。
-- **内置终端**：可选 PowerShell 7 或 macOS Shell，最多 7 个独立会话，共用应用的 ADB 与 Python 环境。
+- **终端集成**：Windows 提供可选的 PowerShell 7 多标签终端；macOS 打开系统 Terminal。两端都会临时注入应用的 ADB、scrcpy 与 Python 环境。
 - **主题系统**：支持跟随系统、浅色和深色模式；主题风格从 JSON 配置目录动态加载。
 - **应用更新**：支持正式版和测试版渠道，在应用内展示 GitHub Release Notes、下载、校验并安装更新。
 - **桌面集成**：单实例运行、系统托盘、预设工具与最近使用脚本快捷入口。
+- **原生窗口体验**：macOS 使用系统标题栏、圆角、阴影和交通灯按钮，悬浮提示跟随系统外观；Windows 保持定制标题栏。
 
 ## 快速开始
 
@@ -33,7 +34,7 @@
 | --- | --- |
 | 客制 | 管理和运行个人脚本，支持搜索、排序、剪贴板导入与新建 |
 | 预设 | 使用 Android 投屏、联合录制、调色盘和 Jira 飞书推送 |
-| 终端 | 使用可选的多标签交互式 Shell；仅在设置中启用且运行环境就绪后显示 |
+| 终端 | Windows 使用可选的多标签 PowerShell；macOS 打开系统 Terminal；仅在设置中启用且运行环境就绪后显示 |
 | 设置 | 管理主题、客制脚本并发数、终端、本地脚本迁移、版本与应用更新 |
 
 系统托盘提供预设工具和最近使用客制脚本的快捷入口。有参数的工具会先显示参数弹窗，无参数的工具直接运行。
@@ -161,22 +162,28 @@ Python 脚本内容既可以是源码，也可以是 `.py` 文件路径。路径
 | `dateutil` | `python-dateutil` |
 | `lunar_python` | `lunar-python` |
 
-## 内置终端
+## 终端集成
 
-终端默认关闭。Windows 首次启用时会下载、校验并安装应用专用 PowerShell 7；macOS 使用用户系统 Shell。启用成功后，主界面显示“终端”入口。
+终端默认关闭。Windows 首次启用时会下载、校验并安装应用专用 PowerShell 7；macOS 直接使用系统自带的 Terminal.app。启用成功后，主界面显示“终端”入口。
 
-终端最多支持 7 个标签页，每个标签页拥有独立 Shell 会话、当前目录和输出记录。切换页面不会结束会话；关闭标签页会停止对应会话，始终至少保留一个标签页。“重启会话”只重启当前标签页。
+Windows 内置终端最多支持 7 个标签页，每个标签页拥有独立 PowerShell 会话、当前目录和输出记录。切换页面不会结束会话；关闭标签页会停止对应会话，始终至少保留一个标签页。“重启会话”只重启当前标签页。
 
-终端会把应用专属 Python、pip 和内置 ADB 加入环境，可直接执行：
+macOS 点击“终端”会新开系统 Terminal 窗口。应用通过一次性 `.command` 启动脚本向该窗口注入环境，随后立即删除启动脚本；不会修改 `~/.zshrc`、`~/.zprofile`、`~/.bash_profile` 等用户配置。关闭泡泡工具箱不会强制关闭已经打开的系统 Terminal。
+
+两端终端都会把应用专属 Python/venv 和内置 Android 工具目录加入当前会话环境，可直接执行：
 
 ```text
 python --version
 pip list
 pip install requests
 adb devices
+scrcpy --version
+scrapy version
 ```
 
-快捷键和鼠标操作：
+`scrapy` 由应用专属 Python 环境提供；尚未安装时可在该终端执行 `pip install scrapy`，安装结果与客制 Python 脚本共用。
+
+以下快捷键和鼠标操作适用于 Windows 内置终端；macOS 使用 Terminal.app 自身的快捷键和设置：
 
 - `Ctrl+C`：存在选区时复制；没有选区时停止当前命令；
 - `Ctrl+V`：粘贴剪贴板内容；
@@ -198,6 +205,8 @@ adb devices
 应用会同时扫描内置主题目录和用户数据目录下的 `themes` 目录。在 Windows 上，默认用户主题目录为 `%LOCALAPPDATA%\PopTools\themes`；设置 `POPTOOLS_DATA_DIR` 时则使用该目录下的 `themes`。用户主题可覆盖同 ID 的内置主题。
 
 应用启动时扫描一次主题目录，每次打开设置弹窗时重新扫描。有效主题必须同时提供浅色颜色、深色颜色和圆角配置；无效文件不会进入列表，已保存主题不可用时回退到 Material 3。主题切换立即作用于主界面、弹窗、菜单、颜色和圆角，不会修改业务数据。
+
+macOS 主窗口由系统窗口框架绘制标题栏、圆角、阴影和红黄绿控制按钮，支持系统最小化、缩放与全屏。按钮悬浮提示使用 macOS 系统提示外观，并跟随系统浅色/深色设置，不受应用内 Material 3、Windows XP 或 Mario 主题影响。Windows 继续使用现有无边框窗口、定制标题栏和主题化 QML 提示。
 
 ## 应用更新
 
@@ -230,7 +239,7 @@ Jira Token、飞书 Webhook、签名 Secret 和飞书应用凭据保存在本机
 - **找不到 Android 设备**：确认 USB 调试已开启并授权，重新连接后等待设备列表刷新。
 - **Bash 无法运行**：Windows 需要可用的 Bash 环境，例如 Git Bash；macOS 使用 `/bin/bash`。
 - **Python 提示缺少依赖**：使用 Python Doctor 安装，或在内置终端中执行 `pip install`。
-- **终端入口不显示**：在设置中启用终端；Windows 还需完成 PowerShell 7 插件安装。
+- **终端入口不显示**：在设置中启用终端；Windows 还需完成 PowerShell 7 插件安装。macOS 点击后会打开系统 Terminal，不会在应用内切换页面。
 - **Jira 或飞书操作失败**：检查地址、凭据、JQL、机器人安全设置和当前网络。
 - **定时推送没有执行**：确认方案启用定时、调度器已经启动，并保持应用进程运行。
 - **关闭窗口后程序仍在运行**：应用已隐藏到系统托盘，可从托盘菜单完全退出。

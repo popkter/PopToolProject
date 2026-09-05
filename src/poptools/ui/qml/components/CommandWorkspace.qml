@@ -230,9 +230,11 @@ ColumnLayout {
                                         color: Theme.primaryText
                                     }
 
-                                    ToolTip.visible: defaultValueMouse.containsMouse
-                                    ToolTip.text: "设为默认值"
-                                    ToolTip.delay: 450
+                                    AppToolTip {
+                                        visible: defaultValueMouse.containsMouse
+                                        text: "设为默认值"
+                                        delay: 450
+                                    }
 
                                     MouseArea {
                                         id: defaultValueMouse

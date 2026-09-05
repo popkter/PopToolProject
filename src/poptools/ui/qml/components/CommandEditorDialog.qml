@@ -325,8 +325,10 @@ Dialog {
                                     iconSize: 24
                                     color: Theme.primary
                                 }
-                                ToolTip.visible: iconButtonMouse.containsMouse
-                                ToolTip.text: "点击选择命令图标"
+                                AppToolTip {
+                                    visible: iconButtonMouse.containsMouse
+                                    text: "点击选择命令图标"
+                                }
                                 MouseArea {
                                     id: iconButtonMouse
                                     anchors.fill: parent
@@ -374,8 +376,10 @@ Dialog {
                                                 color: root.selectedIcon === iconChoice.modelData.value
                                                        ? Theme.primary : Theme.textSecondary
                                             }
-                                            ToolTip.visible: iconMouse.containsMouse
-                                            ToolTip.text: modelData.label
+                                            AppToolTip {
+                                                visible: iconMouse.containsMouse
+                                                text: modelData.label
+                                            }
                                             MouseArea {
                                                 id: iconMouse
                                                 anchors.fill: parent

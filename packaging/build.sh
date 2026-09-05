@@ -91,8 +91,6 @@ if ! "$VENV_PYTHON" -c 'import PIL, PyInstaller, PySide6, platformdirs, psutil, 
     fi
 fi
 
-"$PROJECT_ROOT/packaging/build-native.sh"
-
 if [[ "$SKIP_TESTS" -eq 0 ]]; then
     TESTS_DIR="$PROJECT_ROOT/tests"
     TEST_FILE=""

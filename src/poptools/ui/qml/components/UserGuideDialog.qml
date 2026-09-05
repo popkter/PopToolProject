@@ -49,7 +49,7 @@ Dialog {
             }
             Text {
                 Layout.fillWidth: true
-                text: "用几步了解如何创建客制、配置 Jira 飞书推送、切换主题、管理 Python 依赖，以及使用内置终端。"
+                text: "用几步了解如何创建客制、配置 Jira 飞书推送、切换主题、管理 Python 依赖，以及使用终端集成。"
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontBody
                 wrapMode: Text.WordWrap
@@ -283,7 +283,7 @@ Dialog {
                             MaterialIcon { icon: "terminal"; iconSize: 24; color: Theme.primary }
                             Text {
                                 Layout.fillWidth: true
-                                text: "6. 开启并使用内置终端"
+                                text: "6. 开启并使用终端"
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
@@ -291,7 +291,7 @@ Dialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "终端功能默认关闭。Windows 首次开启时需确认安装应用专用 PowerShell 7，macOS 使用系统 Shell；运行环境就绪后主界面显示“终端”。终端最多支持 7 个独立会话，并与客制 Python 脚本共用应用专属 python 和 pip。Ctrl+C 有选区时复制、无选区时停止当前命令，Ctrl+V 粘贴，Ctrl+L 清屏。再次关闭终端功能会隐藏入口并停止全部会话。"
+                            text: "终端功能默认关闭。Windows 首次开启时需确认安装应用专用 PowerShell 7，并支持最多 7 个应用内会话；macOS 点击入口会打开系统 Terminal。两端都临时使用应用专属 python、pip、ADB 与 scrcpy，macOS 不会修改用户的 Shell 配置。Windows 内置终端中，Ctrl+C 有选区时复制、无选区时停止当前命令，Ctrl+V 粘贴，Ctrl+L 清屏。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap

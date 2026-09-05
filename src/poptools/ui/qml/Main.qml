@@ -13,7 +13,8 @@ ApplicationWindow {
     height: Math.max(minimumHeight, Math.round(Screen.height * 0.8))
     visible: true
     title: "泡泡工具箱"
-    flags: Qt.Window | Qt.FramelessWindowHint
+    readonly property bool macOS: platformUiController.nativeWindowFrameEnabled
+    flags: macOS ? Qt.Window : Qt.Window | Qt.FramelessWindowHint
     color: Theme.surface
     palette.window: Theme.surface
     palette.windowText: Theme.textPrimary
@@ -236,6 +237,11 @@ ApplicationWindow {
     }
 
     function requestTerminalEnable() {
+        if (developerConsoleController.externalTerminal) {
+            terminalEnablePending = true
+            developerConsoleController.requestTerminalAccess()
+            return
+        }
         if (developerConsoleController.pluginInstalled) {
             settingsController.saveTerminalEnabled(true)
             return
@@ -307,6 +313,15 @@ ApplicationWindow {
             settingsController.saveTerminalEnabled(true)
             window.terminalEnablePending = false
         }
+
+        function onExternalTerminalOpened() {
+            customTransferToast.showMessage("已打开系统 Terminal", false)
+        }
+
+        function onExternalTerminalOpenFailed(message) {
+            window.terminalEnablePending = false
+            customTransferToast.showMessage(message, true)
+        }
     }
 
     Connections {
@@ -339,7 +354,7 @@ ApplicationWindow {
 
     component ResizeHandle: MouseArea {
         required property int resizeEdges
-        visible: window.visibility !== Window.Maximized
+        visible: !window.macOS && window.visibility !== Window.Maximized
         z: 1000
         onPressed: window.startSystemResize(resizeEdges)
     }
@@ -422,7 +437,8 @@ ApplicationWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 38
+        visible: !window.macOS
+        height: visible ? 38 : 0
         color: "transparent"
         z: 900
 
@@ -681,12 +697,18 @@ ApplicationWindow {
                     compact: window.compactPrimaryNav
                     dense: window.compactHeight
                     selected: window.developerSelected
+                        && !developerConsoleController.externalTerminal
                     onClicked: {
                         // scrcpy is a native child window and would otherwise
                         // cover QML dialogs regardless of their z value.
                         window.hideScrcpyWindow()
-                        window.developerSelected = true
-                        developerConsoleController.ensureStarted()
+                        if (developerConsoleController.externalTerminal) {
+                            window.developerSelected = false
+                            developerConsoleController.openTerminal()
+                        } else {
+                            window.developerSelected = true
+                            developerConsoleController.ensureStarted()
+                        }
                     }
                 }
 
@@ -779,11 +801,15 @@ ApplicationWindow {
                     }
                 }
 
-                TerminalPage {
-                    id: terminalPage
+                Loader {
+                    id: terminalPageLoader
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    controller: developerConsoleController
+                    active: !developerConsoleController.externalTerminal
+                    source: active ? "components/TerminalPage.qml" : ""
+                    onLoaded: {
+                        item.controller = developerConsoleController
+                    }
                 }
             }
         }

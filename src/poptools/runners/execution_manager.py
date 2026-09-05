@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import uuid
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -365,11 +366,8 @@ class ExecutionManager(QObject):
         self._output_dir = None
         if output_dir is None:
             return
-        try:
+        with suppress(OSError):
             output_dir.rmdir()
-        except OSError:
-            # Preserve files intentionally written by the executed tool.
-            pass
 
     def _flush_decoder(self, decoder: codecs.IncrementalDecoder | None) -> None:
         if decoder is None:

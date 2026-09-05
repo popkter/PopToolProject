@@ -128,11 +128,13 @@ Rectangle {
         }
     }
 
-    ToolTip.visible: cardMouse.containsMouse
-    ToolTip.text: root.description
-        ? root.title + "\n" + root.description
-        : root.title
-    ToolTip.delay: 600
+    AppToolTip {
+        visible: cardMouse.containsMouse
+        text: root.description
+            ? root.title + "\n" + root.description
+            : root.title
+        delay: 600
+    }
 
     MouseArea {
         id: cardMouse
