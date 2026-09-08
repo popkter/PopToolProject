@@ -5,7 +5,7 @@ import "../theme"
 ComboBox {
     id: control
 
-    implicitHeight: 46
+    implicitHeight: 44
     leftPadding: Theme.space16
     rightPadding: Theme.space40
     font.pixelSize: Theme.fontBody
@@ -30,8 +30,7 @@ ComboBox {
 
     background: Rectangle {
         radius: Theme.radiusMedium
-        color: control.activeFocus ? (Theme.inputFocused || Theme.primaryContainer)
-               : control.enabled ? (Theme.inputDefault || Theme.surface)
+        color: control.enabled ? Theme.popupSurface
                : (Theme.inputDisabled || Theme.surfaceContainerLow)
         border.color: control.activeFocus ? (Theme.borderColorFocused || Theme.primary)
                     : control.enabled ? (Theme.borderColorDefault || Theme.outline)
@@ -41,7 +40,7 @@ ComboBox {
 
     delegate: ItemDelegate {
         width: control.popup.width - control.popup.leftPadding - control.popup.rightPadding
-        height: 42
+        height: 48
         highlighted: control.highlightedIndex === index
 
         contentItem: Text {
@@ -57,15 +56,15 @@ ComboBox {
         background: Rectangle {
             radius: Theme.radiusSmall
             color: control.currentIndex === index
-                   ? (Theme.cardSelected || Theme.primaryContainer)
-                   : (parent.highlighted ? (Theme.cardHover || Theme.surfaceContainerHigh) : "transparent")
+                   ? Theme.popupSelected
+                   : (parent.highlighted ? Theme.popupHover : "transparent")
         }
     }
 
     popup: Popup {
         y: control.height + Theme.space8
         width: Math.max(control.width, 160)
-        padding: Theme.space8
+        padding: 6
         implicitHeight: Math.min(contentItem.implicitHeight + topPadding + bottomPadding, 280)
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 

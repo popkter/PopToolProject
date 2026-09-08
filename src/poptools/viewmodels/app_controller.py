@@ -106,7 +106,7 @@ class AppController(QObject):
         self.execution_coordinator.runningChanged.connect(self._on_execution_running_changed)
         self.execution_coordinator.finished.connect(self._on_execution_finished)
         self.execution_coordinator.capacityRequested.connect(self.executionCapacityRequested)
-        self._refresh(select_first=False)
+        self._refresh(select_first=True)
         self._tools_ready = True
 
     @Property(QObject, constant=True)
@@ -241,13 +241,11 @@ class AppController(QObject):
     def navigate(self, section: str) -> None:
         target = ToolSection(section)
         if target == self._section:
-            if target == ToolSection.CUSTOM:
-                self.clearToolSelection()
             return
         self._section = target
         self.sectionChanged.emit()
         self.sectionTitleChanged.emit()
-        self._refresh(select_first=target != ToolSection.CUSTOM)
+        self._refresh(select_first=True)
 
     @Slot(str)
     def selectTool(self, tool_id: str) -> None:

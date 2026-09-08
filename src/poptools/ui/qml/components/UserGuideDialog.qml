@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-Dialog {
+AppDialog {
     id: root
     objectName: "userGuideDialog"
 
@@ -20,13 +20,6 @@ Dialog {
     function finishGuide() {
         controller.markUserGuideSeen()
         close()
-    }
-
-    background: Rectangle {
-        radius: Theme.radiusLarge
-        color: Theme.surface
-        border.color: Theme.outlineVariant
-        border.width: 1
     }
 
     contentItem: ColumnLayout {

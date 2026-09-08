@@ -15,7 +15,7 @@ Rectangle {
     readonly property real popupRowsHeight: popupDeviceCount * 58
                                             + Math.max(0, popupDeviceCount - 1) * 4
 
-    implicitHeight: dense ? 52 : 58
+    implicitHeight: dense ? 60 : 74
     radius: Theme.radiusMedium
     color: selectorMouse.containsMouse ? Theme.surfaceContainer : Theme.surfaceContainerLow
     border.color: Theme.outlineVariant

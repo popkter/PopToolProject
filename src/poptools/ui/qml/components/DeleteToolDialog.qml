@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-Dialog {
+AppDialog {
     id: root
     required property var controller
     required property var parentWindow
@@ -12,8 +12,6 @@ Dialog {
     anchors.centerIn: Overlay.overlay
     modal: true
     closePolicy: Popup.CloseOnEscape
-    background: Rectangle { radius: Theme.radiusLarge; color: Theme.surface }
-
     contentItem: ColumnLayout {
         spacing: 14
         MaterialIcon { icon: "delete"; iconSize: 34; color: Theme.errorColor }

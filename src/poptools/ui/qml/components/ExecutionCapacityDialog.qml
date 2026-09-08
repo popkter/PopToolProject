@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-Dialog {
+AppDialog {
     id: root
 
     required property var controller
@@ -15,11 +15,6 @@ Dialog {
     anchors.centerIn: Overlay.overlay
     modal: true
     closePolicy: Popup.NoAutoClose
-    background: Rectangle {
-        radius: Theme.radiusLarge
-        color: Theme.surface
-    }
-
     Connections {
         target: root.controller
         function onExecutionCapacityRequested(victimTitle, requestedTitle) {

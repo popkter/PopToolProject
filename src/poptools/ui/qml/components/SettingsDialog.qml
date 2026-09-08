@@ -5,7 +5,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-Dialog {
+AppDialog {
     id: root
     objectName: "settingsDialog"
 
@@ -44,13 +44,6 @@ Dialog {
             0, flickable["contentHeight"] - settingsScroll.availableHeight)
     }
     // qmllint enable missing-property
-
-    background: Rectangle {
-        radius: Theme.radiusLarge
-        color: Theme.surface
-        border.color: Theme.outlineVariant
-        border.width: 1
-    }
 
     contentItem: ColumnLayout {
         spacing: 0

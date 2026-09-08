@@ -34,11 +34,11 @@ Rectangle {
     signal confirmRunRequested(var values)
     signal toastRequested(string message, bool error)
 
-    radius: drawerMode ? Theme.radiusLarge : Theme.radiusNone
-    border.color: drawerMode ? Theme.outlineVariant : "transparent"
-    border.width: drawerMode ? Theme.borderWidthThin : 0
+    radius: Theme.radiusLarge
+    border.color: Theme.outlineVariant
+    border.width: Theme.borderWidthThin
     clip: true
-    color: Theme.surface
+    color: Theme.surfaceContainerLow
 
     MouseArea {
         anchors.fill: parent
@@ -104,6 +104,22 @@ Rectangle {
             Layout.fillWidth: true
             spacing: root.compactHeight ? Theme.space8 : Theme.space12
 
+            Rectangle {
+                visible: !!root.displayedTool.id
+                Layout.preferredWidth: 48
+                Layout.preferredHeight: 48
+                Layout.alignment: Qt.AlignTop
+                radius: Theme.radiusMedium
+                color: Theme.primaryContainer
+                MaterialIcon {
+                    anchors.centerIn: parent
+                    icon: root.displayedTool.presentation
+                        ? (root.displayedTool.presentation.icon || "terminal") : "terminal"
+                    iconSize: 25
+                    color: Theme.primary
+                }
+            }
+
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: Theme.controlSpacing
@@ -139,6 +155,28 @@ Rectangle {
                     id: drawerActionRow
                     Layout.alignment: Qt.AlignRight
                     spacing: Theme.space4
+
+                    Rectangle {
+                        visible: !root.drawerMode && !!root.displayedTool.id
+                        Layout.preferredWidth: 86
+                        Layout.preferredHeight: 38
+                        radius: Theme.radiusSmall
+                        color: favoriteMouse.containsMouse
+                            ? Theme.surfaceContainer : Theme.surfaceContainerLow
+                        border.color: Theme.outline
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 7
+                            MaterialIcon { icon: "star_border"; iconSize: 18; color: Theme.textSecondary }
+                            Text { text: "收藏"; color: Theme.textPrimary; font.pixelSize: Theme.fontBody }
+                        }
+                        MouseArea {
+                            id: favoriteMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                        }
+                    }
 
                     Rectangle {
                         visible: root.drawerMode

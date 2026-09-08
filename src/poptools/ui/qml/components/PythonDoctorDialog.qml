@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-Dialog {
+AppDialog {
     id: root
     required property var controller
     required property var parentWindow
@@ -18,13 +18,6 @@ Dialog {
     modal: true
     padding: 0
     closePolicy: root.installing ? Popup.NoAutoClose : Popup.CloseOnEscape
-
-    background: Rectangle {
-        radius: Theme.radiusLarge
-        color: Theme.surface
-        border.color: Theme.outlineVariant
-        border.width: 1
-    }
 
     contentItem: ColumnLayout {
         spacing: 0

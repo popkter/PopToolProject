@@ -5,23 +5,21 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-Item {
+Rectangle {
     id: root
     objectName: "customScriptsPage"
-
     required property var controller
+    required property var androidBackend
     required property var parentWindow
     required property var parameterValues
     property string searchQuery: ""
     property bool compact: false
     property bool compactHeight: false
     property bool overlaysVisible: false
-    property bool gridReady: false
-    property bool drawerClosing: false
-    property var drawerTool: ({})
-    readonly property bool drawerVisible: root.visible
-        && root.controller.selectedTool.section === "custom"
-        && !!root.controller.selectedTool.id && !root.drawerClosing
+    property string kindFilter: "all"
+    readonly property bool drawerVisible: false
+    readonly property bool popupVisible: false
+    color: Theme.darkMode ? Theme.surface : "#FBFCFE"
 
     signal searchEdited(string query)
     signal createRequested()
@@ -31,328 +29,201 @@ Item {
     signal confirmRunRequested(var values)
     signal toastRequested(string message, bool error)
 
-    function prepareGrid() {
-        root.gridReady = false
-        if (!root.controller.toolsReady)
-            return
-        Qt.callLater(function() {
-            root.gridReady = true
-            gridRelayoutTimer.restart()
-        })
-    }
+    function closeDrawerImmediately() {}
+    function closeDrawer() {}
 
-    function openDrawer(toolId) {
-        root.drawerClosing = false
-        root.controller.selectTool(toolId)
-    }
-
-    function closeDrawer() {
-        if (root.controller.selectedTool.section === "custom"
-                && !!root.controller.selectedTool.id)
-            root.drawerClosing = true
-    }
-
-    function closeDrawerImmediately() {
-        root.drawerClosing = false
-        root.controller.clearToolSelection()
-    }
-
-    function cacheDrawerTool() {
-        const tool = root.controller.selectedTool
-        if (tool.section === "custom" && !!tool.id)
-            root.drawerTool = tool
-    }
-
-    Component.onCompleted: prepareGrid()
-    onWidthChanged: {
-        if (root.gridReady)
-            gridRelayoutTimer.restart()
-    }
-
-    Connections {
-        target: root.controller
-        function onSelectedToolChanged() {
-            root.cacheDrawerTool()
-            if (root.controller.selectedTool.section !== "custom")
-                root.drawerClosing = false
+    component OutlineButton: Rectangle {
+        id: button
+        property string text: ""
+        property string iconName: ""
+        signal clicked()
+        implicitWidth: labelRow.implicitWidth + 28
+        implicitHeight: 34
+        radius: Theme.radiusSmall
+        color: buttonMouse.containsMouse ? Theme.surfaceContainer : Theme.surfaceContainerLow
+        border.color: Theme.outline
+        Row {
+            id: labelRow; anchors.centerIn: parent; spacing: 8
+            MaterialIcon { visible: button.iconName.length > 0; icon: button.iconName; iconSize: 18; color: Theme.textSecondary }
+            Text { text: button.text; color: Theme.textPrimary; font.pixelSize: Theme.fontBody; font.weight: Font.DemiBold }
         }
+        MouseArea { id: buttonMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: button.clicked() }
     }
 
-    Shortcut {
-        sequence: "Esc"
-        enabled: root.drawerVisible && !root.overlaysVisible
-        onActivated: root.closeDrawer()
-    }
-
-    Rectangle {
+    ColumnLayout {
         anchors.fill: parent
-        color: Theme.surface
+        anchors.leftMargin: Theme.space28
+        anchors.rightMargin: Theme.space28
+        anchors.topMargin: 0
+        anchors.bottomMargin: Theme.space28
+        spacing: Theme.space16
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.leftMargin: Theme.space12
-            anchors.rightMargin: root.compact
-                ? Theme.pagePaddingCompact : Theme.pagePadding
-            anchors.topMargin: root.compact
-                ? Theme.pagePaddingCompact : Theme.pagePadding
-            anchors.bottomMargin: root.compact
-                ? Theme.pagePaddingCompact : Theme.pagePadding
-            spacing: Theme.sectionSpacing
+        WorkspacePageHeader {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 68
+            Layout.minimumHeight: 68
+            Layout.maximumHeight: 68
+            title: "自定义"
+            description: "管理与运行常用脚本"
+            titlePixelSize: 28
+            actionWidth: 209
+            OutlineButton { Layout.preferredWidth: 78; Layout.preferredHeight: 34; text: "导入"; onClicked: root.importRequested() }
+            PrimaryButton { Layout.preferredWidth: 116; Layout.preferredHeight: 34; text: "新建脚本"; iconName: "add"; onClicked: root.createRequested() }
+        }
 
-            WorkspacePageHeader {
-                Layout.fillWidth: true
-                Layout.preferredHeight: root.compactHeight ? 56 : 68
-                compact: root.compactHeight
-                title: "客制脚本"
-                description: "选择脚本以查看参数、运行状态和输出"
-                actionWidth: 144
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 18
 
-                ToolSortButton {
-                    Layout.preferredWidth: 44
-                    Layout.preferredHeight: 44
-                    controller: root.controller
-                    foregroundColor: Theme.tertiary
-                    backgroundColor: Theme.tertiaryContainer
-                    hoverColor: Theme.tertiaryContainerHover
-                }
-
-                Rectangle {
-                    Layout.preferredWidth: 44
-                    Layout.preferredHeight: 44
-                    radius: Theme.radiusMedium
-                    color: importMouse.containsMouse
-                        ? Theme.secondaryContainerHover : Theme.secondaryContainer
-                    MaterialIcon {
-                        anchors.centerIn: parent
-                        icon: "file_download"
-                        iconSize: 24
-                        color: Theme.secondary
-                    }
-                    ToolTip.visible: importMouse.containsMouse
-                    ToolTip.text: "从剪贴板导入脚本"
-                    ToolTip.delay: 450
-                    MouseArea {
-                        id: importMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.importRequested()
-                    }
-                }
-
-                Rectangle {
-                    Layout.preferredWidth: 44
-                    Layout.preferredHeight: 44
-                    radius: Theme.radiusMedium
-                    color: createMouse.containsMouse
-                        ? Theme.primaryContainerHover : Theme.primaryContainer
-                    MaterialIcon {
-                        anchors.centerIn: parent
-                        icon: "add"
-                        iconSize: 24
-                        color: Theme.primary
-                    }
-                    ToolTip.visible: createMouse.containsMouse
-                    ToolTip.text: "新建命令"
-                    ToolTip.delay: 450
-                    MouseArea {
-                        id: createMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.createRequested()
-                    }
-                }
-            }
-
-            TextField {
-                id: searchField
-                Layout.fillWidth: true
-                Layout.preferredHeight: 48
-                leftPadding: Theme.space40
-                rightPadding: Theme.space16
-                placeholderText: "搜索脚本名称、说明或运行方式"
-                text: root.searchQuery
-                color: Theme.textPrimary
-                font.pixelSize: Theme.fontBody
-                onTextChanged: {
-                    if (root.searchQuery !== text)
-                        root.searchEdited(text)
-                }
-                background: Rectangle {
-                    radius: Theme.radiusMedium
-                    color: Theme.surfaceContainerLow
-                    border.color: searchField.activeFocus
-                        ? Theme.primary : Theme.outlineVariant
-                    border.width: searchField.activeFocus
-                        ? Theme.borderWidthMedium : Theme.borderWidthThin
-                    MaterialIcon {
-                        anchors.left: parent.left
-                        anchors.leftMargin: Theme.space12
-                        anchors.verticalCenter: parent.verticalCenter
-                        icon: "search"
-                        iconSize: 24
-                        color: Theme.textSecondary
-                    }
-                }
-            }
-
-            Item {
-                Layout.fillWidth: true
+            Rectangle {
+                Layout.preferredWidth: 338
+                Layout.minimumWidth: 338
+                Layout.maximumWidth: 338
                 Layout.fillHeight: true
+                radius: Theme.radiusMedium
+                color: Theme.surfaceContainerLow
+                border.color: Theme.outlineVariant
+                border.width: 1
 
-                GridView {
-                    id: scriptGrid
-                    readonly property int columnCount: Math.max(
-                        1, Math.min(4, Math.floor(width / 240)))
-                    readonly property real columnGap: Theme.space12
+                ColumnLayout {
                     anchors.fill: parent
-                    clip: true
-                    visible: root.gridReady
-                    model: root.gridReady && root.controller.toolsReady
-                        ? root.controller.toolsModel : null
-                    cellWidth: width / columnCount
-                    cellHeight: 92
-                    boundsBehavior: Flickable.StopAtBounds
-                    onWidthChanged: {
-                        if (root.gridReady)
-                            gridRelayoutTimer.restart()
-                    }
-                    onColumnCountChanged: {
-                        if (root.gridReady)
-                            gridRelayoutTimer.restart()
+                    anchors.margins: Theme.space16
+                    spacing: 10
+
+                    TextField {
+                        id: searchField
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 36
+                        leftPadding: 42
+                        rightPadding: 14
+                        placeholderText: "搜索名称、说明或标签..."
+                        text: root.searchQuery
+                        color: Theme.textPrimary
+                        font.pixelSize: Theme.fontBody
+                        onTextChanged: if (root.searchQuery !== text) root.searchEdited(text)
+                        background: Rectangle {
+                            radius: Theme.radiusSmall
+                            color: Theme.surfaceContainer
+                            border.color: searchField.activeFocus ? Theme.primary : "transparent"
+                            border.width: searchField.activeFocus ? 1 : 0
+                            MaterialIcon { anchors.left: parent.left; anchors.leftMargin: 13; anchors.verticalCenter: parent.verticalCenter; icon: "search"; iconSize: 20; color: Theme.textSecondary }
+                        }
                     }
 
-                    delegate: Item {
-                        id: scriptDelegate
-                        required property int index
-                        required property string toolId
-                        required property string title
-                        required property string description
-                        required property string iconName
-                        required property string executorKind
-                        required property bool selected
-                        required property bool running
-                        readonly property int gridColumn:
-                            index % scriptGrid.columnCount
-                        width: scriptGrid.cellWidth
-                        height: scriptGrid.cellHeight
-                        z: scriptCard.dragging ? 10 : 0
-
-                        ToolGridItem {
-                            id: scriptCard
-                            x: scriptDelegate.gridColumn * scriptGrid.columnGap
-                                / scriptGrid.columnCount
-                            width: parent.width - scriptGrid.columnGap
-                                * (scriptGrid.columnCount - 1)
-                                / scriptGrid.columnCount
-                            anchors.verticalCenter: parent.verticalCenter
-                            height: 80
-                            title: parent.title
-                            description: parent.description
-                            iconName: parent.iconName
-                            executorKind: parent.executorKind
-                            selected: parent.selected
-                            running: parent.running
-                            draggable: root.controller.toolSortMode === "custom"
-                                && root.searchQuery.length === 0
-                            dragTarget: scriptDelegate
-                            dragMinimumX: 0
-                            dragMaximumX: Math.max(0,
-                                scriptGrid.width - scriptDelegate.width)
-                            dragMinimumY: 0
-                            dragMaximumY: Math.max(0,
-                                scriptGrid.contentHeight - scriptDelegate.height)
-                            onClicked: root.openDrawer(parent.toolId)
-                            onDragFinished: function(centerX, centerY) {
-                                const column = Math.max(0, Math.min(
-                                    scriptGrid.columnCount - 1,
-                                    Math.floor(centerX / scriptGrid.cellWidth)))
-                                const row = Math.max(0,
-                                    Math.floor(centerY / scriptGrid.cellHeight))
-                                const targetIndex = Math.max(0, Math.min(
-                                    scriptGrid.count - 1,
-                                    row * scriptGrid.columnCount + column))
-                                root.controller.moveTool(parent.toolId, targetIndex)
+                    Flow {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: implicitHeight
+                        spacing: 6
+                        Repeater {
+                            model: [
+                                { label: "全部", value: "all" },
+                                { label: "ADB", value: "batch" },
+                                { label: "PowerShell", value: "powershell" },
+                                { label: "Python", value: "python" },
+                            ]
+                            delegate: Rectangle {
+                                id: filterChip
+                                required property var modelData
+                                width: filterChip.modelData.value === "powershell" ? 95
+                                    : filterChip.modelData.value === "python" ? 69
+                                    : filterChip.modelData.value === "all" ? 52 : 54
+                                height: 28
+                                radius: Theme.radiusSmall
+                                color: root.kindFilter === modelData.value ? Theme.primaryContainer : Theme.surfaceContainerLow
+                                border.color: root.kindFilter === modelData.value ? Theme.primary : Theme.outline
+                                Text { anchors.centerIn: parent; text: filterChip.modelData.label; color: root.kindFilter === filterChip.modelData.value ? Theme.primary : Theme.textSecondary; font.pixelSize: Theme.fontCaption }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.kindFilter = filterChip.modelData.value }
                             }
                         }
                     }
-                }
 
-                Column {
-                    anchors.centerIn: parent
-                    spacing: Theme.space12
-                    visible: root.gridReady && scriptGrid.count === 0
-                    MaterialIcon {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        icon: root.searchQuery ? "search_off" : "inventory_2"
-                        iconSize: 44
-                        color: Theme.textSecondary
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 24
+                        Layout.topMargin: 3
+                        Text { Layout.fillWidth: true; Layout.leftMargin: 8; text: "脚本名称"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption }
+                        Text { text: "类型"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption; Layout.rightMargin: 61 }
                     }
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: root.searchQuery
-                            ? "没有匹配的客制脚本" : "还没有客制脚本"
-                        color: Theme.textSecondary
-                        font.pixelSize: Theme.fontBody
+
+                    ListView {
+                        id: scriptList
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        Layout.leftMargin: -8
+                        Layout.rightMargin: -8
+                        spacing: 0
+                        model: root.controller.toolsModel
+                        boundsBehavior: Flickable.StopAtBounds
+                        delegate: Rectangle {
+                            id: scriptRow
+                            required property string toolId
+                            required property string title
+                            required property string description
+                            required property string iconName
+                            required property string executorKind
+                            required property bool selected
+                            required property bool running
+                            required property int index
+                            width: scriptList.width
+                            height: (root.kindFilter === "all" || root.kindFilter === "favorite" || root.kindFilter === executorKind) ? 40 : 0
+                            visible: height > 0
+                            radius: 6
+                            color: selected ? (Theme.darkMode ? Theme.primaryContainer : "#E5F0FF")
+                                : (rowMouse.containsMouse ? Theme.surfaceContainer
+                                : (index % 2 === 0 ? (Theme.darkMode ? "transparent" : "#FAFBFC") : "transparent"))
+                            RowLayout {
+                                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                                Rectangle {
+                                    Layout.preferredWidth: 26; Layout.preferredHeight: 26; radius: 5
+                                    color: scriptRow.executorKind === "python" ? Theme.tertiaryContainer : scriptRow.executorKind === "powershell" ? Theme.primaryContainer : Theme.successContainer
+                                    MaterialIcon { anchors.centerIn: parent; icon: scriptRow.executorKind === "batch" ? "smartphone" : "terminal"; iconSize: 16; color: scriptRow.executorKind === "python" ? Theme.tertiary : scriptRow.executorKind === "powershell" ? Theme.primary : Theme.success }
+                                }
+                                Text { Layout.fillWidth: true; text: scriptRow.title; color: scriptRow.selected ? Theme.primary : Theme.textPrimary; font.pixelSize: Theme.fontBody; font.weight: scriptRow.selected ? Font.Bold : Font.Normal; elide: Text.ElideRight }
+                                Rectangle {
+                                    Layout.preferredWidth: 94; Layout.preferredHeight: 22; radius: 4
+                                    color: scriptRow.executorKind === "python" ? Theme.tertiaryContainer : scriptRow.executorKind === "powershell" ? Theme.primaryContainer : Theme.successContainer
+                                    Text { id: kindLabel; anchors.centerIn: parent; text: scriptRow.executorKind === "batch" ? "ADB" : scriptRow.executorKind === "powershell" ? "PowerShell" : scriptRow.executorKind === "python" ? "Python" : scriptRow.executorKind; color: scriptRow.executorKind === "python" ? Theme.tertiary : scriptRow.executorKind === "powershell" ? Theme.primary : Theme.success; font.pixelSize: Theme.fontCaption }
+                                }
+                                MaterialIcon { icon: "chevron_right"; iconSize: 19; color: scriptRow.selected ? Theme.primary : Theme.textSecondary }
+                            }
+                            MouseArea { id: rowMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.controller.selectTool(scriptRow.toolId) }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 28
+                        Text { Layout.fillWidth: true; text: scriptList.count + " 个脚本"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption }
+                        Text { text: "紧凑 · ↑↓ 切换"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption }
+                        ToolSortButton { Layout.preferredWidth: 24; Layout.preferredHeight: 24; controller: root.controller }
                     }
                 }
             }
-        }
-    }
 
-    Timer {
-        id: gridRelayoutTimer
-        interval: 0
-        repeat: false
-        onTriggered: {
-            if (root.gridReady && root.controller.toolsReady)
-                scriptGrid.forceLayout()
-        }
-    }
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                radius: Theme.radiusMedium
+                color: Theme.surfaceContainerLow
+                border.color: Theme.outlineVariant
+                border.width: 1
+                clip: true
 
-    Rectangle {
-        anchors.fill: parent
-        visible: root.drawerVisible
-        radius: Theme.applicationRadius
-        color: Qt.rgba(0, 0, 0, 0.28)
-        z: 5
-        MouseArea {
-            anchors.fill: parent
-            onClicked: root.closeDrawer()
-        }
-    }
-
-    ToolDetailPanel {
-        id: detailPanel
-        controller: root.controller
-        parentWindow: root.parentWindow
-        parameterValues: root.parameterValues
-        displayedTool: root.drawerTool
-        drawerMode: true
-        drawerVisible: root.drawerVisible
-        compact: root.compact
-        compactHeight: root.compactHeight
-        overlaysVisible: root.overlaysVisible
-        x: parent.width + Theme.space12
-        y: Theme.space12
-        width: Math.min(700, Math.max(560, parent.width * 0.56))
-        height: parent.height - Theme.space24
-        z: 6
-        onCloseRequested: root.closeDrawer()
-        onDrawerClosed: {
-            if (root.drawerClosing
-                    && root.controller.selectedTool.section === "custom")
-                root.controller.clearToolSelection()
-            root.drawerClosing = false
-        }
-        onEditRequested: root.editRequested()
-        onDeleteRequested: root.deleteRequested()
-        onConfirmRunRequested: function(values) {
-            root.confirmRunRequested(values)
-        }
-        onToastRequested: function(message, error) {
-            root.toastRequested(message, error)
+                CustomToolDetailPanel {
+                    anchors.fill: parent
+                    controller: root.controller
+                    androidBackend: root.androidBackend
+                    parentWindow: root.parentWindow
+                    parameterValues: root.parameterValues
+                    displayedTool: root.controller.selectedTool
+                    onEditRequested: root.editRequested()
+                    onDeleteRequested: root.deleteRequested()
+                    onConfirmRunRequested: function(values) { root.confirmRunRequested(values) }
+                    onToastRequested: function(message, error) { root.toastRequested(message, error) }
+                }
+            }
         }
     }
 }

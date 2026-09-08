@@ -1,30 +1,28 @@
 import QtQuick
+import QtQuick.Effects
 import "../theme"
 
 Item {
     id: root
 
-    property color fillColor: Theme.surfaceContainer
+    property color fillColor: Theme.popupSurface
     property color outlineColor: Theme.outlineVariant
-    property int cornerRadius: Theme.radiusLarge
+    property int cornerRadius: Theme.radiusMedium
+    property bool dialogSurface: false
+
+    MultiEffect {
+        anchors.fill: surface
+        source: surface
+        autoPaddingEnabled: true
+        shadowEnabled: true
+        shadowColor: root.dialogSurface ? Theme.dialogShadow : Theme.popupShadow
+        shadowBlur: root.dialogSurface ? 0.9 : 0.65
+        shadowVerticalOffset: root.dialogSurface ? 18 : 10
+        shadowHorizontalOffset: 0
+    }
 
     Rectangle {
-        x: -4
-        y: -4
-        width: parent.width + 8
-        height: parent.height + 8
-        radius: root.cornerRadius + 4
-        color: Theme.darkMode ? "#52000000" : "#24000000"
-    }
-    Rectangle {
-        x: -2
-        y: -2
-        width: parent.width + 4
-        height: parent.height + 4
-        radius: root.cornerRadius + 2
-        color: Theme.darkMode ? "#66000000" : "#18000000"
-    }
-    Rectangle {
+        id: surface
         anchors.fill: parent
         radius: root.cornerRadius
         color: root.fillColor

@@ -31,40 +31,19 @@ ApplicationWindow {
         value: settingsController.darkTheme
     }
 
-    Connections {
-        target: settingsController
-        function onThemeChanged() {
-            applyThemeFromConfig()
-        }
-    }
-
-    function applyThemeFromConfig() {
-        try {
-            var style = settingsController.themeStyle
-            var jsonText = settingsController.themeConfigJson(style)
-            if (!jsonText)
-                return false
-            return ThemeConfig.applyTheme(
-                style, settingsController.darkTheme, JSON.parse(jsonText))
-        } catch (error) {
-            console.warn("主题应用失败：" + error)
-            return false
-        }
-    }
-
     property var parameterValues: ({})
     property string toolSearchQuery: ""
-    property real primaryNavWidth: Theme.navigationMaximumWidth
+    readonly property real primaryNavWidth: Theme.primaryNavigationWidth
     property real toolListWidth: Theme.navigationMaximumWidth
     property bool developerSelected: false
+    property bool settingsSelected: false
     property bool terminalEnablePending: false
     property bool updateDialogPending: false
-    readonly property real minimumPrimaryNavWidth: 76
     readonly property real minimumToolListWidth: 120
     readonly property real maximumNavigationWidth: Theme.navigationMaximumWidth
     readonly property real minimumContentWidth: 480
     readonly property real minimumContentHeight: 480
-    readonly property bool compactPrimaryNav: primaryNavWidth < 176
+    readonly property bool compactPrimaryNav: false
     readonly property bool compactToolList: toolListWidth < 190
     readonly property bool compactContentActions: width < 760
     readonly property bool compactHeight: height < 620
@@ -76,7 +55,6 @@ ApplicationWindow {
         || customScriptImportDialog.visible
         || powershellPluginDialog.visible
         || (updateDialogLoader.item && updateDialogLoader.item.visible)
-        || (settingsDialogLoader.item && settingsDialogLoader.item.visible)
         || (commandEditorDialogLoader.item && commandEditorDialogLoader.item.visible)
         || (deleteCommandDialogLoader.item && deleteCommandDialogLoader.item.visible)
         || (confirmRunDialogLoader.item && confirmRunDialogLoader.item.visible)
@@ -85,10 +63,6 @@ ApplicationWindow {
 
     onToolSearchQueryChanged: appController.setToolSearchQuery(toolSearchQuery)
     function clampPanelWidths() {
-        primaryNavWidth = Math.max(minimumPrimaryNavWidth,
-            Math.min(primaryNavWidth,
-                maximumNavigationWidth,
-                width - minimumToolListWidth - minimumContentWidth))
         toolListWidth = Math.max(minimumToolListWidth,
             Math.min(toolListWidth,
                 maximumNavigationWidth,
@@ -114,8 +88,9 @@ ApplicationWindow {
     }
 
     function openSettingsDialog() {
-        settingsDialogLoader.active = true
-        Qt.callLater(function () { settingsDialogLoader.item.open() })
+        developerSelected = false
+        settingsSelected = true
+        hideScrcpyWindow()
     }
 
     function openCommandEditorForCreate() {
@@ -324,11 +299,9 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
-        primaryNavWidth = maximumNavigationWidth
         toolListWidth = maximumNavigationWidth
         clampPanelWidths()
         resetParameters()
-        applyThemeFromConfig()
         if (settingsController.terminalEnabled
                 && !developerConsoleController.pluginInstalled)
             settingsController.saveTerminalEnabled(false)
@@ -426,9 +399,17 @@ ApplicationWindow {
         color: "transparent"
         z: 900
 
-        MouseArea {
+        Rectangle {
             anchors.left: parent.left
-            anchors.right: windowButtons.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: window.primaryNavWidth
+            color: Theme.sidebar
+            z: -1
+        }
+
+        MouseArea {
+            anchors.fill: parent
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             onPressed: window.startSystemMove()
@@ -442,56 +423,54 @@ ApplicationWindow {
 
         RowLayout {
             id: windowButtons
+            anchors.left: parent.left
+            anchors.leftMargin: 20
             anchors.top: parent.top
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            spacing: 0
+            anchors.topMargin: 26
+            spacing: 10
+            z: 2
 
             Rectangle {
-                Layout.preferredWidth: 46
-                Layout.fillHeight: true
-                color: minimizeArea.containsMouse ? Theme.surfaceContainerHigh : "transparent"
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
+                radius: 8
+                color: "#FF5F57"
                 MaterialIcon {
-                    anchors.centerIn: parent; icon: "remove"; iconSize: 19; color: Theme.textPrimary
+                    anchors.centerIn: parent; icon: "close"; iconSize: 9
+                    color: closeArea.containsMouse ? "#6B1512" : "transparent"
+                }
+                MouseArea {
+                    id: closeArea; anchors.fill: parent; hoverEnabled: true; onClicked: window.close()
+                }
+            }
+            Rectangle {
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
+                radius: 8
+                color: "#FFBD2E"
+                MaterialIcon {
+                    anchors.centerIn: parent; icon: "remove"; iconSize: 9
+                    color: minimizeArea.containsMouse ? "#765300" : "transparent"
                 }
                 MouseArea {
                     id: minimizeArea; anchors.fill: parent; hoverEnabled: true; onClicked: window.showMinimized()
                 }
             }
             Rectangle {
-                Layout.preferredWidth: 46
-                Layout.fillHeight: true
-                color: maximizeArea.containsMouse ? Theme.surfaceContainerHigh : "transparent"
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
+                radius: 8
+                color: "#28C840"
                 MaterialIcon {
                     anchors.centerIn: parent
                     icon: window.visibility === Window.Maximized ? "filter_none" : "crop_square"
-                    iconSize: 17
-                    color: Theme.textPrimary
+                    iconSize: 8
+                    color: maximizeArea.containsMouse ? "#0A5B16" : "transparent"
                 }
                 MouseArea {
-                    id: maximizeArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: {
-                        if (window.visibility === Window.Maximized)
-                            window.showNormal()
-                        else
-                            window.showMaximized()
-                    }
-                }
-            }
-            Rectangle {
-                Layout.preferredWidth: 46
-                Layout.fillHeight: true
-                color: closeArea.containsMouse ? "#C42B1C" : "transparent"
-                MaterialIcon {
-                    anchors.centerIn: parent
-                    icon: "close"
-                    iconSize: 19
-                    color: closeArea.containsMouse ? "white" : Theme.textPrimary
-                }
-                MouseArea {
-                    id: closeArea; anchors.fill: parent; hoverEnabled: true; onClicked: window.close()
+                    id: maximizeArea; anchors.fill: parent; hoverEnabled: true
+                    onClicked: window.visibility === Window.Maximized
+                        ? window.showNormal() : window.showMaximized()
                 }
             }
         }
@@ -554,36 +533,40 @@ ApplicationWindow {
 
         Rectangle {
             Layout.preferredWidth: window.primaryNavWidth
-            Layout.maximumWidth: window.maximumNavigationWidth
+            Layout.minimumWidth: window.primaryNavWidth
+            Layout.maximumWidth: window.primaryNavWidth
             Layout.fillHeight: true
-            color: Theme.surface
+            color: Theme.sidebar
             clip: true
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.pagePadding
-                anchors.rightMargin: Theme.space8
+                anchors.leftMargin: Theme.space20
+                anchors.rightMargin: Theme.space20
                 anchors.topMargin: window.compactHeight
-                    ? Theme.panelPaddingCompact : Theme.panelPadding
+                    ? Theme.panelPaddingCompact : Theme.space20
                 anchors.bottomMargin: window.compactHeight
-                    ? Theme.panelPaddingCompact : Theme.panelPadding
+                    ? Theme.panelPaddingCompact : Theme.space24
                 spacing: window.compactHeight
-                    ? Theme.controlSpacing : Theme.sectionSpacing
+                    ? Theme.controlSpacing : Theme.space12
 
                 Item {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: window.compactHeight ? 74 : 112
+                    Layout.preferredHeight: window.compactHeight ? 68 : 90
 
                     RowLayout {
-                        anchors.fill: parent
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: window.compactHeight ? 68 : 82
                         spacing: window.compactPrimaryNav ? 0 : Theme.sectionSpacing
 
                         Image {
                             id: appLogo
                             Layout.preferredWidth: window.compactPrimaryNav
-                                ? Theme.space32 : 58
+                                ? Theme.space32 : 48
                             Layout.preferredHeight: window.compactPrimaryNav
-                                ? Theme.space32 : 58
+                                ? Theme.space32 : 48
                             source: Qt.resolvedUrl("../../resources/icons/app-icon-ui.png")
                             sourceSize.width: 116
                             sourceSize.height: 116
@@ -608,14 +591,14 @@ ApplicationWindow {
                                 Layout.minimumWidth: 0
                                 text: "泡泡工具箱"
                                 color: Theme.textPrimary
-                                font.pixelSize: Theme.fontTitleLarge
+                                font.pixelSize: 20
                                 font.weight: Font.Bold
                                 elide: Text.ElideRight
                             }
                             Text {
                                 Layout.fillWidth: true
                                 Layout.minimumWidth: 0
-                                text: "Android 开发者工具箱"
+                                text: "Android 开发者工具"
                                 color: Theme.textSecondary
                                 font.pixelSize: Theme.fontSupporting
                                 elide: Text.ElideRight
@@ -646,14 +629,15 @@ ApplicationWindow {
                 NavItem {
                     Layout.fillWidth: true
                     Layout.minimumWidth: 0
-                    label: "客制"
+                    label: "自定义"
                     iconName: "build"
                     compact: window.compactPrimaryNav
                     dense: window.compactHeight
-                    selected: !window.developerSelected
+                    selected: !window.developerSelected && !window.settingsSelected
                         && appController.section === "custom"
                     onClicked: {
                         window.developerSelected = false
+                        window.settingsSelected = false
                         appController.navigate("custom")
                     }
                 }
@@ -664,30 +648,49 @@ ApplicationWindow {
                     iconName: "widgets"
                     compact: window.compactPrimaryNav
                     dense: window.compactHeight
-                    selected: !window.developerSelected
+                    selected: !window.developerSelected && !window.settingsSelected
                         && appController.section === "preset"
                     onClicked: {
                         window.developerSelected = false
+                        window.settingsSelected = false
                         appController.navigate("preset")
                     }
                 }
                 NavItem {
                     Layout.fillWidth: true
                     Layout.minimumWidth: 0
-                    visible: settingsController.terminalEnabled
-                        && developerConsoleController.pluginInstalled
+                    visible: true
                     label: "终端"
                     iconName: "terminal"
                     compact: window.compactPrimaryNav
                     dense: window.compactHeight
-                    selected: window.developerSelected
+                    selected: window.developerSelected && !window.settingsSelected
                     onClicked: {
+                        if (!developerConsoleController.pluginInstalled) {
+                            window.requestTerminalEnable()
+                            return
+                        }
                         // scrcpy is a native child window and would otherwise
                         // cover QML dialogs regardless of their z value.
                         window.hideScrcpyWindow()
                         window.developerSelected = true
+                        window.settingsSelected = false
                         developerConsoleController.ensureStarted()
                     }
+                }
+
+                NavItem {
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 0
+                    label: "设置"
+                    iconName: "settings"
+                    compact: window.compactPrimaryNav
+                    dense: window.compactHeight
+                    selected: window.settingsSelected
+                    actionText: updateController.state === "available"
+                                ? "有新版本可用" : ""
+                    onActionClicked: window.queueUpdateDialog()
+                    onClicked: window.openSettingsDialog()
                 }
 
                 Item {
@@ -702,20 +705,6 @@ ApplicationWindow {
                     compact: window.compactPrimaryNav
                     dense: window.compactHeight
                 }
-
-                NavItem {
-                    Layout.fillWidth: true
-                    Layout.minimumWidth: 0
-                    label: "设置"
-                    iconName: "settings"
-                    compact: window.compactPrimaryNav
-                    dense: window.compactHeight
-                    selected: false
-                    actionText: updateController.state === "available"
-                                ? "有新版本可用" : ""
-                    onActionClicked: window.queueUpdateDialog()
-                    onClicked: window.openSettingsDialog()
-                }
             }
         }
 
@@ -726,7 +715,8 @@ ApplicationWindow {
 
             StackLayout {
                 anchors.fill: parent
-                currentIndex: window.developerSelected ? 2
+                currentIndex: window.settingsSelected ? 3
+                    : window.developerSelected ? 2
                     : (appController.section === "custom" ? 0 : 1)
 
                 CustomScriptsPage {
@@ -734,6 +724,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     controller: appController
+                    androidBackend: androidController
                     parentWindow: window
                     parameterValues: window.parameterValues
                     searchQuery: window.toolSearchQuery
@@ -785,32 +776,19 @@ ApplicationWindow {
                     Layout.fillHeight: true
                     controller: developerConsoleController
                 }
+
+                SettingsPage {
+                    id: settingsPage
+                    objectName: "settingsDialog"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    controller: settingsController
+                    updateBackend: updateController
+                    onTerminalEnableRequested: window.requestTerminalEnable()
+                }
             }
         }
 
-    }
-
-    MouseArea {
-        id: primaryPanelResizeHandle
-        property real lastWindowX: 0
-        x: window.primaryNavWidth - width / 2
-        anchors.top: customTitleBar.bottom
-        anchors.bottom: parent.bottom
-        width: 10
-        z: 850
-        cursorShape: Qt.SizeHorCursor
-        hoverEnabled: true
-        onPressed: function (mouse) {
-            lastWindowX = mapToItem(window.contentItem, mouse.x, mouse.y).x
-        }
-        onPositionChanged: function (mouse) {
-            if (!pressed)
-                return
-            var currentX = mapToItem(window.contentItem, mouse.x, mouse.y).x
-            window.primaryNavWidth += currentX - lastWindowX
-            window.clampPanelWidths()
-            lastWindowX = currentX
-        }
     }
 
     MouseArea {
@@ -871,13 +849,11 @@ ApplicationWindow {
         padding: Theme.space16
         modal: false
         closePolicy: Popup.NoAutoClose
-        background: Rectangle {
-            radius: Theme.radiusMedium
-            color: customTransferToast.error
-                   ? Theme.errorContainer : Theme.surfaceContainerHigh
-            border.color: customTransferToast.error
+        background: AppPopupSurface {
+            fillColor: customTransferToast.error
+                       ? Theme.errorContainer : Theme.popupSurface
+            outlineColor: customTransferToast.error
                           ? Theme.errorColor : Theme.outlineVariant
-            border.width: 1
         }
         contentItem: RowLayout {
             spacing: Theme.space12
@@ -954,18 +930,6 @@ ApplicationWindow {
             controller: appController
             parentWindow: window
             onClosed: pythonDoctorDialogLoader.active = false
-        }
-    }
-    Loader {
-        id: settingsDialogLoader
-        active: false
-        sourceComponent: SettingsDialog {
-            objectName: "settingsDialog"
-            controller: settingsController
-            updateBackend: updateController
-            parentWindow: window
-            onTerminalEnableRequested: window.requestTerminalEnable()
-            onClosed: settingsDialogLoader.active = false
         }
     }
     Loader {

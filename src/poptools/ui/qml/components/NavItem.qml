@@ -16,26 +16,26 @@ Rectangle {
     signal clicked()
     signal actionClicked()
 
-    implicitHeight: dense ? 58 : 66
-    radius: Theme.radiusLarge
-    color: selected ? (Theme.cardSelected || Theme.primaryContainer)
-                   : (mouseArea.containsMouse ? (Theme.cardHover || Theme.surfaceContainer) : "transparent")
+    implicitHeight: dense ? 48 : 52
+    radius: Theme.radiusMedium
+    color: selected ? Theme.navigationSelected
+                   : (mouseArea.containsMouse ? Theme.surfaceContainerHigh : "transparent")
 
     RowLayout {
         z: 1
         anchors.fill: parent
-        anchors.leftMargin: root.compact ? 0 : Theme.pagePadding
+        anchors.leftMargin: root.compact ? 0 : Theme.space16
         anchors.rightMargin: root.actionText.length > 0
                              ? (root.compact ? 0 : actionButton.width + Theme.pagePadding)
-                             : (root.compact ? 0 : Theme.space16)
-        spacing: root.compact ? 0 : Theme.sectionSpacing
+                             : (root.compact ? 0 : Theme.space12)
+        spacing: root.compact ? 0 : Theme.space12
 
         Item { visible: root.compact; Layout.fillWidth: true }
         MaterialIcon {
             icon: root.iconName
-            iconSize: 27
+            iconSize: 21
             color: root.selected ? Theme.primary : Theme.textPrimary
-            Layout.preferredWidth: 32
+            Layout.preferredWidth: 24
             Layout.preferredHeight: 32
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
         }
@@ -43,8 +43,8 @@ Rectangle {
             visible: !root.compact
             text: root.label
             color: root.selected ? Theme.primary : Theme.textPrimary
-            font.pixelSize: Theme.fontComponentTitle
-            font.weight: root.selected ? Font.DemiBold : Font.Normal
+            font.pixelSize: 15
+            font.weight: root.selected ? Font.Bold : Font.Medium
             Layout.fillWidth: true
             Layout.minimumWidth: 0
             elide: Text.ElideRight

@@ -177,6 +177,20 @@ class ConfigStore:
             return 0.0
         return float(value)
 
+    def update_check_frequency(self) -> str:
+        app = self.load_config().get("app", {})
+        value = app.get("update_check_frequency", "weekly") if isinstance(app, dict) else "weekly"
+        return value if value in {"daily", "weekly", "never"} else "weekly"
+
+    def set_update_check_frequency(self, value: str) -> None:
+        if value not in {"daily", "weekly", "never"}:
+            raise ValueError("Invalid update frequency")
+        config = self.load_config()
+        if not isinstance(config.get("app"), dict):
+            config["app"] = {}
+        config["app"]["update_check_frequency"] = value
+        self.save_config(config)
+
     def set_last_update_check_at(self, value: float) -> None:
         config = self.load_config()
         app = config.get("app")

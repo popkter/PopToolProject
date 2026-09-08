@@ -4,81 +4,79 @@ import QtQuick
 QtObject {
     property bool darkMode: false
 
-    // Theme colors — defaults are Material 3; ThemeConfig overrides at runtime.
-    property color primary: darkMode ? "#C5C0FF" : "#4543C7"
-    property color primaryForeground: darkMode ? "#1D1B20" : "#FFFFFF"
-    property color primaryHover: darkMode ? "#D8D4FF" : "#3734B4"
-    property color primaryContainer: darkMode ? "#34316E" : "#E7E4FF"
-    property color primaryContainerHover: darkMode ? "#423F80" : "#DBD7FF"
-    property color primaryText: darkMode ? "#E7E4FF" : "#34319E"
-    property color secondary: darkMode ? "#C8C5DC" : "#5F5D72"
-    property color secondaryForeground: darkMode ? "#302E41" : "#FFFFFF"
-    property color secondaryHover: darkMode ? "#DBD8EF" : "#504E63"
-    property color secondaryContainer: darkMode ? "#464457" : "#E4E1F9"
-    property color secondaryContainerHover: darkMode ? "#535064" : "#D8D5ED"
-    property color secondaryText: darkMode ? "#E4E1F9" : "#1B1A2C"
-    property color tertiary: darkMode ? "#EAB9D8" : "#77536D"
-    property color tertiaryForeground: darkMode ? "#45163B" : "#FFFFFF"
-    property color tertiaryHover: darkMode ? "#F5CBE4" : "#65445C"
-    property color tertiaryContainer: darkMode ? "#5C3D54" : "#FFD8EE"
-    property color tertiaryContainerHover: darkMode ? "#6B4A63" : "#F2CBE1"
-    property color tertiaryText: darkMode ? "#FFD8EE" : "#2D1227"
-    property color surface: darkMode ? "#211F26" : "#FCF9FF"
-    property color surfaceContainerLow: darkMode ? "#1D1B20" : "#F8F5FC"
-    property color surfaceContainer: darkMode ? "#211F26" : "#F2EFF8"
-    property color surfaceContainerHigh: darkMode ? "#2B2930" : "#ECE8F3"
-    property color outline: darkMode ? "#938F99" : "#C9C5CF"
-    property color outlineVariant: darkMode ? "#49454F" : "#E2DEE7"
-    property color textPrimary: darkMode ? "#E6E1E9" : "#1D1B20"
-    property color textSecondary: darkMode ? "#CAC4D0" : "#67636C"
-    property color success: darkMode ? "#7DDBA4" : "#16844C"
-    property color successForeground: darkMode ? "#082016" : "#FFFFFF"
-    property color successContainer: darkMode ? "#0B4B2B" : "#D9F8E4"
-    property color tealContainer: darkMode ? "#174B48" : "#D8F2EF"
-    property color teal: darkMode ? "#9BD5D0" : "#1E6F69"
-    property color errorColor: darkMode ? "#FFB4AB" : "#B3261E"
-    property color errorContainer: darkMode ? "#690005" : "#F9DEDC"
-    property color middlePanel: darkMode ? "#18242D" : "#EEF7FF"
-    property color consoleBackground: darkMode ? "#141A20" : "#EEF3F8"
-    property color consoleText: darkMode ? "#E8EEF5" : "#1B2430"
-    property color consoleMuted: darkMode ? "#A9C7D8" : "#536779"
-    property color consoleHeaderBackground: darkMode ? "#202A33" : "#E8EEF3"
-    property color consoleTag: darkMode ? "#A8D8FF" : "#075985"
-    property color consoleWarning: darkMode ? "#FFD166" : "#9A6700"
-    property color consoleError: darkMode ? "#FF9B93" : "#B42318"
-    property color consoleDivider: darkMode ? "#ba0101" : "#e80000"
+    // The application ships one visual language with light and dark palettes.
+    readonly property color primary: darkMode ? "#4090FF" : "#1677FF"
+    readonly property color primaryForeground: "#FFFFFF"
+    readonly property color primaryHover: darkMode ? "#66A5FF" : "#0868EA"
+    readonly property color primaryContainer: darkMode ? "#16365F" : "#E8F2FF"
+    readonly property color primaryContainerHover: darkMode ? "#1E477B" : "#D8E9FF"
+    readonly property color primaryText: darkMode ? "#79B2FF" : "#0E6FEA"
+    readonly property color secondary: darkMode ? "#AAB6C8" : "#536174"
+    readonly property color secondaryForeground: "#FFFFFF"
+    readonly property color secondaryHover: darkMode ? "#C3CDDB" : "#405064"
+    readonly property color secondaryContainer: darkMode ? "#2A3442" : "#F1F4F8"
+    readonly property color secondaryContainerHover: darkMode ? "#344152" : "#E7EBF1"
+    readonly property color secondaryText: darkMode ? "#D7DEE8" : "#334155"
+    readonly property color tertiary: darkMode ? "#C29BFF" : "#8556D8"
+    readonly property color tertiaryForeground: "#FFFFFF"
+    readonly property color tertiaryHover: darkMode ? "#D1B4FF" : "#7145BE"
+    readonly property color tertiaryContainer: darkMode ? "#3B2858" : "#F1E9FF"
+    readonly property color tertiaryContainerHover: darkMode ? "#4A326E" : "#E7DAFF"
+    readonly property color tertiaryText: darkMode ? "#E3D2FF" : "#6F42C1"
+    readonly property color surface: darkMode ? "#11161E" : "#F8FAFC"
+    readonly property color sidebar: darkMode ? "#171D26" : "#F4F6F8"
+    readonly property color navigationSelected: darkMode ? "#16365F" : "#DCEAFF"
+    readonly property color surfaceContainerLow: darkMode ? "#171E28" : "#FFFFFF"
+    readonly property color surfaceContainer: darkMode ? "#1D2530" : "#F5F7FA"
+    readonly property color surfaceContainerHigh: darkMode ? "#26313F" : "#EDF1F5"
+    readonly property color outline: darkMode ? "#435064" : "#D6DEE8"
+    readonly property color outlineVariant: darkMode ? "#303B4B" : "#E4E9F0"
+    readonly property color popupSurface: darkMode ? "#1B232E" : "#FFFFFF"
+    readonly property color popupHover: darkMode ? "#26313F" : "#F4F6F9"
+    readonly property color popupSelected: darkMode ? "#173A66" : "#E8F2FF"
+    readonly property color popupShadow: darkMode ? "#99000000" : "#290F172A"
+    readonly property color dialogShadow: darkMode ? "#B3000000" : "#380F172A"
+    readonly property color scrim: darkMode ? "#8F070B12" : "#470F172A"
+    readonly property color textPrimary: darkMode ? "#F3F6FA" : "#101722"
+    readonly property color textSecondary: darkMode ? "#93A0B3" : "#7C899B"
+    readonly property color success: darkMode ? "#5FD49A" : "#29AF6F"
+    readonly property color successForeground: darkMode ? "#071D13" : "#FFFFFF"
+    readonly property color successContainer: darkMode ? "#123D2A" : "#E8F8EF"
+    readonly property color tealContainer: darkMode ? "#123A3B" : "#E8F8F7"
+    readonly property color teal: darkMode ? "#63D7D2" : "#159B95"
+    readonly property color errorColor: darkMode ? "#FF8D87" : "#E5484D"
+    readonly property color errorContainer: darkMode ? "#4C2225" : "#FFF0F0"
+    readonly property color middlePanel: surfaceContainerLow
+    readonly property color consoleBackground: "#10151D"
+    readonly property color consoleText: "#E5E7EB"
+    readonly property color consoleMuted: "#728298"
+    readonly property color consoleHeaderBackground: "#252C36"
+    readonly property color consoleTag: "#66AFFF"
+    readonly property color consoleWarning: "#FFCE66"
+    readonly property color consoleError: "#FF8585"
+    readonly property color consoleDivider: outlineVariant
 
-    // Shared desktop typography scale. Components should use these semantic
-    // roles instead of introducing local pixel sizes.
     property int fontDisplay: 40
     property int fontPageTitle: 30
-    property int fontTitleLarge: 24
+    property int fontTitleLarge: 22
     property int fontDialogTitle: 22
-    property int fontSectionTitle: 20
-    property int fontComponentTitle: 16
-    property int fontButton: 16
+    property int fontSectionTitle: 18
+    property int fontComponentTitle: 15
+    property int fontButton: 14
     property int fontBody: 14
     property int fontLabel: 13
     property int fontSupporting: 13
     property int fontCode: 13
     property int fontCaption: 12
     property int fontMicro: 10
-
-    property int radiusSmall: 8
-    property int radiusMedium: 12
-    property int radiusLarge: 18
-
-    // Extended radius values for more granular control
     property int radiusNone: 0
     property int radiusTiny: 4
-    property int radiusXLarge: 24
+    property int radiusSmall: 7
+    property int radiusMedium: 10
+    property int radiusLarge: 16
+    property int radiusXLarge: 20
     property int radiusFull: 9999
-    // Matches the native rounded main-window frame and is intentionally not
-    // replaced by theme JSON radius values.
-    readonly property int applicationRadius: 8
-
-    // Shared layout scale. Page-level margins, padding and gaps must use these
-    // tokens so every workspace follows the same 4 px rhythm.
+    readonly property int applicationRadius: 10
     property int space0: 0
     property int space4: 4
     property int space8: 8
@@ -90,54 +88,36 @@ QtObject {
     property int space32: 32
     property int space36: 36
     property int space40: 40
-    property int pagePadding: space20
-    property int pagePaddingCompact: space12
-    property int panelPadding: space16
-    property int panelPaddingCompact: space8
-    property int sectionSpacing: space16
-    property int controlSpacing: space8
-    property int terminalContentPadding: Math.min(
-        space40,
-        Math.max(space8,
-            Math.ceil(radiusLarge * 0.4 / space4) * space4))
-
-    // Vertical navigation panels may be resized, but should never consume an
-    // excessive share of the workspace on wide windows.
-    property int navigationMaximumWidth: 288
-
-    // Border widths
+    property int pagePadding: 24
+    property int pagePaddingCompact: 14
+    property int panelPadding: 16
+    property int panelPaddingCompact: 10
+    property int sectionSpacing: 16
+    property int controlSpacing: 8
+    property int terminalContentPadding: 20
+    readonly property int primaryNavigationWidth: 246
+    property int navigationMaximumWidth: 306
     property int borderWidthThin: 1
     property int borderWidthMedium: 2
     property int borderWidthThick: 3
-
-    // Button state colors
-    property color buttonDefault: primary
-    property color buttonHover: primaryHover
-    property color buttonPressed: darkMode ? "#9D8FFF" : "#2823A0"
-    property color buttonDisabled: surfaceContainerHigh
-
-    // Input state colors
-    property color inputDefault: surface
-    property color inputHover: surfaceContainer
-    property color inputFocused: primaryContainer
-    property color inputError: errorColor
-    property color inputDisabled: surfaceContainerLow
-
-    // Card state colors
-    property color cardDefault: surfaceContainerLow
-    property color cardHover: surfaceContainer
-    property color cardSelected: primaryContainer
-    property color cardDisabled: surfaceContainerHigh
-
-    // Border state colors
-    property color borderColorDefault: outline
-    property color borderColorHover: primary
-    property color borderColorFocused: primary
-    property color borderColorError: errorColor
-
-    // XP-specific 3D bevel colors (used by components for raised/sunken effects)
-    property color buttonShadow: outline
-    property color buttonHighlight: "#FFFFFF"
-
+    readonly property color buttonDefault: primary
+    readonly property color buttonHover: primaryHover
+    readonly property color buttonPressed: darkMode ? "#2578E8" : "#005AC7"
+    readonly property color buttonDisabled: surfaceContainerHigh
+    readonly property color inputDefault: surfaceContainerLow
+    readonly property color inputHover: surfaceContainer
+    readonly property color inputFocused: primaryContainer
+    readonly property color inputError: errorColor
+    readonly property color inputDisabled: surfaceContainer
+    readonly property color cardDefault: surfaceContainerLow
+    readonly property color cardHover: surfaceContainer
+    readonly property color cardSelected: primaryContainer
+    readonly property color cardDisabled: surfaceContainerHigh
+    readonly property color borderColorDefault: outline
+    readonly property color borderColorHover: primary
+    readonly property color borderColorFocused: primary
+    readonly property color borderColorError: errorColor
+    readonly property color buttonShadow: primaryHover
+    readonly property color buttonHighlight: "transparent"
     property int unit: 8
 }

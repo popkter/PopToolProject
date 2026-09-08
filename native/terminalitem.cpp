@@ -26,9 +26,10 @@ constexpr int kScrollbackLimit = 10'000;
 // scale keeps small terminal glyphs crisp after the painted texture is sampled
 // by the Qt Quick scene graph, without the 4x memory cost of 2x supersampling.
 constexpr qreal kTextRenderScale = 1.25;
-const QColor kDefaultBackground(0x14, 0x1a, 0x20);
-const QColor kDefaultForeground(0xe8, 0xee, 0xf5);
-const QColor kCursorColor(0xc5, 0xc0, 0xff);
+// Match the terminal surface defined by the latest UI specification.
+const QColor kDefaultBackground(0x10, 0x15, 0x1d);
+const QColor kDefaultForeground(0xe5, 0xe7, 0xeb);
+const QColor kCursorColor(0xe5, 0xe7, 0xeb);
 const QColor kSelectionColor(0x66, 0x60, 0xc8, 0x80);
 
 using CellLine = std::vector<VTermScreenCell>;

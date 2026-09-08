@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-Dialog {
+AppDialog {
     id: root
     required property var controller
     property bool editMode: false
@@ -198,13 +198,6 @@ Dialog {
             close()
     }
 
-    background: Rectangle {
-        radius: Theme.radiusLarge
-        color: Theme.surface
-        border.color: Theme.outlineVariant
-        border.width: 1
-    }
-
     contentItem: ColumnLayout {
         spacing: 0
 
@@ -344,12 +337,7 @@ Dialog {
                                     padding: 8
                                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-                                    background: Rectangle {
-                                        radius: Theme.radiusMedium
-                                        color: Theme.surface
-                                        border.color: Theme.outlineVariant
-                                        border.width: 1
-                                    }
+                                    background: AppPopupSurface { }
 
                                     contentItem: GridView {
                                         cellWidth: 52

@@ -8,7 +8,7 @@ import urllib.error
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import Property, QCoreApplication, QObject, QThread, Signal, Slot
+from PySide6.QtCore import Property, QCoreApplication, QObject, QThread, QTimer, Signal, Slot
 
 from poptools import __version__
 from poptools.infrastructure.app_updater import (
@@ -120,6 +120,22 @@ class UpdateController(QObject):
         self._check_thread: UpdateCheckThread | None = None
         self._download_thread: UpdateDownloadThread | None = None
         self._check_is_manual = False
+        self._last_auto_attempt: float | None = None
+        self._schedule_timer = QTimer(self)
+        self._schedule_timer.setInterval(60_000)
+        self._schedule_timer.timeout.connect(self.checkForUpdatesAutomatically)
+        self._schedule_timer.start()
+
+    @Property(str, notify=stateChanged)
+    def updateCheckFrequency(self) -> str:
+        return self.config_store.update_check_frequency()
+
+    @Slot(str)
+    def setUpdateCheckFrequency(self, value: str) -> None:
+        if value not in {"daily", "weekly", "never"}:
+            return
+        self.config_store.set_update_check_frequency(value)
+        self.stateChanged.emit()
 
     @Property(str, constant=True)
     def currentVersion(self) -> str:
@@ -180,12 +196,19 @@ class UpdateController(QObject):
 
     @Slot(result=bool)
     def checkForUpdatesAutomatically(self) -> bool:
-        if not self._auto_check_enabled:
+        frequency = self.updateCheckFrequency
+        if not self._auto_check_enabled or frequency == "never":
+            return False
+        if self._last_auto_attempt is not None and 0 <= self._clock() - self._last_auto_attempt < 3600:
             return False
         elapsed = self._clock() - self.config_store.last_update_check_at()
-        if 0 <= elapsed < AUTO_CHECK_INTERVAL_SECONDS:
+        interval = AUTO_CHECK_INTERVAL_SECONDS * (7 if frequency == "weekly" else 1)
+        if self.config_store.last_update_check_at() > 0 and 0 <= elapsed < interval:
             return False
-        return self._start_check(manual=False)
+        started = self._start_check(manual=False)
+        if started:
+            self._last_auto_attempt = self._clock()
+        return started
 
     @Slot(bool, result=bool)
     def setPrereleaseUpdatesEnabled(self, enabled: bool) -> bool:
@@ -275,6 +298,7 @@ class UpdateController(QObject):
 
     @Slot()
     def shutdown(self) -> None:
+        self._schedule_timer.stop()
         for thread in (self._check_thread, self._download_thread):
             if thread is not None and thread.isRunning():
                 thread.requestInterruption()
