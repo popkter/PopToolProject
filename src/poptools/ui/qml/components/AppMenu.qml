@@ -5,7 +5,7 @@ import "../theme"
 Menu {
     id: control
 
-    implicitWidth: 270
+    implicitWidth: 180
     padding: Theme.space8
     overlap: 0
 

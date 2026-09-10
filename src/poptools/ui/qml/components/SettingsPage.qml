@@ -43,29 +43,6 @@ Rectangle {
         }
     }
 
-    component ToggleControl: Rectangle {
-        id: toggle
-        property bool checked: false
-        signal toggled(bool value)
-        implicitWidth: 52
-        implicitHeight: 28
-        Layout.preferredWidth: 52
-        Layout.preferredHeight: 28
-        radius: height / 2
-        color: checked ? Theme.primary : Theme.outline
-        Rectangle {
-            width: 22; height: 22; radius: 11
-            x: toggle.checked ? toggle.width - width - 3 : 3
-            anchors.verticalCenter: parent.verticalCenter
-            color: "white"
-            Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-        }
-        MouseArea {
-            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-            onClicked: toggle.toggled(!toggle.checked)
-        }
-    }
-
     ColumnLayout {
         anchors.fill: parent
         anchors.leftMargin: Theme.space28
@@ -93,6 +70,7 @@ Rectangle {
             contentWidth: width
             contentHeight: settingsGrid.implicitHeight
             boundsBehavior: Flickable.StopAtBounds
+            acceptedButtons: Qt.NoButton
 
             GridLayout {
                 id: settingsGrid
@@ -156,18 +134,27 @@ Rectangle {
                             anchors.margins: 16
                             spacing: 10
                             SectionTitle { Layout.fillWidth: true; iconName: "folder"; title: "脚本目录"; description: "设置脚本文件的默认存储目录" }
-                            Rectangle {
+                            PrimaryButton {
                                 Layout.fillWidth: true; Layout.preferredHeight: 42
-                                radius: Theme.radiusSmall; color: Theme.surfaceContainerLow
+                                radius: Theme.radiusSmall; tonal: true; color: Theme.surfaceContainerLow
                                 border.color: Theme.outline
-                                Text { anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 14; verticalAlignment: Text.AlignVCenter; text: root.controller.configurationDirectory; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting; elide: Text.ElideMiddle }
-                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.controller.openConfigurationDirectory() }
+                                text: root.controller.configurationDirectory
+                                iconName: "folder_open"
+                                foregroundColor: Theme.textSecondary
+                                labelFontSize: Theme.fontSupporting
+                                labelFontWeight: Font.Normal
+                                glyphSize: 18
+                                contentSpacing: Theme.space8
+                                contentFillWidth: true
+                                contentHorizontalPadding: 14
+                                labelElide: Text.ElideMiddle
+                                onClicked: root.controller.openConfigurationDirectory()
                             }
                             Text { text: "自定义脚本、预设和相关数据将保存在此目录下。"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption }
                             RowLayout {
                                 Layout.fillWidth: true; spacing: Theme.space12
-                                PrimaryButton { Layout.fillWidth: true; implicitWidth: 0; implicitHeight: 48; tonal: true; color: Theme.surfaceContainerLow; border.color: Theme.darkMode ? Theme.outline : "#333333"; text: "导入脚本"; iconName: ""; onClicked: root.controller.importConfiguration() }
-                                PrimaryButton { Layout.fillWidth: true; implicitWidth: 0; implicitHeight: 48; text: "导出脚本"; iconName: ""; onClicked: root.controller.exportConfiguration() }
+                                PrimaryButton { Layout.fillWidth: true; implicitWidth: 0; implicitHeight: 48; tonal: true; color: Theme.surfaceContainerLow; border.color: Theme.darkMode ? Theme.outline : "#333333"; text: "导入脚本"; iconName: "file_upload"; onClicked: root.controller.importConfiguration() }
+                                PrimaryButton { Layout.fillWidth: true; implicitWidth: 0; implicitHeight: 48; text: "导出脚本"; iconName: "file_download"; onClicked: root.controller.exportConfiguration() }
                             }
                         }
                     }
@@ -304,15 +291,49 @@ Rectangle {
                                 }
                             }
                             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.outlineVariant }
-                            GridLayout {
-                                columns: 2; columnSpacing: 24; rowSpacing: 0
-                                Button { flat: true; implicitHeight: 24; text: "访问官网"; onClicked: Qt.openUrlExternally(root.controller.appInfoUrl) }
-                                Button { flat: true; implicitHeight: 24; text: "在 GitHub 上查看"; onClicked: Qt.openUrlExternally(root.controller.appInfoUrl) }
-                                Button { flat: true; implicitHeight: 24; text: "反馈问题"; onClicked: Qt.openUrlExternally(root.controller.appInfoUrl + "/issues") }
-                                Button {
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.space8
+                                PrimaryButton {
+                                    Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
+                                    Layout.preferredWidth: 0
+                                    Layout.preferredHeight: 40
+                                    tonal: true
+                                    text: "访问官网"
+                                    iconName: "public"
+                                    onClicked: Qt.openUrlExternally(root.controller.appInfoUrl)
+                                }
+                                PrimaryButton {
+                                    Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
+                                    Layout.preferredWidth: 0
+                                    Layout.preferredHeight: 40
+                                    tonal: true
+                                    text: "查看 GitHub"
+                                    iconName: "code"
+                                    onClicked: Qt.openUrlExternally(root.controller.appInfoUrl)
+                                }
+                                PrimaryButton {
+                                    Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
+                                    Layout.preferredWidth: 0
+                                    Layout.preferredHeight: 40
+                                    tonal: true
+                                    text: "反馈问题"
+                                    iconName: "bug_report"
+                                    onClicked: Qt.openUrlExternally(root.controller.appInfoUrl + "/issues")
+                                }
+                                PrimaryButton {
                                     objectName: "checkUpdateButton"
-                                    flat: true; implicitHeight: 24
+                                    Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
+                                    Layout.preferredWidth: 0
+                                    Layout.preferredHeight: 40
+                                    tonal: true
                                     text: root.updateBackend.state === "checking" ? "正在检查…" : "检查更新"
+                                    iconName: "sync"
+                                    iconSpinning: root.updateBackend.state === "checking"
                                     enabled: root.updateBackend.canChangeUpdateChannel
                                     onClicked: root.updateBackend.checkForUpdates()
                                 }

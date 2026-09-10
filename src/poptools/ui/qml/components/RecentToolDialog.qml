@@ -127,31 +127,26 @@ Window {
                     spacing: 4
 
                     // ── Custom command run button ─────────
-                    Rectangle {
+                    PrimaryButton {
                         visible: !root.presetMode
                         width: 48; height: 32
                         anchors.verticalCenter: parent.verticalCenter
+                        compact: true
+                        text: root.operationRunning ? "停止运行" : "运行工具"
+                        iconName: root.operationRunning ? "stop" : "play_arrow"
+                        glyphSize: 24
+                        tonal: true
+                        foregroundColor: "white"
+                        border.width: 0
                         radius: Theme.radiusMedium
                         color: root.operationRunning
-                            ? (runBtnMouse.containsMouse ? Qt.darker(Theme.errorColor, 1.1) : Theme.errorColor)
-                            : (runBtnMouse.containsMouse ? Theme.primaryHover : Theme.primary)
-                        MaterialIcon {
-                            anchors.centerIn: parent
-                            icon: root.operationRunning ? "stop" : "play_arrow"
-                            iconSize: 24
-                            color: "white"
-                        }
-                        MouseArea {
-                            id: runBtnMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (appController.running) {
-                                    appController.stopExecution()
-                                } else {
-                                    appController.runSelected(root.parameterValues)
-                                }
+                            ? (hovered ? Qt.darker(Theme.errorColor, 1.1) : Theme.errorColor)
+                            : (hovered ? Theme.primaryHover : Theme.primary)
+                        onClicked: {
+                            if (appController.running) {
+                                appController.stopExecution()
+                            } else {
+                                appController.runSelected(root.parameterValues)
                             }
                         }
                     }

@@ -14,284 +14,479 @@ Rectangle {
     required property var presetUtilities
     required property var androidBackend
     required property var jiraFeishuBackend
-    property real toolListWidth: 288
     property string searchQuery: ""
     property bool compact: false
     property bool compactHeight: false
     property bool compactToolList: false
     property bool overlaysVisible: false
+    property real toolListWidth: 288
+    property real categoryListHeight: 0
     property int selectedCategory: 0
-    property int selectedTool: 0
-    property bool favorite: false
-    property bool includeBasic: true
-    property bool includeHardware: true
-    property bool includeSystem: false
-    property bool includeBuild: false
-    readonly property bool popupVisible: false
+    property bool showHiddenCategories: false
+    property string contextCategoryTag: ""
 
     signal searchEdited(string query)
     signal confirmRunRequested(var values)
 
-    component PresetCheckRow: Item {
-        id: checkRow
-        property string text: ""
-        property bool checked: false
-        signal toggled(bool checked)
-        width: 420
-        height: 25
-        Rectangle {
-            x: 0; anchors.verticalCenter: parent.verticalCenter
-            width: 14; height: 14
-            color: checkRow.checked ? Theme.secondary : "transparent"
-            border.color: checkRow.checked ? Theme.secondary : Theme.outline
-            MaterialIcon { anchors.centerIn: parent; visible: checkRow.checked; icon: "check"; iconSize: 12; color: "white" }
-        }
-        Text { x: 22; anchors.verticalCenter: parent.verticalCenter; text: checkRow.text; color: Theme.textPrimary; font.pixelSize: 13 }
-        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { checkRow.checked = !checkRow.checked; checkRow.toggled(checkRow.checked) } }
-    }
-
     color: Theme.darkMode ? Theme.surface : "#FBFCFE"
 
     readonly property var categories: [
-        { title: "设备信息", subtitle: "获取设备基础信息", icon: "smartphone", count: 4 },
-        { title: "应用管理", subtitle: "安装、卸载、清理应用", icon: "apps", count: 6 },
-        { title: "日志抓取", subtitle: "系统与应用日志", icon: "article", count: 5 },
-        { title: "网络调试", subtitle: "网络状态与抓包调试", icon: "language", count: 4 },
-        { title: "性能分析", subtitle: "CPU、内存、帧率分析", icon: "monitoring", count: 5 },
-        { title: "文件操作", subtitle: "设备文件管理", icon: "folder", count: 4 }
+        { title: "模拟相关", subtitle: "文本、按键与触控", icon: "touch_app", tag: "模拟相关", count: 7 },
+        { title: "环境相关", subtitle: "ADB 与 Fastboot 环境", icon: "terminal", tag: "环境相关", count: 4 },
+        { title: "硬件相关", subtitle: "设备电源控制", icon: "power_settings_new", tag: "硬件相关", count: 2 },
+        { title: "跳转相关", subtitle: "URL、Activity 与设置", icon: "open_in_new", tag: "跳转相关", count: 4 },
+        { title: "其他设备操作", subtitle: "应用、文件、日志与网络", icon: "build", tag: "其他设备操作", count: 24 },
+        { title: "其他预设", subtitle: "投屏、录制与实用工具", icon: "widgets", tag: "其他预设", count: 4 }
     ]
+    readonly property bool hasHiddenCategories: root.controller.hiddenPresetCategories
+        && root.controller.hiddenPresetCategories.length > 0
+    readonly property var visibleCategories: root.showHiddenCategories
+        ? root.categories
+        : root.categories.filter(function(category) {
+            return root.controller.hiddenPresetCategories.indexOf(category.tag) < 0
+        })
+    readonly property string activeCategoryTag:
+        visibleCategories[selectedCategory] ? visibleCategories[selectedCategory].tag : ""
+    readonly property string selectedPresetCommand:
+        root.controller.selectedTool && root.controller.selectedTool.executor
+            ? root.controller.selectedTool.executor.command : ""
+    readonly property bool usesDedicatedWorkspace:
+        ["scrcpy", "recording", "jira_feishu", "colors"].indexOf(
+            root.selectedPresetCommand) >= 0
 
-    readonly property var deviceTools: [
-        { title: "查看设备基本信息", subtitle: "获取设备的品牌、型号、Android 版本等信息", icon: "smartphone" },
-        { title: "查看电池信息", subtitle: "获取电池状态、电量、温度等信息", icon: "battery_full" },
-        { title: "查看屏幕信息", subtitle: "获取屏幕分辨率、密度、刷新率等信息", icon: "phone_android" },
-        { title: "查看存储信息", subtitle: "获取存储空间使用情况", icon: "storage" }
-    ]
-
-    readonly property var commands: [
-        "adb shell getprop ro.product.brand",
-        "adb shell getprop ro.product.model",
-        "adb shell getprop ro.product.device",
-        "adb shell getprop ro.build.version.release",
-        "adb shell getprop ro.build.version.sdk"
-    ]
-
-    Text {
-        x: 28; y: 1
-        text: "预设"
-        color: Theme.textPrimary
-        font.pixelSize: 28
-        font.weight: Font.Bold
+    function belongsToCategory(tags) {
+        const values = tags || []
+        if (activeCategoryTag === "其他预设") {
+            const imported = ["模拟相关", "环境相关", "硬件相关", "跳转相关", "其他设备操作"]
+            for (let index = 0; index < imported.length; index++) {
+                if (values.indexOf(imported[index]) >= 0)
+                    return false
+            }
+            return true
+        }
+        return values.indexOf(activeCategoryTag) >= 0
     }
-    Text {
-        x: 28; y: 47
-        text: "快速调用常用调试方案"
-        color: Theme.textSecondary
-        font.pixelSize: 14
+
+    function selectCategory(index) {
+        selectedCategory = index
+        controller.selectFirstPresetInCategory(visibleCategories[index].tag)
+        toolList.positionViewAtBeginning()
     }
 
-    TextField {
-        id: searchField
-        x: parent.width - 422; y: 12; width: 390; height: 46
-        leftPadding: 38; rightPadding: 14
-        placeholderText: "搜索预设名称或描述..."
-        text: root.searchQuery
-        color: Theme.textPrimary
-        font.pixelSize: 13
-        onTextChanged: if (root.searchQuery !== text) root.searchEdited(text)
-        background: Rectangle {
-            radius: 10
-            color: Theme.surfaceContainerLow
-            border.color: searchField.activeFocus ? Theme.primary : Theme.outline
-            border.width: 1
-            MaterialIcon { anchors.left: parent.left; anchors.leftMargin: 13; anchors.verticalCenter: parent.verticalCenter; icon: "search"; iconSize: 18; color: Theme.textSecondary }
+    function syncCategoryForSelectedTool() {
+        const tags = controller.selectedTool.tags || []
+        for (let index = 0; index < visibleCategories.length; index++) {
+            if (tags.indexOf(visibleCategories[index].tag) >= 0) {
+                selectedCategory = index
+                return
+            }
+        }
+        selectedCategory = Math.max(0, visibleCategories.length - 1)
+    }
+
+    function hideCategory(tag) {
+        if (visibleCategories.length <= 1)
+            return
+        controller.setPresetCategoryHidden(tag, true)
+        if (activeCategoryTag === tag && !root.showHiddenCategories) {
+            selectedCategory = 0
+            controller.selectFirstPresetInCategory(visibleCategories[0].tag)
         }
     }
 
-    Rectangle {
-        id: leftPanel
-        x: 28; y: 84; width: 350; height: parent.height - 113
-        radius: 12
-        color: Theme.surfaceContainerLow
-        border.color: Theme.darkMode ? Theme.outlineVariant : "#E0E4EA"
-        border.width: 1
-        clip: true
+    function toggleCategoryHidden(tag) {
+        const hidden = root.controller.hiddenPresetCategories.indexOf(tag) >= 0
+        if (hidden) {
+            root.controller.setPresetCategoryHidden(tag, false)
+            return
+        }
+        root.hideCategory(tag)
+    }
 
-        Column {
-            x: 10; y: 10; width: 330; spacing: 8
-            Repeater {
-                model: root.categories
-                delegate: Rectangle {
-                    id: categoryRow
-                    required property var modelData
-                    required property int index
-                    width: 330; height: 68; radius: 10
-                    color: root.selectedCategory === index
-                        ? (Theme.darkMode ? Theme.primaryContainer : "#DCEBFF")
-                        : (categoryMouse.containsMouse ? Theme.surfaceContainer : "transparent")
+    function ensureSelectedCategoryVisible() {
+        if (visibleCategories.length === 0)
+            return
+        if (selectedCategory >= visibleCategories.length) {
+            selectedCategory = 0
+            controller.selectFirstPresetInCategory(visibleCategories[0].tag)
+        }
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.leftMargin: Theme.space28
+        anchors.rightMargin: Theme.space28
+        anchors.bottomMargin: Theme.space28
+        spacing: Theme.space16
+
+        WorkspacePageHeader {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 68
+            Layout.minimumHeight: 68
+            Layout.maximumHeight: 68
+            title: "预设"
+            description: "快速调用常用 Android 调试功能"
+            titlePixelSize: 28
+            actionWidth: Math.min(390, root.width * 0.38)
+
+            TextField {
+                Layout.preferredWidth: Math.min(390, root.width * 0.38)
+                Layout.preferredHeight: 40
+                leftPadding: 40
+                rightPadding: 14
+                placeholderText: "搜索预设名称或描述..."
+                text: root.searchQuery
+                color: Theme.textPrimary
+                onTextChanged: if (root.searchQuery !== text) root.searchEdited(text)
+                background: Rectangle {
+                    radius: Theme.radiusSmall
+                    color: Theme.surfaceContainerLow
+                    border.color: parent.activeFocus ? Theme.primary : Theme.outline
+                    MaterialIcon {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 13
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: "search"
+                        iconSize: 19
+                        color: Theme.textSecondary
+                    }
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: Theme.space16
+
+            Rectangle {
+                Layout.preferredWidth: root.toolListWidth
+                Layout.minimumWidth: 250
+                Layout.maximumWidth: Math.max(250, root.width * 0.46)
+                Layout.fillHeight: true
+                radius: Theme.radiusMedium
+                color: Theme.surfaceContainerLow
+                border.color: Theme.outlineVariant
+                border.width: Theme.borderWidthThin
+                clip: true
+
+                ColumnLayout {
+                    id: categoryPaneLayout
+                    anchors.fill: parent
+                    anchors.margins: Theme.space12
+                    spacing: Theme.space8
+
                     RowLayout {
-                        anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 12
-                        MaterialIcon { Layout.preferredWidth: 24; icon: categoryRow.modelData.icon; iconSize: 24; color: root.selectedCategory === categoryRow.index ? Theme.primary : Theme.secondary }
-                        ColumnLayout {
-                            Layout.fillWidth: true; spacing: 2
-                            Text { text: categoryRow.modelData.title; color: Theme.textPrimary; font.pixelSize: 15; font.weight: Font.DemiBold }
-                            Text { text: categoryRow.modelData.subtitle; color: Theme.textSecondary; font.pixelSize: 11 }
+                        Layout.fillWidth: true
+                        Layout.leftMargin: Theme.space8
+                        Text {
+                            font.pixelSize: Theme.fontBody
+                            font.weight: Font.DemiBold
+                            Layout.fillWidth: true
+                            text: "功能分类"
+                            color: Theme.textSecondary
                         }
-                        Text { text: categoryRow.modelData.count; color: Theme.textSecondary; font.pixelSize: 12 }
-                        MaterialIcon { icon: "chevron_right"; iconSize: 16; color: Theme.textSecondary }
+                        Text {
+                            visible: root.hasHiddenCategories
+                            text: "显示全部"
+                            color: Theme.textSecondary
+                            font.pixelSize: Theme.fontLabel
+                        }
+                        ToggleControl {
+                            visible: root.hasHiddenCategories
+                            checked: root.showHiddenCategories
+                            onToggled: function(value) { root.showHiddenCategories = value }
+                        }
                     }
-                    MouseArea { id: categoryMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.selectedCategory = categoryRow.index; root.selectedTool = 0 } }
+
+                    ListView {
+                        id: categoryList
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: root.categoryListHeight > 0
+                            ? root.categoryListHeight
+                            : Math.min(contentHeight, parent.height * 0.52)
+                        model: root.visibleCategories
+                        spacing: Theme.space4
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        ScrollBar.vertical: ScrollBar {
+                            id: categoryScrollBar
+                            policy: categoryList.contentHeight > categoryList.height + 0.5
+                                ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                        }
+
+                        delegate: Rectangle {
+                            id: categoryRow
+                            required property var modelData
+                            required property int index
+                            readonly property bool hiddenCategory:
+                                root.controller.hiddenPresetCategories.indexOf(
+                                    categoryRow.modelData.tag) >= 0
+                            width: categoryList.width - (categoryScrollBar.visible
+                                ? categoryScrollBar.width + Theme.space8 : 0)
+                            height: 54
+                            radius: Theme.radiusSmall
+                            color: root.selectedCategory === index
+                                ? Theme.primaryContainer
+                                : (categoryMouse.containsMouse ? Theme.surfaceContainer : "transparent")
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: Theme.space8
+                                anchors.rightMargin: Theme.space8
+                                spacing: Theme.space12
+                                MaterialIcon {
+                                    icon: categoryRow.modelData.icon
+                                    iconSize: 21
+                                    color: categoryRow.hiddenCategory
+                                        ? Theme.textSecondary
+                                        : root.selectedCategory === categoryRow.index
+                                            ? Theme.primary : Theme.secondary
+                                }
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
+                                    Text {
+                                        text: categoryRow.modelData.title
+                                        color: categoryRow.hiddenCategory
+                                            ? Theme.textSecondary : Theme.textPrimary
+                                        font.pixelSize: Theme.fontBody
+                                        font.weight: categoryRow.hiddenCategory
+                                            ? Font.Normal : Font.DemiBold
+                                    }
+                                    Text { Layout.fillWidth: true; text: categoryRow.modelData.subtitle; color: Theme.textSecondary; font.pixelSize: Theme.fontMicro; elide: Text.ElideRight }
+                                }
+                                Text {
+                                    text: categoryRow.modelData.count
+                                    color: Theme.textSecondary
+                                    font.pixelSize: Theme.fontCaption
+                                }
+                            }
+
+                            MouseArea {
+                                id: categoryMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.selectCategory(categoryRow.index)
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.RightButton
+                                preventStealing: true
+                                z: 2
+                                onClicked: function(mouse) {
+                                    root.contextCategoryTag = categoryRow.modelData.tag
+                                    const point = categoryRow.mapToItem(root, mouse.x, mouse.y)
+                                    categoryContextMenu.x = Math.round(point.x)
+                                    categoryContextMenu.y = Math.round(point.y)
+                                    categoryContextMenu.open()
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        id: categoryDivider
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 10
+                        color: Theme.surfaceContainerLow
+                        z: 2
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: 1
+                            color: Theme.outlineVariant
+                        }
+
+                        MouseArea {
+                            id: categoryDividerMouse
+                            anchors.fill: parent
+                            cursorShape: Qt.SizeVerCursor
+                            property real startHeight: 0
+                            property real startPointerY: 0
+
+                            onPressed: {
+                                startHeight = categoryList.height
+                                startPointerY = categoryDivider.mapToItem(
+                                    categoryPaneLayout, mouse.x, mouse.y).y
+                            }
+                            onPositionChanged: {
+                                if (!pressed)
+                                    return
+
+                                const pointerY = categoryDivider.mapToItem(
+                                    categoryPaneLayout, mouse.x, mouse.y).y
+                                const minimumCategoryHeight = Math.min(
+                                    54, categoryList.contentHeight
+                                )
+                                const minimumToolHeight = 120
+                                const maximumCategoryHeight = Math.max(
+                                    minimumCategoryHeight,
+                                    categoryPaneLayout.height - categoryList.y
+                                        - minimumToolHeight
+                                )
+                                root.categoryListHeight = Math.max(
+                                    minimumCategoryHeight,
+                                    Math.min(
+                                        maximumCategoryHeight,
+                                        startHeight + pointerY - startPointerY
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: Theme.space8
+                        text: root.visibleCategories.length > 0
+                            ? root.visibleCategories[root.selectedCategory].title
+                                + "（" + root.visibleCategories[root.selectedCategory].count + "）"
+                            : "暂无可见分类"
+                        color: Theme.textPrimary
+                        font.pixelSize: Theme.fontBody
+                        font.weight: Font.DemiBold
+                    }
+
+                    ListView {
+                        id: toolList
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        model: root.controller.toolsModel
+                        spacing: Theme.space4
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                        delegate: Rectangle {
+                            id: toolRow
+                            required property string toolId
+                            required property string title
+                            required property string description
+                            required property string iconName
+                            required property bool selected
+                            width: toolList.width - 8
+                            height: 56
+                            radius: Theme.radiusSmall
+                            color: selected ? Theme.primaryContainer
+                                : (toolMouse.containsMouse ? Theme.surfaceContainer : "transparent")
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: Theme.space8
+                                anchors.rightMargin: Theme.space8
+                                spacing: Theme.space12
+                                Rectangle {
+                                    Layout.preferredWidth: 30
+                                    Layout.preferredHeight: 30
+                                    radius: Theme.radiusSmall
+                                    color: Theme.surface
+                                    MaterialIcon { anchors.centerIn: parent; icon: toolRow.iconName || "terminal"; iconSize: 19; color: toolRow.selected ? Theme.primary : Theme.secondary }
+                                }
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
+                                    Text { Layout.fillWidth: true; text: toolRow.title; color: toolRow.selected ? Theme.primary : Theme.textPrimary; font.pixelSize: Theme.fontBody; font.weight: toolRow.selected ? Font.Bold : Font.Normal; elide: Text.ElideRight }
+                                    Text { Layout.fillWidth: true; text: toolRow.description; color: Theme.textSecondary; font.pixelSize: Theme.fontMicro; elide: Text.ElideRight }
+                                }
+                                MaterialIcon { icon: "chevron_right"; iconSize: 18; color: toolRow.selected ? Theme.primary : Theme.textSecondary }
+                            }
+
+                            MouseArea {
+                                id: toolMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.controller.selectTool(toolRow.toolId)
+                            }
+                        }
+                    }
                 }
             }
-        }
-        Rectangle { x: 10; y: 465; width: 330; height: 1; color: Theme.outlineVariant }
-        Text {
-            x: 10; y: 475
-            text: root.categories[root.selectedCategory].title + "（" + root.categories[root.selectedCategory].count + "）"
-            color: Theme.textPrimary; font.pixelSize: 14; font.weight: Font.DemiBold
-        }
-        Column {
-            x: 10; y: 501; width: 330; spacing: 8
-            Repeater {
-                model: root.deviceTools
-                delegate: Rectangle {
-                    id: toolRow
-                    required property var modelData
-                    required property int index
-                    width: 330; height: 60; radius: 9
-                    color: root.selectedTool === index
-                        ? (Theme.darkMode ? Theme.primaryContainer : "#DCEBFF")
-                        : (toolMouse.containsMouse ? Theme.surfaceContainer : "transparent")
-                    RowLayout {
-                        anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 10
-                        MaterialIcon { Layout.preferredWidth: 22; icon: toolRow.modelData.icon; iconSize: 20; color: root.selectedTool === toolRow.index ? Theme.primary : Theme.secondary }
-                        ColumnLayout {
-                            Layout.fillWidth: true; spacing: 1
-                            Text { text: toolRow.modelData.title; color: Theme.textPrimary; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
-                            Text { text: toolRow.modelData.subtitle; color: Theme.textSecondary; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
-                        }
-                    }
-                    MouseArea { id: toolMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.selectedTool = toolRow.index }
-                }
+
+            Loader {
+                id: detailWorkspaceLoader
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                sourceComponent: root.usesDedicatedWorkspace
+                    ? dedicatedWorkspace
+                    : standardWorkspace
             }
         }
     }
 
-    Rectangle {
-        id: detailPanel
-        x: 396; y: 84; width: parent.width - 428; height: parent.height - 113
-        radius: 12
-        color: Theme.surfaceContainerLow
-        border.color: Theme.darkMode ? Theme.outlineVariant : "#E0E4EA"
-        border.width: 1
-        clip: true
+    Component {
+        id: standardWorkspace
+        CustomToolDetailPanel {
+            controller: root.controller
+            androidBackend: root.androidBackend
+            parentWindow: root.parentWindow
+            parameterValues: root.parameterValues
+            displayedTool: root.controller.selectedTool
+            allowManagement: false
+            onConfirmRunRequested: function(values) { root.confirmRunRequested(values) }
+        }
+    }
 
-        Rectangle {
-            x: 17; y: 27; width: 56; height: 56; radius: 10
-            color: Theme.darkMode ? Theme.primaryContainer : "#DCEBFF"
-            MaterialIcon { anchors.centerIn: parent; icon: root.deviceTools[root.selectedTool].icon; iconSize: 28; color: Theme.primary }
+    AppMenu {
+        id: categoryContextMenu
+        AppMenuItem {
+            readonly property bool categoryHidden:
+                root.controller.hiddenPresetCategories.indexOf(root.contextCategoryTag) >= 0
+            text: categoryHidden
+                ? "取消隐藏“" + root.contextCategoryTag + "”分类"
+                : "隐藏“" + root.contextCategoryTag + "”分类"
+            enabled: categoryHidden || root.visibleCategories.length > 1
+            onTriggered: root.toggleCategoryHidden(root.contextCategoryTag)
         }
-        Text {
-            x: 87; y: 29; width: parent.width - 240
-            text: root.deviceTools[root.selectedTool].title
-            color: Theme.textPrimary; font.pixelSize: 22; font.weight: Font.Bold; elide: Text.ElideRight
-        }
-        Text {
-            x: 87; y: 62; width: parent.width - 240
-            text: root.deviceTools[root.selectedTool].subtitle
-            color: Theme.textSecondary; font.pixelSize: 13; elide: Text.ElideRight
-        }
-        Rectangle {
-            x: parent.width - 102; y: 34; width: 84; height: 42; radius: 9
-            color: favoriteMouse.containsMouse ? Theme.surfaceContainer : Theme.surfaceContainerLow
-            border.color: Theme.outline
-            Row {
-                anchors.centerIn: parent
-                spacing: 7
-                MaterialIcon { icon: root.favorite ? "star" : "star_border"; iconSize: 19; color: root.favorite ? Theme.primary : Theme.secondary }
-                Text { text: "收藏"; color: Theme.textPrimary; font.pixelSize: 13; font.weight: Font.DemiBold }
-            }
-            MouseArea { id: favoriteMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.favorite = !root.favorite }
-        }
-        Rectangle { x: 17; y: 105; width: parent.width - 35; height: 1; color: Theme.outlineVariant }
+    }
 
-        Text { x: 17; y: 123; text: "参数配置"; color: Theme.textPrimary; font.pixelSize: 17; font.weight: Font.DemiBold }
-        Text { x: 17; y: 172; text: "输出格式"; color: Theme.textPrimary; font.pixelSize: 13 }
-        AppComboBox { x: 87; y: 159; width: 550; height: 40; model: ["标准输出（默认）", "JSON 格式", "仅显示值"]; font.pixelSize: 13 }
-        Text { x: 17; y: 218; text: "信息类型"; color: Theme.textPrimary; font.pixelSize: 13; font.weight: Font.Medium }
-        Column {
-            x: 17; y: 238; spacing: 6
-            PresetCheckRow { text: "基本信息（品牌、型号、系统版本）"; checked: root.includeBasic; onToggled: function(value) { root.includeBasic = value } }
-            PresetCheckRow { text: "硬件信息（CPU、内存）"; checked: root.includeHardware; onToggled: function(value) { root.includeHardware = value } }
-            PresetCheckRow { text: "系统属性"; checked: root.includeSystem; onToggled: function(value) { root.includeSystem = value } }
-            PresetCheckRow { text: "显示构建信息（Build）"; checked: root.includeBuild; onToggled: function(value) { root.includeBuild = value } }
-        }
-        Text { x: 17; y: 385; text: "设备选择"; color: Theme.textPrimary; font.pixelSize: 13 }
-        Rectangle {
-            x: 87; y: 372; width: 520; height: 40; radius: 8
-            color: Theme.surfaceContainerLow; border.color: Theme.outline
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 10
-                Text { Layout.fillWidth: true; text: root.androidBackend.selectedAndroidDevice.length > 0 ? root.androidBackend.selectedAndroidDeviceLabel : "当前连接的设备（默认）"; color: Theme.textPrimary; font.pixelSize: 13; elide: Text.ElideMiddle }
-                MaterialIcon { icon: "expand_more"; iconSize: 17; color: Theme.textSecondary }
+    Component {
+        id: dedicatedWorkspace
+        Item {
+            anchors.fill: parent
+
+            CommandWorkspace {
+                anchors.fill: parent
+                visible: root.selectedPresetCommand === "scrcpy"
+                controller: root.controller
+                parentWindow: root.parentWindow
+                parameterValues: root.parameterValues
+                androidController: root.androidBackend
+                scrcpySelected: true
+                overlaysVisible: root.overlaysVisible
+            }
+
+            PresetWorkspace {
+                anchors.fill: parent
+                visible: root.selectedPresetCommand !== "scrcpy"
+                toolController: root.controller
+                utilities: root.presetUtilities
+                androidBackend: root.androidBackend
+                jiraFeishuBackend: root.jiraFeishuBackend
+                compact: root.compact
             }
         }
-        Rectangle {
-            x: 17; y: 428; width: parent.width - 35; height: 210; radius: 10
-            color: Theme.darkMode ? Theme.surfaceContainer : "#F7F8FA"
-            Text { x: 14; y: 14; text: "命令预览"; color: Theme.textPrimary; font.pixelSize: 15; font.weight: Font.DemiBold }
-            Column {
-                x: 14; y: 45; spacing: 8
-                Repeater {
-                    model: root.commands
-                    delegate: Row {
-                        required property string modelData
-                        required property int index
-                        spacing: 15
-                        Text { width: 10; text: String(index + 1); color: Theme.primary; font.pixelSize: 13 }
-                        Text { text: modelData; color: Theme.primary; font.pixelSize: 13 }
-                    }
-                }
-            }
+    }
+
+    Connections {
+        target: root.controller
+        function onSelectedToolChanged() {
+            root.syncCategoryForSelectedTool()
+            root.controller.setPresetCategory(root.activeCategoryTag)
         }
-        Row {
-            x: 17; y: 652; spacing: 12
-            Rectangle {
-                width: 260; height: 48; radius: 9
-                color: runMouse.containsMouse ? Theme.primaryHover : Theme.primary
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 8
-                    MaterialIcon { icon: "play_arrow"; iconSize: 20; color: "white" }
-                    Text { text: "运行"; color: "white"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                }
-                MouseArea { id: runMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.controller.appendConsoleMessage("已运行预设：" + root.deviceTools[root.selectedTool].title + "\n") }
-            }
-            Rectangle {
-                width: 240; height: 48; radius: 9
-                color: favoriteBottomMouse.containsMouse ? Theme.surfaceContainer : Theme.surfaceContainerLow
-                border.color: Theme.outline
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 8
-                    MaterialIcon { icon: root.favorite ? "star" : "star_border"; iconSize: 18; color: Theme.secondary }
-                    Text { text: "收藏"; color: Theme.textPrimary; font.pixelSize: 14; font.weight: Font.DemiBold }
-                }
-                MouseArea { id: favoriteBottomMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.favorite = !root.favorite }
-            }
-            Rectangle {
-                width: 240; height: 48; radius: 9
-                color: copyMouse.containsMouse ? Theme.surfaceContainer : Theme.surfaceContainerLow
-                border.color: Theme.outline
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 8
-                    MaterialIcon { icon: "content_copy"; iconSize: 18; color: Theme.secondary }
-                    Text { text: "复制命令"; color: Theme.textPrimary; font.pixelSize: 14; font.weight: Font.DemiBold }
-                }
-                MouseArea { id: copyMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { clipboardBuffer.selectAll(); clipboardBuffer.copy(); clipboardBuffer.deselect() } }
-            }
+        function onHiddenPresetCategoriesChanged() {
+            root.ensureSelectedCategoryVisible()
         }
-        TextArea { id: clipboardBuffer; visible: false; text: root.commands.join("\n") }
+    }
+
+    Component.onCompleted: {
+        if (root.visibleCategories.length > 0) {
+            root.selectedCategory = 0
+            root.controller.selectFirstPresetInCategory(root.visibleCategories[0].tag)
+        }
     }
 }

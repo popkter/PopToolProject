@@ -34,7 +34,10 @@ ApplicationWindow {
     property var parameterValues: ({})
     property string toolSearchQuery: ""
     readonly property real primaryNavWidth: Theme.primaryNavigationWidth
-    property real toolListWidth: Theme.navigationMaximumWidth
+    readonly property real toolListWidth: Math.max(
+        minimumToolListWidth,
+        Math.min(maximumNavigationWidth,
+                 width - primaryNavWidth - minimumContentWidth))
     property bool developerSelected: false
     property bool settingsSelected: false
     property bool terminalEnablePending: false
@@ -62,13 +65,6 @@ ApplicationWindow {
         || (userGuideDialogLoader.item && userGuideDialogLoader.item.visible)
 
     onToolSearchQueryChanged: appController.setToolSearchQuery(toolSearchQuery)
-    function clampPanelWidths() {
-        toolListWidth = Math.max(minimumToolListWidth,
-            Math.min(toolListWidth,
-                maximumNavigationWidth,
-                width - primaryNavWidth - minimumContentWidth))
-    }
-
     function addMeritBurst() {
         if (meritClickCooldown.running) {
             return
@@ -177,7 +173,6 @@ ApplicationWindow {
 
     ListModel { id: meritBurstModel }
 
-    onWidthChanged: clampPanelWidths()
     onClosing: function (close) {
         if (trayController.available && !trayController.quitting) {
             close.accepted = false
@@ -299,8 +294,6 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
-        toolListWidth = maximumNavigationWidth
-        clampPanelWidths()
         resetParameters()
         if (settingsController.terminalEnabled
                 && !developerConsoleController.pluginInstalled)
@@ -699,6 +692,7 @@ ApplicationWindow {
 
                 DeviceSelector {
                     id: globalDeviceSelector
+                    objectName: "globalDeviceSelector"
                     Layout.fillWidth: true
                     Layout.minimumWidth: 0
                     controller: androidController
@@ -791,30 +785,6 @@ ApplicationWindow {
 
     }
 
-    MouseArea {
-        id: toolPanelResizeHandle
-        visible: !window.developerSelected
-            && appController.section !== "custom"
-        property real lastWindowX: 0
-        x: window.primaryNavWidth + window.toolListWidth - width / 2
-        anchors.top: customTitleBar.bottom
-        anchors.bottom: parent.bottom
-        width: 10
-        z: 850
-        cursorShape: Qt.SizeHorCursor
-        hoverEnabled: true
-        onPressed: function (mouse) {
-            lastWindowX = mapToItem(window.contentItem, mouse.x, mouse.y).x
-        }
-        onPositionChanged: function (mouse) {
-            if (!pressed)
-                return
-            var currentX = mapToItem(window.contentItem, mouse.x, mouse.y).x
-            window.toolListWidth += currentX - lastWindowX
-            window.clampPanelWidths()
-            lastWindowX = currentX
-        }
-    }
     ExecutionCapacityDialog {
         id: executionCapacityDialog
         controller: appController
@@ -822,6 +792,7 @@ ApplicationWindow {
 
     CustomScriptImportDialog {
         id: customScriptImportDialog
+        objectName: "customScriptImportDialog"
         controller: appController
         parentWindow: window
         onScriptReplaced: function(title) {

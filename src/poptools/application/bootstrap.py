@@ -75,7 +75,7 @@ def build_components(paths: AppPaths) -> ApplicationComponents:
     )
     preset_controller = PresetController(paths)
     jira_feishu_controller = JiraFeishuController(paths.data_dir)
-    developer_console_controller = DeveloperConsoleController(python_environment, paths.data_dir)
+    developer_console_controller = DeveloperConsoleController(python_environment)
     update_controller = UpdateController(config_store)
     settings_controller.scriptsImported.connect(app_controller.reloadImportedScripts)
     settings_controller.consoleMessage.connect(app_controller.appendConsoleMessage)

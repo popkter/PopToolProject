@@ -54,6 +54,7 @@ public:
     Q_INVOKABLE void clearSelection();
     Q_INVOKABLE void copySelection();
     Q_INVOKABLE void pasteClipboard();
+    Q_INVOKABLE void pasteText(const QString &text);
     Q_INVOKABLE void selectAll();
     Q_INVOKABLE void scrollToBottom();
 

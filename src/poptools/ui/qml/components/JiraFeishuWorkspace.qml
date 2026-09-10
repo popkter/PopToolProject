@@ -99,41 +99,19 @@ ColumnLayout {
         }
     }
 
-    component MiniButton: Rectangle {
-        id: mini
-        property string text: ""
-        property string iconName: ""
-        property bool danger: false
-        signal clicked()
+    component MiniButton: PrimaryButton {
         implicitHeight: 46
         implicitWidth: 88
         radius: Theme.radiusMedium
-        color: danger ? (hover.containsMouse ? Qt.darker(Theme.errorContainer, 1.05) : Theme.errorContainer)
-                      : (hover.containsMouse ? Theme.primaryContainerHover : Theme.primaryContainer)
-        RowLayout {
-            anchors.centerIn: parent
-            spacing: Theme.space8
-            MaterialIcon {
-                Layout.alignment: Qt.AlignVCenter
-                icon: mini.iconName
-                iconSize: 18
-                color: mini.danger ? Theme.errorColor : Theme.primaryText
-            }
-            Text {
-                Layout.alignment: Qt.AlignVCenter
-                text: mini.text
-                color: mini.danger ? Theme.errorColor : Theme.primaryText
-                font.pixelSize: Theme.fontLabel
-                font.weight: Font.DemiBold
-            }
-        }
-        MouseArea {
-            id: hover
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: mini.clicked()
-        }
+        tonal: true
+        color: dangerStyle
+               ? (hovered ? Qt.darker(Theme.errorContainer, 1.05) : Theme.errorContainer)
+               : (hovered ? Theme.primaryContainerHover : Theme.primaryContainer)
+        border.width: 0
+        foregroundColor: dangerStyle ? Theme.errorColor : Theme.primaryText
+        labelFontSize: Theme.fontLabel
+        glyphSize: 18
+        contentSpacing: Theme.space8
     }
 
     Connections {
@@ -223,7 +201,7 @@ ColumnLayout {
                 spacing: root.narrow ? 4 : 6
                 MiniButton { implicitWidth: root.narrow ? 66 : 88; text: "新建"; iconName: "add"; onClicked: { root.commitForm(); controller.newProfile() } }
                 MiniButton { implicitWidth: root.narrow ? 66 : 88; text: "复制"; iconName: "content_copy"; onClicked: { root.commitForm(); controller.duplicateProfile() } }
-                MiniButton { implicitWidth: root.narrow ? 66 : 88; text: "删除"; iconName: "delete"; danger: true; onClicked: controller.deleteProfile() }
+                MiniButton { implicitWidth: root.narrow ? 66 : 88; text: "删除"; iconName: "delete"; dangerStyle: true; onClicked: controller.deleteProfile() }
             }
         }
     }
@@ -341,6 +319,7 @@ ColumnLayout {
                 clip: true
                 contentWidth: width
                 contentHeight: jiraForm.implicitHeight
+                acceptedButtons: Qt.NoButton
                 ScrollBar.vertical: ScrollBar { }
                 ColumnLayout {
                     id: jiraForm
@@ -464,7 +443,7 @@ ColumnLayout {
                         }
                     }
                     FieldLabel { text: "JQL 查询 *" }
-                    ScrollView {
+                    DesktopScrollView {
                         id: jiraJqlScroll
                         objectName: "jiraFeishuJqlScroll"
                         Layout.fillWidth: true
@@ -506,6 +485,7 @@ ColumnLayout {
                 clip: true
                 contentWidth: width
                 contentHeight: feishuForm.implicitHeight
+                acceptedButtons: Qt.NoButton
                 ScrollBar.vertical: ScrollBar { }
                 ColumnLayout {
                     id: feishuForm
@@ -576,6 +556,7 @@ ColumnLayout {
                 clip: true
                 contentWidth: width
                 contentHeight: scheduleForm.implicitHeight
+                acceptedButtons: Qt.NoButton
                 ScrollBar.vertical: ScrollBar { }
                 ColumnLayout {
                     id: scheduleForm
@@ -729,7 +710,7 @@ ColumnLayout {
                                 Text { text: "启动后会同时管理所有已启用的推送方案"; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting }
                             }
                             MiniButton { text: "启动"; iconName: "play_arrow"; visible: !controller.scheduleRunning; onClicked: { root.commitForm(); controller.startSchedule() } }
-                            MiniButton { text: "全部停止"; iconName: "stop"; danger: true; visible: controller.scheduleRunning; onClicked: controller.stopSchedule() }
+                            MiniButton { text: "全部停止"; iconName: "stop"; dangerStyle: true; visible: controller.scheduleRunning; onClicked: controller.stopSchedule() }
                         }
                     }
                     Item { Layout.preferredHeight: 2 }
@@ -765,27 +746,20 @@ ColumnLayout {
             anchors.top: parent.top
             height: 10
 
-            Rectangle {
-                anchors.centerIn: parent
-                width: 52
-                height: 4
-                radius: Theme.radiusNone
-                color: outputToggleArea.containsMouse ? Theme.primary : Theme.outline
-            }
-
-            MouseArea {
-                id: outputToggleArea
+            PrimaryButton {
                 anchors.centerIn: parent
                 width: 96
                 height: 28
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
+                compact: true
+                text: root.outputExpanded ? "隐藏运行记录" : "显示运行记录"
+                iconName: root.outputExpanded ? "expand_more" : "expand_less"
+                glyphSize: 18
+                tonal: true
+                foregroundColor: hovered ? Theme.primary : Theme.outline
+                color: "transparent"
+                border.width: 0
                 onClicked: root.outputExpanded = !root.outputExpanded
             }
-
-            ToolTip.visible: outputToggleArea.containsMouse
-            ToolTip.text: root.outputExpanded ? "隐藏运行记录" : "显示运行记录"
-            ToolTip.delay: 450
         }
 
         RowLayout {
@@ -860,7 +834,7 @@ ColumnLayout {
                     Text { text: "运行记录"; color: Theme.consoleText; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold; Layout.fillWidth: true }
                     MiniButton { text: "清空"; iconName: "delete_sweep"; implicitWidth: 78; implicitHeight: 30; onClicked: controller.clearLog() }
                 }
-                ScrollView {
+                DesktopScrollView {
                     Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                     TextArea {
                         text: controller.logText

@@ -135,7 +135,7 @@ AppDialog {
     readonly property var commandKinds: [
         { "label": "PowerShell", "value": "powershell" },
         { "label": "Bash", "value": "bash" },
-        { "label": "BAT 脚本", "value": "batch" },
+        { "label": "Batch 脚本", "value": "batch" },
         { "label": "Python", "value": "python" }
     ]
     width: Math.min(760, Overlay.overlay.width - 24)
@@ -239,24 +239,24 @@ AppDialog {
                         elide: Text.ElideRight
                     }
                 }
-                Rectangle {
+                PrimaryButton {
                     Layout.preferredWidth: 42
                     Layout.preferredHeight: 42
+                    compact: true
+                    text: "关闭"
+                    iconName: "close"
+                    glyphSize: 23
+                    tonal: true
+                    foregroundColor: Theme.textSecondary
+                    border.width: 0
                     radius: height / 2
-                    color: closeMouse.containsMouse ? Theme.surfaceContainerHigh : "transparent"
-                    MaterialIcon { anchors.centerIn: parent; icon: "close"; iconSize: 23; color: Theme.textSecondary }
-                    MouseArea {
-                        id: closeMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.close()
-                    }
+                    color: hovered ? Theme.surfaceContainerHigh : "transparent"
+                    onClicked: root.close()
                 }
             }
         }
 
-        ScrollView {
+        DesktopScrollView {
             id: formScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -286,6 +286,8 @@ AppDialog {
                         Text { text: "命令名称"; color: Theme.textPrimary; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold }
                         TextField {
                             id: titleField
+                            FilePathDropArea { target: titleField }
+                            AppTextEditMenu { target: titleField }
                             Layout.fillWidth: true
                             Layout.preferredHeight: 50
                             leftPadding: 64
@@ -300,33 +302,25 @@ AppDialog {
                                 border.width: titleField.activeFocus || iconPopup.opened ? 2 : 1
                             }
 
-                            Rectangle {
+                            PrimaryButton {
                                 id: iconButton
                                 anchors.left: parent.left
                                 anchors.leftMargin: 5
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 40
                                 height: 40
+                                compact: true
+                                text: "点击选择命令图标"
+                                iconName: root.selectedIcon
+                                glyphSize: 24
+                                tonal: true
+                                foregroundColor: Theme.primary
+                                border.width: 0
                                 radius: Theme.radiusSmall
                                 z: 2
-                                color: iconButtonMouse.containsMouse || iconPopup.opened
+                                color: hovered || iconPopup.opened
                                        ? Theme.primaryContainer : Theme.surfaceContainerLow
-
-                                MaterialIcon {
-                                    anchors.centerIn: parent
-                                    icon: root.selectedIcon
-                                    iconSize: 24
-                                    color: Theme.primary
-                                }
-                                ToolTip.visible: iconButtonMouse.containsMouse
-                                ToolTip.text: "点击选择命令图标"
-                                MouseArea {
-                                    id: iconButtonMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: iconPopup.open()
-                                }
+                                onClicked: iconPopup.open()
 
                                 Popup {
                                     id: iconPopup
@@ -407,6 +401,8 @@ AppDialog {
                     Text { text: "功能说明"; color: Theme.textPrimary; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold }
                     TextField {
                         id: descriptionField
+                        FilePathDropArea { target: descriptionField }
+                        AppTextEditMenu { target: descriptionField }
                         Layout.fillWidth: true
                         Layout.preferredHeight: 50
                         leftPadding: 15
@@ -456,7 +452,7 @@ AppDialog {
                             }
                             Item { Layout.fillWidth: true }
                             Text {
-                                text: "支持 ${标题}、${标题:默认值} 和 ${标题:选项=值|选项=值}"
+                                text: "支持文本、默认值、下拉选项和 ${标题@file} 文件选择参数"
                                 color: Theme.textSecondary
                                 font.pixelSize: Theme.fontMicro
                             }
@@ -468,7 +464,7 @@ AppDialog {
                             color: Theme.outlineVariant
                         }
 
-                        ScrollView {
+                        DesktopScrollView {
                             id: commandScroll
                             Layout.fillWidth: true
                             Layout.fillHeight: true
@@ -479,6 +475,8 @@ AppDialog {
 
                             TextArea {
                                 id: commandArea
+                                FilePathDropArea { target: commandArea; append: true }
+                                AppTextEditMenu { target: commandArea }
                                 width: Math.max(commandScroll.availableWidth,
                                                 contentWidth + leftPadding + rightPadding)
                                 height: Math.max(commandScroll.availableHeight,
@@ -487,7 +485,7 @@ AppDialog {
                                 rightPadding: 12
                                 topPadding: 10
                                 bottomPadding: 10
-                                placeholderText: "例如：pVal vin = ${请输入vin=VIN123}\nadb shell setprop persist.sys.vin ${vin}"
+                                placeholderText: "例如：Var vin = ${请输入 VIN:VIN123}\nadb shell setprop persist.sys.vin ${vin}"
                                 color: Theme.textPrimary
                                 selectionColor: Theme.primary
                                 selectedTextColor: "white"
@@ -516,7 +514,7 @@ AppDialog {
                         Text {
                             id: helperText
                             Layout.fillWidth: true
-                            text: "${请输入数值:1} 会生成带默认值的输入框；${触摸点显示:开启=1|关闭=0} 会生成下拉菜单。需要重复使用时可写 pVal value = ${显示名称:默认值}。"
+                            text: "${请输入数值:1} 生成默认值输入框；${触摸点显示:开启=1|关闭=0} 生成下拉菜单；${APK安装包@file} 生成文件选择框。重复使用可写 Var value = ${显示名称:默认值}。"
                             color: Theme.teal
                             font.pixelSize: Theme.fontCaption
                             wrapMode: Text.WordWrap
@@ -540,15 +538,15 @@ AppDialog {
                 Item { Layout.fillWidth: true }
                 PrimaryButton {
                     implicitWidth: 104
-                    implicitHeight: 48
+                    implicitHeight: 40
                     text: "取消"
-                    iconName: ""
                     tonal: true
+                    iconName: "close"
                     onClicked: root.close()
                 }
                 PrimaryButton {
                     implicitWidth: 120
-                    implicitHeight: 48
+                    implicitHeight: 40
                     text: root.editMode ? "保存" : "创建"
                     iconName: root.editMode ? "save" : "add"
                     onClicked: root.submit()

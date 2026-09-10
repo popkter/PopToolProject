@@ -65,7 +65,7 @@ class ExecutionManager(QObject):
         missing = [
             parameter.label
             for parameter in tool.parameters
-            if parameter.required and not values.get(parameter.id)
+            if parameter.required and values.get(parameter.id) in (None, "")
         ]
         if missing:
             self.output.emit(f"缺少必填参数：{', '.join(missing)}\n")

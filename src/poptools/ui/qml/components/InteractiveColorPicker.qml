@@ -4,7 +4,7 @@ import QtQuick.Layouts
 import QtQuick.Window
 import "../theme"
 
-ScrollView {
+DesktopScrollView {
     id: picker
     clip: true
 

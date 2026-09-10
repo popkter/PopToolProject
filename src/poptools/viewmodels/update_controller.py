@@ -6,6 +6,7 @@ import sys
 import time
 import urllib.error
 from collections.abc import Callable
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from PySide6.QtCore import Property, QCoreApplication, QObject, QThread, QTimer, Signal, Slot
@@ -20,7 +21,6 @@ from poptools.infrastructure.app_updater import (
 from poptools.infrastructure.config_store import ConfigStore
 
 logger = logging.getLogger(__name__)
-AUTO_CHECK_INTERVAL_SECONDS = 24 * 60 * 60
 
 
 class UpdateCheckThread(QThread):
@@ -120,7 +120,6 @@ class UpdateController(QObject):
         self._check_thread: UpdateCheckThread | None = None
         self._download_thread: UpdateDownloadThread | None = None
         self._check_is_manual = False
-        self._last_auto_attempt: float | None = None
         self._schedule_timer = QTimer(self)
         self._schedule_timer.setInterval(60_000)
         self._schedule_timer.timeout.connect(self.checkForUpdatesAutomatically)
@@ -196,18 +195,16 @@ class UpdateController(QObject):
 
     @Slot(result=bool)
     def checkForUpdatesAutomatically(self) -> bool:
-        frequency = self.updateCheckFrequency
+        frequency = self.config_store.update_check_frequency()
         if not self._auto_check_enabled or frequency == "never":
             return False
-        if self._last_auto_attempt is not None and 0 <= self._clock() - self._last_auto_attempt < 3600:
-            return False
-        elapsed = self._clock() - self.config_store.last_update_check_at()
-        interval = AUTO_CHECK_INTERVAL_SECONDS * (7 if frequency == "weekly" else 1)
-        if self.config_store.last_update_check_at() > 0 and 0 <= elapsed < interval:
+        now = self._clock()
+        period_start = self._auto_check_period_start(now, frequency)
+        if self.config_store.last_auto_update_check_at() >= period_start:
             return False
         started = self._start_check(manual=False)
         if started:
-            self._last_auto_attempt = self._clock()
+            self.config_store.set_last_auto_update_check_at(now)
         return started
 
     @Slot(bool, result=bool)
@@ -219,6 +216,7 @@ class UpdateController(QObject):
             return True
         self.config_store.set_prerelease_updates_enabled(enabled)
         self.config_store.set_last_update_check_at(0.0)
+        self.config_store.set_last_auto_update_check_at(0.0)
         self._release = None
         channel = "测试版本" if enabled else "正式版本"
         self._set_state("idle", f"已切换为接收{channel}，可立即检查更新。")
@@ -326,6 +324,13 @@ class UpdateController(QObject):
         self._release = release
         self._set_state("available", f"发现新版本 {release.version}")
         self.updateAvailable.emit()
+
+    @staticmethod
+    def _auto_check_period_start(timestamp: float, frequency: str) -> float:
+        local_now = datetime.fromtimestamp(timestamp)
+        if frequency == "weekly":
+            local_now -= timedelta(days=local_now.weekday())
+        return local_now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
 
     @Slot(int, int)
     def _on_download_progress(self, received: int, total: int) -> None:

@@ -17,7 +17,7 @@ Produce a complete PopToolProject custom script that collects launch-time values
 
 1. Respect the requested script type. If none is specified, choose Python for portable or data-oriented logic, PowerShell for Windows administration, Bash for Unix/macOS shell workflows, and BAT only for simple Windows tasks or when explicitly requested. State the chosen type briefly.
 2. Identify the values users are expected to change between runs. Turn those values into PopTool controls; keep implementation constants internal rather than exposing every literal as a parameter.
-3. Choose text inputs, defaults, and closed-set choices from the user's requirements. Use `pVal` when one value appears more than once or needs a user-facing label distinct from its internal name.
+3. Choose text inputs, defaults, and closed-set choices from the user's requirements. Use `Var` when one value appears more than once or needs a user-facing label distinct from its internal name.
 4. Implement validation, error messages, exit status, and cleanup appropriate to the task. Prefer built-in language features and existing PopToolProject runtime capabilities; mention any required third-party dependency.
 5. Do not add `input`, `Read-Host`, `read`, `set /p`, or another blocking prompt for values that can be collected before execution.
 
@@ -35,17 +35,23 @@ When useful, return a suggested tool name, short description, script type, and t
 - Free text without a default: `${标题}`
 - Free text with an editable default: `${标题:默认值}`
 - Closed set of choices: `${标题:选项文字=实际值|选项文字=实际值}`
+- File path with a system file picker: `${标题@file}`
+- File path with a default location: `${标题@file:默认路径}`
 - Reused value or separate internal/display names:
 
   ```text
-  pVal internalName = ${显示标题:默认值}
+  Var internalName = ${显示标题:默认值}
   ```
 
-  Then use `${internalName}` everywhere in the executable body. `pVal internalName: ${...}` is also valid, but prefer `=` consistently. Place declarations together near the beginning; PopToolProject removes their entire lines before execution.
+  Then use `${internalName}` everywhere in the executable body. `Var internalName: ${...}` is also valid, but prefer `=` consistently. Place declarations together near the beginning; PopToolProject removes their entire lines before execution.
 
 Use current colon syntax for new scripts. Do not generate the legacy `${名称=默认值}` form. The first choice is the default choice.
 
-Names inside `${...}` and internal `pVal` identifiers must be nonempty and contain only Chinese characters, letters, digits, or underscores. Give controls short, user-facing labels. Do not create conflicting defaults or option sets for the same parameter ID.
+Use `@file` only when the user should select an existing file. The input remains editable and
+the selected absolute path is substituted as text. Quote the placeholder according to the target
+script language because PopToolProject does not add quotes automatically.
+
+Names inside `${...}` and internal `Var` identifiers must be nonempty and contain only Chinese characters, letters, digits, or underscores. Give controls short, user-facing labels. Do not create conflicting defaults or option sets for the same parameter ID.
 
 ## Embed values in each language
 
@@ -96,7 +102,7 @@ Before returning the script, check that:
 
 - every user-adjustable launch-time value requested in the brief has an appropriate control;
 - no launch-time `input`, `Read-Host`, `read`, `set /p`, or equivalent blocking prompt remains;
-- every reused parameter has one `pVal` declaration and matching `${internalName}` references;
+- every reused parameter has one `Var` declaration and matching `${internalName}` references;
 - every repeated direct placeholder has the same definition;
 - choice options have nonempty, unique labels and nonempty values;
 - Python placeholders representing strings are quoted before conversion or use;

@@ -42,7 +42,7 @@ AppDialog {
             }
             Text {
                 Layout.fillWidth: true
-                text: "用几步了解如何创建客制、配置 Jira 飞书推送、切换主题、管理 Python 依赖，以及使用内置终端。"
+                text: "用几步了解如何管理自定义脚本、使用 Android 预设、配置 Jira 飞书推送、管理运行环境与应用更新。"
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontBody
                 wrapMode: Text.WordWrap
@@ -55,7 +55,7 @@ AppDialog {
             color: Theme.outlineVariant
         }
 
-        ScrollView {
+        DesktopScrollView {
             id: guideScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -101,7 +101,7 @@ AppDialog {
                             MaterialIcon { icon: "build"; iconSize: 24; color: Theme.primary }
                             Text {
                                 Layout.fillWidth: true
-                                text: "1. 创建客制"
+                                text: "1. 管理自定义脚本"
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
@@ -109,7 +109,7 @@ AppDialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "进入“客制”，点击新建脚本，选择 PowerShell、Bash、BAT 或 Python，填写脚本内容后保存。客制保存在本机，可以编辑、删除和重复运行。"
+                            text: "进入“自定义”，在左侧搜索、筛选并选择脚本，在右侧配置参数和查看控制台输出。点击“新建脚本”可创建 PowerShell、Bash、Batch 或 Python 脚本；选中脚本后可以运行、停止、编辑、分享或删除。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap
@@ -136,7 +136,7 @@ AppDialog {
                             MaterialIcon { icon: "input"; iconSize: 24; color: Theme.primary }
                             Text {
                                 Layout.fillWidth: true
-                                text: "2. 用变量生成参数控件"
+                                text: "2. 用模板生成参数控件"
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
@@ -144,7 +144,42 @@ AppDialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "在脚本中写 ${参数名} 会自动生成输入框；写 ${参数名:默认值} 会生成带默认值的输入框。输入内容与默认值不同时，可点击输入框右侧的“设为默认值”将内容写回客制脚本。${触摸点显示:开启=1|关闭=0} 会生成标题为“触摸点显示”的下拉菜单，并在执行时使用所选项的值。需要重复使用时，可在开头写 pVal serial = ${设备序列号:emulator-5554}，之后使用 ${serial}。pVal 声明行不会被执行。"
+                            text: "${参数名} 生成文本框，${参数名:默认值} 生成带默认值的文本框，${模式:开启=1|关闭=0} 生成下拉菜单，${APK文件@file} 生成带文件选择按钮的路径框。需要重复使用或分开内部名与显示名时，可先写 Var serial = ${设备序列号:emulator-5554}，再在脚本中使用 ${serial}；Var 声明行不会被执行。"
+                            color: Theme.textSecondary
+                            font.pixelSize: Theme.fontSupporting
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: androidGuide.implicitHeight + 32
+                    radius: Theme.radiusMedium
+                    color: Theme.surfaceContainerLow
+                    border.color: Theme.outlineVariant
+
+                    ColumnLayout {
+                        id: androidGuide
+                        anchors.fill: parent
+                        anchors.margins: 16
+                        spacing: 6
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 10
+                            MaterialIcon { icon: "android"; iconSize: 24; color: Theme.primary }
+                            Text {
+                                Layout.fillWidth: true
+                                text: "3. 使用 Android 预设"
+                                color: Theme.textPrimary
+                                font.pixelSize: Theme.fontComponentTitle
+                                font.weight: Font.DemiBold
+                            }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "进入“预设”，可按模拟、环境、硬件、跳转、其他设备操作和其他预设分类查找功能，也可以直接搜索名称或说明。先在左下角选择目标设备，再运行按键模拟、应用管理、文件操作、截图录屏、无线调试、设备信息、Logcat、投屏或联合录制等功能。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap
@@ -171,7 +206,7 @@ AppDialog {
                             MaterialIcon { icon: "send"; iconSize: 24; color: Theme.primary }
                             Text {
                                 Layout.fillWidth: true
-                                text: "3. 配置 Jira 飞书推送"
+                                text: "4. 配置 Jira 飞书推送"
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
@@ -179,42 +214,7 @@ AppDialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "进入“预设 → Jira 飞书推送”，新建或选择方案，填写 Jira 地址、Token/PAT 和 JQL；再配置飞书机器人 Webhook 及安全校验。建议依次使用“测试连接”“预览消息”“保存配置”和“立即推送”。定时推送只在应用保持运行时生效；Token、Webhook 与应用凭据仅保存在本机。"
-                            color: Theme.textSecondary
-                            font.pixelSize: Theme.fontSupporting
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: themeGuide.implicitHeight + 32
-                    radius: Theme.radiusMedium
-                    color: Theme.surfaceContainerLow
-                    border.color: Theme.outlineVariant
-
-                    ColumnLayout {
-                        id: themeGuide
-                        anchors.fill: parent
-                        anchors.margins: 16
-                        spacing: 6
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 10
-                            MaterialIcon { icon: "palette"; iconSize: 24; color: Theme.primary }
-                            Text {
-                                Layout.fillWidth: true
-                                text: "4. 选择主题外观"
-                                color: Theme.textPrimary
-                                font.pixelSize: Theme.fontComponentTitle
-                                font.weight: Font.DemiBold
-                            }
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            text: "进入“设置 → 外观”，可选择跟随系统、浅色或深色模式。主题风格会从内置目录和用户数据目录下的 themes 目录动态加载；每次打开设置都会刷新列表，用户主题可覆盖同名内置主题。修改会立即生效并在下次启动时保留，不会影响脚本和推送方案。"
+                            text: "在“预设”的“其他预设”分类中打开 Jira 飞书推送，新建或选择方案，填写 Jira 地址、Token/PAT、JQL 和飞书机器人信息。保存后可测试连接、预览消息、立即推送或启动定时任务；凭据与方案保存在本机，定时任务仅在应用进程运行期间生效。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap
@@ -238,10 +238,10 @@ AppDialog {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 10
-                            MaterialIcon { icon: "terminal"; iconSize: 24; color: Theme.primary }
+                            MaterialIcon { icon: "settings"; iconSize: 24; color: Theme.primary }
                             Text {
                                 Layout.fillWidth: true
-                                text: "5. 自动配置 Python 依赖"
+                                text: "5. 管理设置与 Python 环境"
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
@@ -249,7 +249,7 @@ AppDialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "新建、编辑或运行 Python 脚本时，应用会检查 import 的模块。发现常见缺失依赖后，确认即可自动安装到应用专属 Python 环境；也可以点击运行按钮左侧的依赖检查图标手动检查。"
+                            text: "进入“设置”可切换跟随系统、浅色或深色模式，打开脚本目录，批量导入或导出脚本，并选择每天、每周或从不检查更新。新建、编辑或运行 Python 脚本时，应用会检查 import；确认后可把缺失依赖安装到应用专属 Python 环境。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap
@@ -276,7 +276,7 @@ AppDialog {
                             MaterialIcon { icon: "terminal"; iconSize: 24; color: Theme.primary }
                             Text {
                                 Layout.fillWidth: true
-                                text: "6. 开启并使用内置终端"
+                                text: "6. 使用内置终端"
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontComponentTitle
                                 font.weight: Font.DemiBold
@@ -284,7 +284,7 @@ AppDialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "终端功能默认关闭。Windows 首次开启时需确认安装应用专用 PowerShell 7，macOS 使用系统 Shell；运行环境就绪后主界面显示“终端”。终端最多支持 7 个独立会话，并与客制 Python 脚本共用应用专属 python 和 pip。Ctrl+C 有选区时复制、无选区时停止当前命令，Ctrl+V 粘贴，Ctrl+L 清屏。再次关闭终端功能会隐藏入口并停止全部会话。"
+                            text: "点击左侧“终端”即可进入；Windows 首次使用时按提示安装应用专用 PowerShell 7，macOS 使用系统 Shell。终端最多支持 7 个独立会话，并与自定义 Python 脚本共用应用专属 python、pip 和 ADB。Ctrl+C 有选区时复制、无选区时停止当前命令，Ctrl+V 粘贴，Ctrl+L 清屏。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap

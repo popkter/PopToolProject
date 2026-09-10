@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import os
+import re
 import uuid
 from typing import Any
 
@@ -16,6 +17,7 @@ from poptools.paths import (
 )
 
 _SCRCPY_STARTUP_POSITION = -32000
+_VIDEO_SIZE_PATTERN = re.compile(r"(?:Texture|Video size):\s*(\d+)x(\d+)", re.IGNORECASE)
 
 
 def _projection_arguments(
@@ -62,6 +64,11 @@ class ScrcpyController(QObject):
         self._host_visible = False
         self._window_title = ""
         self._embed_attempts = 0
+        self._synced_window = 0
+        self._synced_rect = QRect()
+        self._synced_visible = False
+        self._video_aspect_ratio: float | None = None
+        self._dimension_output_tail = ""
         self._embed_timer = QTimer(self)
         self._embed_timer.setInterval(10)
         self._embed_timer.timeout.connect(self._try_embed_window)
@@ -105,6 +112,9 @@ class ScrcpyController(QObject):
         self._started = False
         self._scrcpy_window = 0
         self._embed_attempts = 0
+        self._video_aspect_ratio = None
+        self._dimension_output_tail = ""
+        self._reset_synced_geometry()
         environment = dict(os.environ)
         environment["ADB"] = str(adb)
         environment["SCRCPY_SERVER_PATH"] = str(server)
@@ -153,6 +163,7 @@ class ScrcpyController(QObject):
             # and leaving only the QML placeholder visible.
             self._scrcpy_window = 0
             self._embed_attempts = 0
+            self._reset_synced_geometry()
             self._embed_timer.setInterval(10)
         self._embed_attempts += 1
         handle = _find_process_window(process.process_id, self._window_title)
@@ -162,6 +173,7 @@ class ScrcpyController(QObject):
             # video window, then hide and embed it in one event-loop turn.
             _show_window(handle, False)
             self._scrcpy_window = handle
+            self._reset_synced_geometry()
             if self._host_window is None or not _embed_window(
                 handle, int(self._host_window.winId())
             ):
@@ -186,7 +198,58 @@ class ScrcpyController(QObject):
             round(self._host_rect.width() * scale),
             round(self._host_rect.height() * scale),
         )
-        _move_window(self._scrcpy_window, rect, self._host_visible and not rect.isEmpty())
+        rect = self._fit_rect_to_video(rect)
+        visible = self._host_visible and not rect.isEmpty()
+        if (
+            self._synced_window == self._scrcpy_window
+            and self._synced_rect == rect
+            and self._synced_visible == visible
+            and _embedded_window_state_matches(self._scrcpy_window, rect, visible)
+        ):
+            return
+        _move_window(self._scrcpy_window, rect, visible)
+        self._synced_window = self._scrcpy_window
+        self._synced_rect = QRect(rect)
+        self._synced_visible = visible
+
+    def _reset_synced_geometry(self) -> None:
+        self._synced_window = 0
+        self._synced_rect = QRect()
+        self._synced_visible = False
+
+    def _fit_rect_to_video(self, host_rect: QRect) -> QRect:
+        aspect_ratio = self._video_aspect_ratio
+        if aspect_ratio is None or host_rect.isEmpty():
+            return QRect(host_rect)
+
+        width = host_rect.width()
+        height = max(1, round(width / aspect_ratio))
+        if height > host_rect.height():
+            height = host_rect.height()
+            width = max(1, round(height * aspect_ratio))
+        return QRect(
+            host_rect.x() + (host_rect.width() - width) // 2,
+            host_rect.y() + (host_rect.height() - height) // 2,
+            width,
+            height,
+        )
+
+    def _update_video_dimensions(self, text: str) -> None:
+        combined = self._dimension_output_tail + text
+        self._dimension_output_tail = combined[-160:]
+        matches = list(_VIDEO_SIZE_PATTERN.finditer(combined))
+        if not matches:
+            return
+        width = int(matches[-1].group(1))
+        height = int(matches[-1].group(2))
+        if width <= 0 or height <= 0:
+            return
+        aspect_ratio = width / height
+        if self._video_aspect_ratio == aspect_ratio:
+            return
+        self._video_aspect_ratio = aspect_ratio
+        self._reset_synced_geometry()
+        self._sync_embedded_window()
 
     def _on_started(self) -> None:
         self._started = True
@@ -198,10 +261,14 @@ class ScrcpyController(QObject):
         self.runningChanged.emit(True)
 
     def _read_output(self, payload: bytes) -> None:
-        self.output.emit(payload.decode("utf-8", "replace"))
+        text = payload.decode("utf-8", "replace")
+        self._update_video_dimensions(text)
+        self.output.emit(text)
 
     def _read_error(self, payload: bytes) -> None:
-        self.output.emit(payload.decode("utf-8", "replace"))
+        text = payload.decode("utf-8", "replace")
+        self._update_video_dimensions(text)
+        self.output.emit(text)
 
     def _on_error(self, message: str) -> None:
         self.output.emit(f"投屏启动失败：{message}\n")
@@ -218,6 +285,9 @@ class ScrcpyController(QObject):
         was_started = self._started
         self._started = False
         self._scrcpy_window = 0
+        self._video_aspect_ratio = None
+        self._dimension_output_tail = ""
+        self._reset_synced_geometry()
         process.deleteLater()
         if was_started:
             self.runningChanged.emit(False)
@@ -274,6 +344,49 @@ def _is_window_visible(handle: int) -> bool:
     return bool(user32.IsWindowVisible(handle))
 
 
+def _embedded_window_state_matches(handle: int, expected: QRect, visible: bool) -> bool:
+    """Check whether scrcpy changed its own embedded window geometry."""
+    if os.name != "nt" or not handle:
+        return True
+    user32 = _user32()
+
+    class RECT(ctypes.Structure):
+        _fields_ = [
+            ("left", ctypes.c_long),
+            ("top", ctypes.c_long),
+            ("right", ctypes.c_long),
+            ("bottom", ctypes.c_long),
+        ]
+
+    class POINT(ctypes.Structure):
+        _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+    user32.GetWindowRect.argtypes = [ctypes.c_void_p, ctypes.POINTER(RECT)]
+    user32.GetWindowRect.restype = ctypes.c_bool
+    user32.GetParent.argtypes = [ctypes.c_void_p]
+    user32.GetParent.restype = ctypes.c_void_p
+    user32.ClientToScreen.argtypes = [ctypes.c_void_p, ctypes.POINTER(POINT)]
+    user32.ClientToScreen.restype = ctypes.c_bool
+
+    actual = RECT()
+    parent = user32.GetParent(handle)
+    parent_origin = POINT()
+    if (
+        not parent
+        or not user32.GetWindowRect(handle, ctypes.byref(actual))
+        or not user32.ClientToScreen(parent, ctypes.byref(parent_origin))
+    ):
+        return False
+
+    actual_rect = QRect(
+        actual.left - parent_origin.x,
+        actual.top - parent_origin.y,
+        actual.right - actual.left,
+        actual.bottom - actual.top,
+    )
+    return actual_rect == expected and _is_window_visible(handle) == visible
+
+
 def _embed_window(child: int, parent: int) -> bool:
     if os.name != "nt" or not child or not parent:
         return False
@@ -320,7 +433,10 @@ def _move_window(handle: int, rect: QRect, visible: bool) -> None:
         rect.y(),
         max(1, rect.width()),
         max(1, rect.height()),
-        0x0010 | 0x0020 | 0x0040,
+        # Keep the embedded child in its current z-order and avoid forcing a
+        # non-client frame refresh on every geometry update. Reapplying either
+        # while the host receives mouse focus causes SDL's surface to flash.
+        0x0004 | 0x0010 | 0x0040,
     )
 
 

@@ -23,7 +23,7 @@
     "parameters": [],
     "presentation": {
       "icon": "send",
-      "order": 25,
+      "order": 910,
       "confirm_before_run": false,
       "output_mode": "inline"
     }
@@ -52,7 +52,7 @@
     "parameters": [],
     "presentation": {
       "icon": "videocam",
-      "order": 5,
+      "order": 900,
       "confirm_before_run": false,
       "output_mode": "inline"
     }
@@ -83,7 +83,7 @@
     "parameters": [],
     "presentation": {
       "icon": "palette",
-      "order": 30,
+      "order": 920,
       "confirm_before_run": false,
       "output_mode": "inline"
     }

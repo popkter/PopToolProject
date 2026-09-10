@@ -12,7 +12,8 @@ Rectangle {
     readonly property int popupGap: 8
     readonly property int popupDeviceCount: Math.min(3, root.controller.androidDevices.length)
     readonly property bool popupIconOnly: root.compact || devicePopup.width < 220
-    readonly property real popupRowsHeight: popupDeviceCount * 58
+    readonly property int popupRowHeight: 52
+    readonly property real popupRowsHeight: popupDeviceCount * popupRowHeight
                                             + Math.max(0, popupDeviceCount - 1) * 4
 
     implicitHeight: dense ? 60 : 74
@@ -136,27 +137,22 @@ Rectangle {
                     }
                 }
                 Item { visible: root.popupIconOnly; Layout.fillWidth: true }
-                Rectangle {
+                PrimaryButton {
                     Layout.preferredWidth: 40
                     Layout.preferredHeight: 40
+                    compact: true
+                    text: "刷新设备"
+                    iconName: "refresh"
+                    glyphSize: 22
+                    tonal: true
+                    foregroundColor: Theme.primary
+                    border.width: 0
                     radius: Theme.radiusLarge
-                    color: refreshMouse.containsMouse ? Theme.primaryContainer : "transparent"
-                    MaterialIcon {
-                        anchors.centerIn: parent
-                        icon: "refresh"
-                        iconSize: 22
-                        color: Theme.primary
-                        rotation: root.controller.androidDeviceRefreshing ? 120 : 0
-                        Behavior on rotation { NumberAnimation { duration: 180 } }
-                    }
-                    MouseArea {
-                        id: refreshMouse
-                        anchors.fill: parent
-                        enabled: !root.controller.androidDeviceRefreshing
-                        hoverEnabled: true
-                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: root.controller.refreshAndroidDevices()
-                    }
+                    color: hovered ? Theme.primaryContainer : "transparent"
+                    enabled: !root.controller.androidDeviceRefreshing
+                    disabledOpacity: 0.38
+                    iconSpinning: root.controller.androidDeviceRefreshing
+                    onClicked: root.controller.refreshAndroidDevices()
                 }
                 Item { visible: root.popupIconOnly; Layout.fillWidth: true }
             }
@@ -191,81 +187,37 @@ Rectangle {
                     id: deviceRow
                     required property var modelData
                     width: deviceList.width
-                    height: 58
+                    height: root.popupRowHeight
                     radius: Theme.radiusMedium
                     color: modelData.serial === root.controller.selectedAndroidDevice
                            ? Theme.primaryContainer
                            : (rowMouse.containsMouse ? Theme.surfaceContainerHigh : "transparent")
                     RowLayout {
-                        visible: !root.popupIconOnly
                         anchors.fill: parent
                         anchors.leftMargin: Theme.space12
                         anchors.rightMargin: Theme.space12
-                        spacing: Theme.space12
-                        Item {
-                            Layout.preferredWidth: 22
-                            Layout.preferredHeight: 22
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: 9
-                                height: 9
-                                radius: Theme.radiusTiny
-                                color: Theme.success
-                            }
+                        spacing: Theme.space8
+                        MaterialIcon {
+                            Layout.preferredWidth: 24
+                            icon: "android"
+                            iconSize: 23
+                            color: Theme.success
                         }
-                        ColumnLayout {
+                        Text {
                             Layout.fillWidth: true
-                            spacing: Theme.space4
-                            Text {
-                                Layout.fillWidth: true
-                                text: deviceRow.modelData.label
-                                horizontalAlignment: Text.AlignHCenter
-                                elide: Text.ElideMiddle
-                                font.pixelSize: Theme.fontSupporting
-                                font.weight: Font.DemiBold
-                                color: Theme.textPrimary
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                text: deviceRow.modelData.status
-                                horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: Theme.fontMicro
-                                color: Theme.success
-                            }
+                            Layout.minimumWidth: 0
+                            text: deviceRow.modelData.serial
+                            elide: Text.ElideMiddle
+                            font.pixelSize: Theme.fontSupporting
+                            font.weight: Font.DemiBold
+                            color: Theme.textPrimary
                         }
-                        Item {
+                        MaterialIcon {
                             Layout.preferredWidth: 22
-                            Layout.preferredHeight: 22
-                            MaterialIcon {
-                                anchors.centerIn: parent
-                                visible: deviceRow.modelData.serial === root.controller.selectedAndroidDevice
-                                icon: "check_circle"
-                                iconSize: 22
-                                color: Theme.primary
-                            }
-                        }
-                    }
-                    MaterialIcon {
-                        anchors.centerIn: parent
-                        visible: root.popupIconOnly
-                        icon: deviceRow.modelData.serial === root.controller.selectedAndroidDevice
-                              ? "phonelink_ring" : "smartphone"
-                        iconSize: 27
-                        color: deviceRow.modelData.serial === root.controller.selectedAndroidDevice
-                               ? Theme.primary : Theme.success
-                    }
-                    property bool revealClickedName: false
-                    ToolTip.visible: root.popupIconOnly
-                                     && (rowMouse.containsMouse || deviceRow.revealClickedName)
-                    ToolTip.text: deviceRow.modelData.label + "\n" + deviceRow.modelData.status
-                    ToolTip.delay: rowMouse.containsMouse ? 300 : 0
-                    ToolTip.timeout: 1800
-                    Timer {
-                        id: clickedNameTimer
-                        interval: 1500
-                        onTriggered: {
-                            deviceRow.revealClickedName = false
-                            devicePopup.close()
+                            visible: deviceRow.modelData.serial === root.controller.selectedAndroidDevice
+                            icon: "check_circle"
+                            iconSize: 22
+                            color: Theme.primary
                         }
                     }
                     MouseArea {
@@ -273,14 +225,9 @@ Rectangle {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-onClicked: {
+                        onClicked: {
                             root.controller.selectAndroidDevice(deviceRow.modelData.serial)
-                            if (root.popupIconOnly) {
-                                deviceRow.revealClickedName = true
-                                clickedNameTimer.restart()
-                            } else {
-                                devicePopup.close()
-                            }
+                            devicePopup.close()
                         }
                     }
                 }

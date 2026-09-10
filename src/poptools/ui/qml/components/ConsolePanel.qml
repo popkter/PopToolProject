@@ -145,44 +145,36 @@ Item {
                 color: Theme.textSecondary
             }
             Item { Layout.fillWidth: true }
-            Rectangle {
+            PrimaryButton {
                 Layout.preferredWidth: 86
                 Layout.preferredHeight: 38
                 radius: Theme.radiusSmall
-                color: clearMouse.containsMouse ? Theme.surfaceContainerHigh : Theme.surface
+                text: "清空"
+                iconName: "delete_sweep"
+                tonal: true
+                color: hovered ? Theme.surfaceContainerHigh : Theme.surface
                 border.color: Theme.outlineVariant
-                Row {
-                    anchors.centerIn: parent
-                    spacing: Theme.controlSpacing
-                    MaterialIcon { icon: "delete"; iconSize: 19; color: Theme.textSecondary }
-                    Text { text: "清空"; font.pixelSize: Theme.fontBody; color: Theme.textSecondary }
-                }
-                MouseArea {
-                    id: clearMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.controller.clearConsole()
-                }
+                foregroundColor: Theme.textSecondary
+                labelFontSize: Theme.fontBody
+                labelFontWeight: Font.Normal
+                glyphSize: 19
+                contentSpacing: Theme.controlSpacing
+                onClicked: root.controller.clearConsole()
             }
-            Rectangle {
+            PrimaryButton {
                 visible: root.resizable
                 Layout.preferredWidth: 36
                 Layout.preferredHeight: 36
+                compact: true
+                text: root.expanded ? "收起控制台" : "展开控制台"
+                iconName: root.expanded ? "keyboard_arrow_down" : "keyboard_arrow_up"
+                glyphSize: 23
+                tonal: true
+                foregroundColor: Theme.textSecondary
+                border.width: 0
                 radius: Theme.radiusLarge
-                color: toggleMouse.containsMouse ? Theme.surfaceContainerHigh : "transparent"
-                MaterialIcon {
-                    anchors.centerIn: parent
-                    icon: root.expanded ? "keyboard_arrow_down" : "keyboard_arrow_up"
-                    iconSize: 23
-                }
-                MouseArea {
-                    id: toggleMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.expanded = !root.expanded
-                }
+                color: hovered ? Theme.surfaceContainerHigh : "transparent"
+                onClicked: root.expanded = !root.expanded
             }
         }
 
@@ -199,7 +191,7 @@ Item {
             radius: Theme.radiusMedium
             color: Theme.consoleBackground
 
-            ScrollView {
+            DesktopScrollView {
                 anchors.fill: parent
                 anchors.margins: root.outputViewportMargin
                 clip: true

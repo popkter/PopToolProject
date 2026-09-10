@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "poptools"
-version = "1.0.9"
+version = "1.1.0"
 description = "A self-contained Material 3 desktop toolbox for Android development and log analysis."
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
@@ -49,6 +49,7 @@ poptools = [
   "resources/vendor/*",
   "ui/qml/**/qmldir",
   "resources/tools/*.json",
+  "resources/tools/*.py",
   "resources/python/*.py",
   "resources/fonts/*",
   "resources/icons/*",

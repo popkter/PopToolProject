@@ -85,7 +85,7 @@ AppDialog {
             Item { Layout.fillWidth: true }
             PrimaryButton {
                 implicitWidth: 110; implicitHeight: 48
-                text: "取消"; iconName: ""; tonal: true
+                text: "取消"; iconName: "close"; tonal: true
                 onClicked: root.close()
             }
             PrimaryButton {

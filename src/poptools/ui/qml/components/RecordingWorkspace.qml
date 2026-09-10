@@ -69,6 +69,22 @@ ColumnLayout {
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
     }
+    PrimaryButton {
+        Layout.alignment: Qt.AlignHCenter
+        Layout.preferredWidth: 168
+        Layout.preferredHeight: 40
+        enabled: root.controller.recording
+                 || root.androidController.selectedAndroidDevice.length > 0
+        text: root.controller.recording ? "结束记录" : "开始记录"
+        iconName: root.controller.recording ? "stop" : "fiber_manual_record"
+        successStyle: root.controller.recording
+        onClicked: {
+            if (root.controller.recording)
+                root.controller.stopRecording()
+            else
+                root.controller.startRecording(root.androidController.selectedAndroidDevice)
+        }
+    }
     Text {
         Layout.fillWidth: true
         visible: root.statusMessage.length > 0

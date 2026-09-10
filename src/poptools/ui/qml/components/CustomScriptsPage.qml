@@ -32,22 +32,16 @@ Rectangle {
     function closeDrawerImmediately() {}
     function closeDrawer() {}
 
-    component OutlineButton: Rectangle {
-        id: button
-        property string text: ""
-        property string iconName: ""
-        signal clicked()
-        implicitWidth: labelRow.implicitWidth + 28
+    component OutlineButton: PrimaryButton {
         implicitHeight: 34
         radius: Theme.radiusSmall
-        color: buttonMouse.containsMouse ? Theme.surfaceContainer : Theme.surfaceContainerLow
+        tonal: true
+        color: hovered ? Theme.surfaceContainer : Theme.surfaceContainerLow
         border.color: Theme.outline
-        Row {
-            id: labelRow; anchors.centerIn: parent; spacing: 8
-            MaterialIcon { visible: button.iconName.length > 0; icon: button.iconName; iconSize: 18; color: Theme.textSecondary }
-            Text { text: button.text; color: Theme.textPrimary; font.pixelSize: Theme.fontBody; font.weight: Font.DemiBold }
-        }
-        MouseArea { id: buttonMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: button.clicked() }
+        foregroundColor: Theme.textPrimary
+        labelFontSize: Theme.fontBody
+        glyphSize: 18
+        contentSpacing: 8
     }
 
     ColumnLayout {
@@ -67,7 +61,7 @@ Rectangle {
             description: "管理与运行常用脚本"
             titlePixelSize: 28
             actionWidth: 209
-            OutlineButton { Layout.preferredWidth: 78; Layout.preferredHeight: 34; text: "导入"; onClicked: root.importRequested() }
+            OutlineButton { Layout.preferredWidth: 78; Layout.preferredHeight: 34; text: "导入"; iconName: "file_download"; onClicked: root.importRequested() }
             PrimaryButton { Layout.preferredWidth: 116; Layout.preferredHeight: 34; text: "新建脚本"; iconName: "add"; onClicked: root.createRequested() }
         }
 
@@ -93,6 +87,7 @@ Rectangle {
 
                     TextField {
                         id: searchField
+                        FilePathDropArea { target: searchField }
                         Layout.fillWidth: true
                         Layout.preferredHeight: 36
                         leftPadding: 42
@@ -118,7 +113,7 @@ Rectangle {
                         Repeater {
                             model: [
                                 { label: "全部", value: "all" },
-                                { label: "ADB", value: "batch" },
+                                { label: "Batch", value: "batch" },
                                 { label: "PowerShell", value: "powershell" },
                                 { label: "Python", value: "python" },
                             ]
@@ -142,8 +137,26 @@ Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 24
                         Layout.topMargin: 3
-                        Text { Layout.fillWidth: true; Layout.leftMargin: 8; text: "脚本名称"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption }
-                        Text { text: "类型"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption; Layout.rightMargin: 61 }
+                        Text {
+                            Layout.fillWidth: true; Layout.leftMargin: 8; text: "脚本名称"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption
+                        }
+                        Text {
+                            text: "类型"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption; Layout.rightMargin: 61
+                        }
+                        ToolSortButton {
+                            Layout.preferredWidth: 32
+                            Layout.preferredHeight: 24
+                            controller: root.controller
+                        }
+/*                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            Text {
+                                Layout.fillWidth: true; text: scriptList.count + " 个脚本"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption
+                            }
+                            // Text { text: "紧凑 · ↑↓ 切换"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption }
+
+                        }*/
                     }
 
                     ListView {
@@ -156,6 +169,13 @@ Rectangle {
                         spacing: 0
                         model: root.controller.toolsModel
                         boundsBehavior: Flickable.StopAtBounds
+
+                        ScrollBar.vertical: ScrollBar {
+                            id: scriptListScrollBar
+                            policy: scriptList.contentHeight > scriptList.height + 0.5
+                                ? ScrollBar.AlwaysOn : ScrollBar.AsNeeded
+                        }
+
                         delegate: Rectangle {
                             id: scriptRow
                             required property string toolId
@@ -166,7 +186,9 @@ Rectangle {
                             required property bool selected
                             required property bool running
                             required property int index
-                            width: scriptList.width
+                            width: scriptList.width - (scriptListScrollBar.visible
+                                ? scriptListScrollBar.width + Theme.space8 : 0)
+
                             height: (root.kindFilter === "all" || root.kindFilter === "favorite" || root.kindFilter === executorKind) ? 40 : 0
                             visible: height > 0
                             radius: 6
@@ -178,13 +200,13 @@ Rectangle {
                                 Rectangle {
                                     Layout.preferredWidth: 26; Layout.preferredHeight: 26; radius: 5
                                     color: scriptRow.executorKind === "python" ? Theme.tertiaryContainer : scriptRow.executorKind === "powershell" ? Theme.primaryContainer : Theme.successContainer
-                                    MaterialIcon { anchors.centerIn: parent; icon: scriptRow.executorKind === "batch" ? "smartphone" : "terminal"; iconSize: 16; color: scriptRow.executorKind === "python" ? Theme.tertiary : scriptRow.executorKind === "powershell" ? Theme.primary : Theme.success }
+                                    MaterialIcon { anchors.centerIn: parent; icon: scriptRow.iconName || (scriptRow.executorKind === "batch" ? "smartphone" : "terminal"); iconSize: 16; color: scriptRow.executorKind === "python" ? Theme.tertiary : scriptRow.executorKind === "powershell" ? Theme.primary : Theme.success }
                                 }
                                 Text { Layout.fillWidth: true; text: scriptRow.title; color: scriptRow.selected ? Theme.primary : Theme.textPrimary; font.pixelSize: Theme.fontBody; font.weight: scriptRow.selected ? Font.Bold : Font.Normal; elide: Text.ElideRight }
                                 Rectangle {
                                     Layout.preferredWidth: 94; Layout.preferredHeight: 22; radius: 4
                                     color: scriptRow.executorKind === "python" ? Theme.tertiaryContainer : scriptRow.executorKind === "powershell" ? Theme.primaryContainer : Theme.successContainer
-                                    Text { id: kindLabel; anchors.centerIn: parent; text: scriptRow.executorKind === "batch" ? "ADB" : scriptRow.executorKind === "powershell" ? "PowerShell" : scriptRow.executorKind === "python" ? "Python" : scriptRow.executorKind; color: scriptRow.executorKind === "python" ? Theme.tertiary : scriptRow.executorKind === "powershell" ? Theme.primary : Theme.success; font.pixelSize: Theme.fontCaption }
+                                    Text { id: kindLabel; anchors.centerIn: parent; text: scriptRow.executorKind === "batch" ? "Batch" : scriptRow.executorKind === "powershell" ? "PowerShell" : scriptRow.executorKind === "python" ? "Python" : scriptRow.executorKind; color: scriptRow.executorKind === "python" ? Theme.tertiary : scriptRow.executorKind === "powershell" ? Theme.primary : Theme.success; font.pixelSize: Theme.fontCaption }
                                 }
                                 MaterialIcon { icon: "chevron_right"; iconSize: 19; color: scriptRow.selected ? Theme.primary : Theme.textSecondary }
                             }
@@ -192,13 +214,6 @@ Rectangle {
                         }
                     }
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 28
-                        Text { Layout.fillWidth: true; text: scriptList.count + " 个脚本"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption }
-                        Text { text: "紧凑 · ↑↓ 切换"; color: Theme.textSecondary; font.pixelSize: Theme.fontCaption }
-                        ToolSortButton { Layout.preferredWidth: 24; Layout.preferredHeight: 24; controller: root.controller }
-                    }
                 }
             }
 

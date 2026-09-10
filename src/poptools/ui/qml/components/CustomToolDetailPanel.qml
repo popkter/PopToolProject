@@ -14,10 +14,13 @@ Rectangle {
     required property var parameterValues
     required property var displayedTool
     property bool consoleExpanded: false
+    property bool allowManagement: true
+    property bool externalRun: false
 
     signal editRequested()
     signal deleteRequested()
     signal confirmRunRequested(var values)
+    signal runRequested()
     signal toastRequested(string message, bool error)
 
     radius: 10
@@ -48,6 +51,10 @@ Rectangle {
     }
 
     function runSelectedTool() {
+        if (root.externalRun) {
+            root.runRequested()
+            return
+        }
         if (root.controller.running) {
             root.controller.stopExecution()
         } else if (root.displayedTool.presentation
@@ -102,29 +109,26 @@ Rectangle {
             elide: Text.ElideRight
         }
 
-        Rectangle {
+        PrimaryButton {
+            visible: root.allowManagement
             x: parent.width - 101
             y: 24
             width: 77
             height: 34
             radius: 7
-            color: shareMouse.containsMouse ? Theme.surfaceContainer : Theme.surfaceContainerLow
+            text: "分享"
+            iconName: "file_upload"
+            tonal: true
+            color: hovered ? Theme.surfaceContainer : Theme.surfaceContainerLow
             border.color: Theme.outline
-            Row {
-                anchors.centerIn: parent
-                spacing: 7
-                MaterialIcon { icon: "ios_share"; iconSize: 17; color: Theme.textSecondary }
-                Text { text: "分享"; color: Theme.textPrimary; font.pixelSize: 13 }
-            }
-            MouseArea {
-                id: shareMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    const success = root.controller.exportSelectedScriptToClipboard()
-                    root.toastRequested(success ? "脚本已复制到剪贴板" : "脚本分享失败", !success)
-                }
+            foregroundColor: Theme.textPrimary
+            labelFontSize: 13
+            labelFontWeight: Font.Normal
+            glyphSize: 17
+            contentSpacing: 7
+            onClicked: {
+                const success = root.controller.exportSelectedScriptToClipboard()
+                root.toastRequested(success ? "脚本已复制到剪贴板" : "脚本分享失败", !success)
             }
         }
 
@@ -164,6 +168,7 @@ Rectangle {
         contentWidth: width
         contentHeight: parameterColumn.height
         boundsBehavior: Flickable.StopAtBounds
+        acceptedButtons: Qt.NoButton
 
         Column {
             id: parameterColumn
@@ -206,12 +211,13 @@ Rectangle {
                         Component {
                             id: textField
                             TextField {
+                                id: parameterTextField
                                 text: String(parameterItem.modelData.default || "")
                                 placeholderText: parameterItem.modelData.placeholder || ""
                                 color: Theme.textPrimary
                                 font.pixelSize: 14
                                 leftPadding: 13
-                                rightPadding: 13
+                                rightPadding: parameterItem.modelData.kind === "file" ? 45 : 13
                                 echoMode: parameterItem.modelData.kind === "secret"
                                     ? TextInput.Password : TextInput.Normal
                                 background: Rectangle {
@@ -221,6 +227,37 @@ Rectangle {
                                     border.width: parent.activeFocus ? 2 : 1
                                 }
                                 onTextChanged: root.parameterValues[parameterItem.modelData.id] = text
+                                FilePathDropArea { target: parameterTextField }
+                                AppTextEditMenu { target: parameterTextField }
+
+                                PrimaryButton {
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 6
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: parameterItem.modelData.kind === "file"
+                                    width: 30
+                                    height: 30
+                                    compact: true
+                                    text: "选择文件"
+                                    iconName: "folder_open"
+                                    glyphSize: 19
+                                    tonal: true
+                                    foregroundColor: Theme.primaryText
+                                    border.width: 0
+                                    radius: 6
+                                    z: 101
+                                    color: hovered
+                                        ? Theme.primaryContainerHover
+                                        : Theme.primaryContainer
+                                    onClicked: {
+                                        const selectedPath = root.controller.chooseParameterFile(
+                                            parameterTextField.text)
+                                        if (selectedPath.length > 0) {
+                                            parameterTextField.text = selectedPath
+                                            parameterTextField.forceActiveFocus()
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -309,57 +346,52 @@ Rectangle {
         width: parent.width - 47
         height: 41
 
-        Rectangle {
+        PrimaryButton {
+            visible: root.allowManagement
             anchors.left: parent.left
             anchors.top: parent.top
             width: 108
-            height: 34
+            height: 36
             radius: 7
-            color: editMouse.containsMouse ? Theme.surfaceContainer : Theme.surfaceContainerLow
+            text: "编辑脚本"
+            iconName: "edit"
+            tonal: true
+            color: hovered ? Theme.surfaceContainer : Theme.surfaceContainerLow
             border.color: Theme.outline
-            Text { anchors.centerIn: parent; text: "编辑脚本"; color: Theme.textPrimary; font.pixelSize: 13 }
-            MouseArea {
-                id: editMouse
-                anchors.fill: parent
-                enabled: !!root.displayedTool.editable && !root.controller.running
-                hoverEnabled: true
-                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: root.editRequested()
-            }
+            foregroundColor: Theme.textPrimary
+            labelFontSize: 13
+            labelFontWeight: Font.Normal
+            glyphSize: 18
+            contentSpacing: 7
+            enabled: !!root.displayedTool.editable && !root.controller.running
+            onClicked: root.editRequested()
         }
 
 
-        Rectangle {
+        PrimaryButton {
             id: runButton
             anchors.right: parent.right
             anchors.top: parent.top
             width: 152
-            height: 34
+            height: 36
             radius: 7
-            color: runMouse.containsMouse ? Theme.primaryHover : Theme.primary
-            Row {
-                anchors.centerIn: parent
-                spacing: 10
-                MaterialIcon { icon: root.controller.running ? "stop" : "play_arrow"; iconSize: 18; color: "white" }
-                Text { text: root.controller.running ? "停止运行" : "运行脚本"; color: "white"; font.pixelSize: 13; font.weight: Font.Medium }
-            }
-            MouseArea {
-                id: runMouse
-                anchors.fill: parent
-                enabled: !!root.displayedTool.id
-                hoverEnabled: true
-                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: root.runSelectedTool()
-            }
+            text: root.controller.running ? "停止运行" : "运行脚本"
+            iconName: root.controller.running ? "stop" : "play_arrow"
+            tonal: true
+            color: hovered ? Theme.primaryHover : Theme.primary
+            border.width: 0
+            foregroundColor: "white"
+            labelFontSize: 13
+            labelFontWeight: Font.Medium
+            glyphSize: 18
+            contentSpacing: 10
+            enabled: !!root.displayedTool.id
+            onClicked: root.runSelectedTool()
         }
 
-        Rectangle { x: 120; anchors.top: parent.top; width: 108; height: 34; radius: 7; color: deleteMouse.containsMouse ? Theme.errorContainer : Theme.errorContainer; border.color: Theme.error
-            Text { anchors.centerIn: parent; text: "删除"; color: Theme.error; font.pixelSize: 13 }
-            MouseArea { id: deleteMouse; anchors.fill: parent; enabled: !!root.displayedTool.id && !root.controller.running; hoverEnabled: true; onClicked: root.deleteRequested() }
-        }
-        Rectangle { x: 240; anchors.top: parent.top; width: 108; height: 34; radius: 7; color: shareBottomMouse.containsMouse ? Theme.surfaceContainer : Theme.surfaceContainerLow; border.color: Theme.outline
-            Text { anchors.centerIn: parent; text: "分享"; color: Theme.textPrimary; font.pixelSize: 13 }
-            MouseArea { id: shareBottomMouse; anchors.fill: parent; enabled: !!root.displayedTool.id; hoverEnabled: true; onClicked: { const success = root.controller.exportSelectedScriptToClipboard(); root.toastRequested(success ? "脚本已复制到剪贴板" : "脚本分享失败", !success) } }
+        PrimaryButton { visible: root.allowManagement; x: 120; anchors.top: parent.top; width: 108; height: 36; radius: 7; tonal: true; color: Theme.errorContainer; border.color: Theme.errorColor
+            text: "删除"; iconName: "delete"; foregroundColor: Theme.errorColor; labelFontSize: 13; labelFontWeight: Font.Normal; glyphSize: 18; contentSpacing: 7
+            enabled: !!root.displayedTool.id && !root.controller.running; onClicked: root.deleteRequested()
         }
     }
 
@@ -373,6 +405,23 @@ Rectangle {
         radius: 9
         color: Theme.consoleBackground
         clip: true
+
+        function scrollConsoleToBottom() {
+            if (!root.consoleExpanded || !consoleScroll.contentItem)
+                return
+
+            var flickable = consoleScroll.contentItem
+            flickable.contentY = Math.max(0, flickable.contentHeight - flickable.height)
+        }
+
+        onHeightChanged: Qt.callLater(scrollConsoleToBottom)
+
+        Behavior on height {
+            NumberAnimation {
+                duration: 220
+                easing.type: Easing.OutCubic
+            }
+        }
 
         Rectangle {
             anchors.left: parent.left
@@ -391,51 +440,72 @@ Rectangle {
                 Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: root.controller.running ? Theme.consoleWarning : Theme.success }
                 Text { text: root.controller.running ? "运行中" : "已完成"; color: root.controller.running ? Theme.consoleWarning : Theme.success; font.pixelSize: 12 }
                 Item { Layout.fillWidth: true }
-                Text {
+                PrimaryButton {
+                    implicitWidth: 82
+                    implicitHeight: 30
+                    radius: 4
                     text: "复制输出"
-                    color: copyMouse.containsMouse ? Theme.consoleText : Theme.consoleMuted
-                    font.pixelSize: 12
-                    MouseArea {
-                        id: copyMouse
-                        anchors.fill: parent
-                        anchors.margins: -8
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: { consoleText.selectAll(); consoleText.copy(); consoleText.deselect() }
-                    }
+                    iconName: "content_copy"
+                    tonal: true
+                    color: "transparent"
+                    border.width: 0
+                    foregroundColor: hovered ? Theme.consoleText : Theme.consoleMuted
+                    labelFontSize: 12
+                    labelFontWeight: Font.Normal
+                    glyphSize: 15
+                    contentSpacing: 4
+                    onClicked: { consoleText.selectAll(); consoleText.copy(); consoleText.deselect() }
                 }
-                Item { Layout.preferredWidth: 28 }
-                Text {
+                Item { Layout.preferredWidth: 8 }
+                PrimaryButton {
+                    implicitWidth: 62
+                    implicitHeight: 30
+                    radius: 4
                     text: "清空"
-                    color: clearMouse.containsMouse ? Theme.consoleText : Theme.consoleMuted
-                    font.pixelSize: 12
-                    MouseArea {
-                        id: clearMouse
-                        anchors.fill: parent
-                        anchors.margins: -8
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.controller.clearConsole()
-                    }
+                    iconName: "delete_sweep"
+                    tonal: true
+                    color: "transparent"
+                    border.width: 0
+                    foregroundColor: hovered ? Theme.consoleText : Theme.consoleMuted
+                    labelFontSize: 12
+                    labelFontWeight: Font.Normal
+                    glyphSize: 15
+                    contentSpacing: 4
+                    onClicked: root.controller.clearConsole()
                 }
-                ToolButton {
+                PrimaryButton {
                     objectName: "customConsoleToggle"
+                    implicitWidth: 66
+                    implicitHeight: 30
+                    radius: 4
                     text: root.consoleExpanded ? "收起" : "展开"
+                    iconName: root.consoleExpanded ? "expand_more" : "expand_less"
                     Accessible.name: root.consoleExpanded ? "收起控制台输出" : "展开控制台输出"
-                    contentItem: Row {
-                        spacing: 4
-                        Text { text: root.consoleExpanded ? "收起" : "展开"; color: Theme.consoleText; font.pixelSize: 12 }
-                        MaterialIcon { icon: root.consoleExpanded ? "expand_more" : "expand_less"; iconSize: 16; color: Theme.consoleText }
-                    }
-                    background: Rectangle { radius: 4; color: parent.hovered ? Theme.consoleBackground : "transparent" }
+                    tonal: true
+                    color: hovered ? Theme.consoleBackground : "transparent"
+                    border.width: 0
+                    foregroundColor: Theme.consoleText
+                    labelFontSize: 12
+                    labelFontWeight: Font.Normal
+                    glyphSize: 16
+                    contentSpacing: 4
                     onClicked: root.consoleExpanded = !root.consoleExpanded
                 }
             }
         }
 
-        TextArea {
-            id: consoleText
-            visible: root.consoleExpanded
+        Connections {
+            target: root
+            function onConsoleExpandedChanged() {
+                Qt.callLater(consolePanel.scrollConsoleToBottom)
+            }
+        }
+
+        DesktopScrollView {
+            id: consoleScroll
+            objectName: "customConsoleScroll"
+            visible: consolePanel.height > 43
+            opacity: root.consoleExpanded ? 1 : 0
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
@@ -443,20 +513,38 @@ Rectangle {
             anchors.bottom: footer.top
             anchors.leftMargin: 12
             anchors.rightMargin: 12
-            text: root.controller.consoleText
-            readOnly: true
-            selectByMouse: true
-            color: Theme.consoleText
-            selectionColor: Theme.primary
-            font.family: "Cascadia Mono"
-            font.pixelSize: 12
-            background: null
+            clip: true
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+            Behavior on opacity {
+                NumberAnimation { duration: 140 }
+            }
+
+            TextArea {
+                id: consoleText
+                width: consoleScroll.availableWidth
+                text: root.controller.consoleText
+                readOnly: true
+                selectByMouse: true
+                wrapMode: TextEdit.WrapAnywhere
+                color: Theme.consoleText
+                selectionColor: Theme.primary
+                selectedTextColor: "white"
+                font.family: "Cascadia Mono"
+                font.pixelSize: 12
+                background: null
+                AppTextEditMenu { target: consoleText }
+                onTextChanged: Qt.callLater(consolePanel.scrollConsoleToBottom)
+                onContentHeightChanged: Qt.callLater(consolePanel.scrollConsoleToBottom)
+            }
         }
 
         Rectangle {
             id: footer
             radius: 8
-            visible: root.consoleExpanded
+            visible: consolePanel.height > 43
+            opacity: root.consoleExpanded ? 1 : 0
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
@@ -464,8 +552,12 @@ Rectangle {
             color: Theme.consoleBackground
             border.color: Theme.darkMode ? "#2A3442" : "#25303D"
             border.width: 1
+            Behavior on opacity {
+                NumberAnimation { duration: 140 }
+            }
             Text { anchors.left: parent.left; anchors.leftMargin: 15; anchors.verticalCenter: parent.verticalCenter; text: "✓ 退出码 0"; color: Theme.success; font.pixelSize: 11 }
             Text { anchors.right: parent.right; anchors.rightMargin: 15; anchors.verticalCenter: parent.verticalCenter; text: root.controller.statusText; color: Theme.consoleMuted; font.pixelSize: 11 }
         }
     }
+
 }

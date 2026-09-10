@@ -14,8 +14,8 @@ AppDialog {
     property string errorMessage: ""
     signal scriptReplaced(string title)
 
-    width: Math.min(540, parentWindow.width - 24)
-    height: Math.min(320, parentWindow.height - 24)
+    width: Math.min(368, parentWindow.width - 24)
+    height: Math.min(root.replacementMode ? 236 : 216, parentWindow.height - 24)
     anchors.centerIn: Overlay.overlay
     modal: true
     closePolicy: Popup.CloseOnEscape
@@ -38,18 +38,24 @@ AppDialog {
     onClosed: root.controller.cancelScriptImportReplacement()
 
     contentItem: ColumnLayout {
-        spacing: 14
+        spacing: Theme.space12
 
-        MaterialIcon {
-            icon: root.replacementMode ? "content_copy" : "error"
-            iconSize: 36
-            color: root.replacementMode ? Theme.primary : Theme.errorColor
-        }
-        Text {
-            text: root.replacementMode ? "发现相同 ID 的脚本" : "无法导入脚本"
-            color: Theme.textPrimary
-            font.pixelSize: Theme.fontDialogTitle
-            font.weight: Font.Bold
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Theme.space12
+
+            MaterialIcon {
+                icon: root.replacementMode ? "content_copy" : "error"
+                iconSize: 24
+                color: root.replacementMode ? Theme.primary : Theme.errorColor
+            }
+            Text {
+                Layout.fillWidth: true
+                text: root.replacementMode ? "发现相同 ID 的脚本" : "无法导入脚本"
+                color: Theme.textPrimary
+                font.pixelSize: Theme.fontDialogTitle
+                font.weight: Font.Bold
+            }
         }
         Text {
             Layout.fillWidth: true
@@ -61,22 +67,29 @@ AppDialog {
             font.pixelSize: Theme.fontBody
             wrapMode: Text.WordWrap
         }
-        Item { Layout.fillHeight: true }
+
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: 1
+            color: Theme.outlineVariant
+        }
+
         RowLayout {
             Layout.fillWidth: true
-            Item { Layout.fillWidth: true }
+            spacing: Theme.space12
+
             PrimaryButton {
-                implicitWidth: 110
-                implicitHeight: 48
+                Layout.fillWidth: true
+                implicitHeight: 44
                 text: root.replacementMode ? "取消" : "关闭"
-                iconName: ""
+                iconName: "close"
                 tonal: true
                 onClicked: root.close()
             }
             PrimaryButton {
+                Layout.fillWidth: true
                 visible: root.replacementMode
-                implicitWidth: 130
-                implicitHeight: 48
+                implicitHeight: 44
                 text: "确认替换"
                 iconName: "sync"
                 onClicked: {

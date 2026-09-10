@@ -391,10 +391,15 @@ void TerminalItem::copySelection()
 
 void TerminalItem::pasteClipboard()
 {
+    pasteText(QGuiApplication::clipboard()->text());
+}
+
+void TerminalItem::pasteText(const QString &value)
+{
     auto *session = activeSession();
     if (!session)
         return;
-    QString text = QGuiApplication::clipboard()->text();
+    QString text = value;
     if (text.isEmpty())
         return;
     text.replace(QStringLiteral("\r\n"), QStringLiteral("\r"));

@@ -16,6 +16,7 @@ from PySide6.QtCore import (
     Slot,
 )
 from PySide6.QtGui import QGuiApplication, QWindow
+from PySide6.QtWidgets import QFileDialog
 
 from poptools.domain.models import (
     ExecutorKind,
@@ -56,6 +57,20 @@ def _local_path_from_url(url: str) -> str:
     return dropped_url.toLocalFile()
 
 
+def _file_picker_start_directory(value: str) -> str:
+    raw_path = value.strip()
+    if raw_path.startswith("file:"):
+        raw_path = _local_path_from_url(raw_path)
+    if raw_path:
+        candidate = Path(raw_path).expanduser()
+        if candidate.is_dir():
+            return str(candidate)
+        if candidate.is_file() or candidate.parent.is_dir():
+            return str(candidate.parent)
+    downloads = Path.home() / "Downloads"
+    return str(downloads if downloads.is_dir() else Path.home())
+
+
 class AppController(QObject):
     sectionChanged = Signal()
     sectionTitleChanged = Signal()
@@ -63,6 +78,7 @@ class AppController(QObject):
     consoleTextChanged = Signal()
     runningChanged = Signal()
     statusTextChanged = Signal()
+    hiddenPresetCategoriesChanged = Signal()
     pythonDoctorWarning = Signal(str)
     pythonDoctorInstallSuggestion = Signal(str)
     pythonDependencyInstallFinished = Signal(bool, str)
@@ -85,6 +101,11 @@ class AppController(QObject):
         self.config_store = config_store
         self._section = ToolSection.CUSTOM
         self._selected: ToolDefinition | None = None
+        self._section_selections: dict[str, str] = {
+            ToolSection.CUSTOM.value: "",
+            ToolSection.PRESET.value: "",
+        }
+        self._hidden_preset_categories = set(config_store.hidden_preset_categories())
         self._console_texts = {"": "14:20:15  泡泡工具箱 已就绪\n"}
         self._pending_console_chunks: dict[str, list[str]] = {}
         self._console_refresh_timer = QTimer(self)
@@ -158,6 +179,26 @@ class AppController(QObject):
     @Property(str, notify=statusTextChanged)
     def statusText(self) -> str:
         return self._status_text
+
+    @Property("QStringList", notify=hiddenPresetCategoriesChanged)
+    def hiddenPresetCategories(self) -> list[str]:
+        return sorted(self._hidden_preset_categories)
+
+    @Slot(str, bool)
+    def setPresetCategoryHidden(self, category: str, hidden: bool) -> None:
+        category = category.strip()
+        if not category or category not in {
+            "模拟相关", "环境相关", "硬件相关", "跳转相关", "其他设备操作", "其他预设"
+        }:
+            return
+        if hidden:
+            self._hidden_preset_categories.add(category)
+        else:
+            self._hidden_preset_categories.discard(category)
+        self.config_store.set_hidden_preset_categories(
+            sorted(self._hidden_preset_categories)
+        )
+        self.hiddenPresetCategoriesChanged.emit()
 
     @Property(str, constant=True)
     def pythonEnvironmentDirectory(self) -> str:
@@ -242,10 +283,14 @@ class AppController(QObject):
         target = ToolSection(section)
         if target == self._section:
             return
+        if self._selected is not None and self._selected.section == self._section:
+            self._section_selections[self._section.value] = self._selected.id
         self._section = target
+        self._tools_model.set_category("")
         self.sectionChanged.emit()
         self.sectionTitleChanged.emit()
-        self._refresh(select_first=True)
+        remembered_id = self._section_selections.get(target.value, "")
+        self._refresh(select_first=not remembered_id, select_id=remembered_id)
 
     @Slot(str)
     def selectTool(self, tool_id: str) -> None:
@@ -261,12 +306,32 @@ class AppController(QObject):
         ):
             self._hide_scrcpy_window()
         self._selected = tool
+        if tool.section in (ToolSection.CUSTOM, ToolSection.PRESET):
+            self._section_selections[tool.section.value] = tool.id
         self._tools_model.select(tool_id)
         self.selectedToolChanged.emit()
         self.consoleTextChanged.emit()
         self.runningChanged.emit()
         self._status_text = "运行中" if self.running else "就绪"
         self.statusTextChanged.emit()
+
+    @Slot(str, result=bool)
+    def selectFirstPresetInCategory(self, category: str) -> bool:
+        """Select the first preset carrying the requested category tag."""
+
+        if self._section != ToolSection.PRESET:
+            return False
+        self._tools_model.set_category(category)
+        tool_id = self._tools_model.first_tool_id()
+        if tool_id:
+            self.selectTool(tool_id)
+            return True
+        return False
+
+    @Slot(str)
+    def setPresetCategory(self, category: str) -> None:
+        if self._section == ToolSection.PRESET:
+            self._tools_model.set_category(category)
 
     @Slot()
     def clearToolSelection(self) -> None:
@@ -447,6 +512,16 @@ class AppController(QObject):
     def localPathFromUrl(self, url: str) -> str:
         """Convert a dropped local-file URL into the native path shown to users."""
         return _local_path_from_url(url)
+
+    @Slot(str, result=str)
+    def chooseParameterFile(self, current_path: str) -> str:
+        selected_path, _ = QFileDialog.getOpenFileName(
+            None,
+            "选择文件",
+            _file_picker_start_directory(current_path),
+            "所有文件 (*)",
+        )
+        return selected_path
 
     @Slot(str, str, str, str, result=bool)
     @Slot(str, str, str, str, str, result=bool)

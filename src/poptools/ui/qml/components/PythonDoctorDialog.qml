@@ -159,7 +159,7 @@ AppDialog {
                     implicitWidth: 104
                     implicitHeight: 48
                     text: "取消"
-                    iconName: ""
+                    iconName: "close"
                     tonal: true
                     enabled: !root.installing
                     onClicked: root.close()

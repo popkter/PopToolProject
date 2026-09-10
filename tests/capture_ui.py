@@ -83,7 +83,7 @@ def main() -> int:
         settings_controller.markUserGuideSeen()
     preset_controller = PresetController()
     jira_feishu_controller = JiraFeishuController(paths.data_dir)
-    developer_console_controller = DeveloperConsoleController(python_environment, paths.data_dir)
+    developer_console_controller = DeveloperConsoleController(python_environment)
     app.aboutToQuit.connect(developer_console_controller.shutdown)
     app.aboutToQuit.connect(jira_feishu_controller.shutdown)
     capture_terminal_tabs = int(os.environ.get("POPTOOLS_CAPTURE_TERMINAL_TABS", "1"))
@@ -217,6 +217,13 @@ def main() -> int:
                     and QMetaObject.invokeMethod(custom_scripts_page, "closeDrawer"),
                 )
     capture_dialog = os.environ.get("POPTOOLS_CAPTURE_DIALOG")
+    if os.environ.get("POPTOOLS_CAPTURE_DEVICE_MENU") == "1":
+        def open_device_menu() -> None:
+            selector = window.findChild(QObject, "globalDeviceSelector")
+            if selector is not None:
+                QMetaObject.invokeMethod(selector, "openDeviceMenu")
+
+        QTimer.singleShot(650, open_device_menu)
     if capture_dialog == "settings":
         window.openSettingsDialog()
         if os.environ.get("POPTOOLS_CAPTURE_SETTINGS_BOTTOM") == "1":
@@ -266,6 +273,18 @@ def main() -> int:
             QTimer.singleShot(350, complete_manual_update_check)
     if capture_dialog == "update":
         QTimer.singleShot(250, lambda: QMetaObject.invokeMethod(window, "queueUpdateDialog"))
+    if capture_dialog == "custom-import":
+        def open_custom_import_dialog() -> None:
+            dialog = window.findChild(QObject, "customScriptImportDialog")
+            if dialog is not None:
+                dialog.openForReplacement(
+                    {
+                        "title": "APK 本地签名",
+                        "existingTitle": "APK 本地签名",
+                    }
+                )
+
+        QTimer.singleShot(250, open_custom_import_dialog)
 
     def capture() -> None:
         if os.environ.get("POPTOOLS_CAPTURE_QML_WARNINGS") == "1" and qml_warnings:

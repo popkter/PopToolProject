@@ -7,6 +7,13 @@ from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
 from poptools.domain.models import ToolDefinition
 
 _EMPTY_INDEX = QModelIndex()
+_PRESET_CATEGORY_TAGS = {
+    "模拟相关",
+    "环境相关",
+    "硬件相关",
+    "跳转相关",
+    "其他设备操作",
+}
 
 
 class ToolListModel(QAbstractListModel):
@@ -17,6 +24,7 @@ class ToolListModel(QAbstractListModel):
     SelectedRole = Qt.UserRole + 5
     KindRole = Qt.UserRole + 6
     RunningRole = Qt.UserRole + 7
+    TagsRole = Qt.UserRole + 8
 
     def __init__(self) -> None:
         super().__init__()
@@ -25,6 +33,7 @@ class ToolListModel(QAbstractListModel):
         self._selected_id = ""
         self._running_ids: set[str] = set()
         self._filter_query = ""
+        self._category_filter = ""
 
     def roleNames(self) -> dict[int, bytes]:
         return {
@@ -35,6 +44,7 @@ class ToolListModel(QAbstractListModel):
             self.SelectedRole: b"selected",
             self.KindRole: b"executorKind",
             self.RunningRole: b"running",
+            self.TagsRole: b"tags",
         }
 
     def rowCount(self, parent: QModelIndex = _EMPTY_INDEX) -> int:
@@ -52,6 +62,7 @@ class ToolListModel(QAbstractListModel):
             self.SelectedRole: tool.id == self._selected_id,
             self.KindRole: tool.executor.kind.value,
             self.RunningRole: tool.id in self._running_ids,
+            self.TagsRole: list(tool.tags),
         }
         return values.get(role)
 
@@ -77,6 +88,15 @@ class ToolListModel(QAbstractListModel):
         self._display_tools = self._filtered_tools()
         self.endResetModel()
 
+    def set_category(self, category: str) -> None:
+        normalized = category.strip()
+        if normalized == self._category_filter:
+            return
+        self.beginResetModel()
+        self._category_filter = normalized
+        self._display_tools = self._filtered_tools()
+        self.endResetModel()
+
     def select(self, tool_id: str) -> None:
         if tool_id == self._selected_id:
             return
@@ -92,13 +112,25 @@ class ToolListModel(QAbstractListModel):
                 index = self.index(row, 0)
                 self.dataChanged.emit(index, index, changed_roles)
 
+    def first_tool_id(self) -> str:
+        return self._display_tools[0].id if self._display_tools else ""
+
     def _filtered_tools(self) -> list[ToolDefinition]:
-        if not self._filter_query:
-            return list(self._tools)
         return [
             tool
             for tool in self._tools
-            if self._filter_query in tool.title.casefold()
-            or self._filter_query in tool.description.casefold()
-            or self._filter_query in tool.executor.kind.value.casefold()
+            if self._matches_category(tool)
+            and (
+                not self._filter_query
+                or self._filter_query in tool.title.casefold()
+                or self._filter_query in tool.description.casefold()
+                or self._filter_query in tool.executor.kind.value.casefold()
+            )
         ]
+
+    def _matches_category(self, tool: ToolDefinition) -> bool:
+        if not self._category_filter:
+            return True
+        if self._category_filter == "其他预设":
+            return not _PRESET_CATEGORY_TAGS.intersection(tool.tags)
+        return self._category_filter in tool.tags

@@ -54,7 +54,7 @@ AppDialog {
                 implicitWidth: 110
                 implicitHeight: 48
                 text: "取消"
-                iconName: ""
+                iconName: "close"
                 tonal: true
                 onClicked: {
                     root.controller.cancelExecutionReplacement()

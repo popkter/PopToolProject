@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import shutil
 import time
@@ -24,6 +25,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "skipped_update_version": "",
         "prerelease_updates_enabled": False,
         "last_update_check_at": 0.0,
+        "last_auto_update_check_at": 0.0,
     },
     "execution": {
         "max_parallel": 3,
@@ -39,6 +41,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "added_at": {},
         "usage_count": {},
         "recent_tools": [],
+        "hidden_preset_categories": [],
     },
 }
 
@@ -173,9 +176,30 @@ class ConfigStore:
         if not isinstance(app, dict):
             return 0.0
         value = app.get("last_update_check_at", 0.0)
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+        if not self._is_valid_timestamp(value):
             return 0.0
         return float(value)
+
+    def last_auto_update_check_at(self) -> float:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+
+        if "last_auto_update_check_at" not in app:
+            legacy_value = app.get("last_update_check_at", 0.0)
+            value = float(legacy_value) if self._is_valid_timestamp(legacy_value) else 0.0
+            app["last_auto_update_check_at"] = value
+            self.save_config(config)
+            return value
+
+        stored_value = app.get("last_auto_update_check_at")
+        if not self._is_valid_timestamp(stored_value):
+            app["last_auto_update_check_at"] = 0.0
+            self.save_config(config)
+            return 0.0
+        return float(cast(int | float, stored_value))
 
     def update_check_frequency(self) -> str:
         app = self.load_config().get("app", {})
@@ -199,6 +223,27 @@ class ConfigStore:
             config["app"] = app
         app["last_update_check_at"] = max(0.0, float(value))
         self.save_config(config)
+
+    def set_last_auto_update_check_at(self, value: float) -> None:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+        timestamp = float(value)
+        app["last_auto_update_check_at"] = (
+            timestamp if self._is_valid_timestamp(timestamp) else 0.0
+        )
+        self.save_config(config)
+
+    @staticmethod
+    def _is_valid_timestamp(value: object) -> bool:
+        return (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+            and value >= 0
+        )
 
     def terminal_enabled(self) -> bool:
         config = self.load_config()
@@ -352,6 +397,23 @@ class ConfigStore:
     def set_tool_order(self, tool_ids: list[str]) -> None:
         config, settings = self._custom_tool_settings()
         settings["order"] = list(dict.fromkeys(tool_ids))
+        self.save_config(config)
+
+    def hidden_preset_categories(self) -> list[str]:
+        config, settings = self._custom_tool_settings()
+        raw = settings.get("hidden_preset_categories", [])
+        value = list(dict.fromkeys(item for item in raw if isinstance(item, str))) \
+            if isinstance(raw, list) else []
+        if raw != value:
+            settings["hidden_preset_categories"] = value
+            self.save_config(config)
+        return value
+
+    def set_hidden_preset_categories(self, categories: list[str]) -> None:
+        config, settings = self._custom_tool_settings()
+        settings["hidden_preset_categories"] = list(dict.fromkeys(
+            category for category in categories if isinstance(category, str)
+        ))
         self.save_config(config)
 
     def tool_added_times(self, tool_ids: list[str]) -> dict[str, float]:

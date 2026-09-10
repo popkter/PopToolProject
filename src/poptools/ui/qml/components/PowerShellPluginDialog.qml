@@ -95,28 +95,22 @@ AppDialog {
                         elide: Text.ElideRight
                     }
                 }
-                Rectangle {
+                PrimaryButton {
                     Layout.preferredWidth: 42
                     Layout.preferredHeight: 42
+                    compact: true
+                    text: "关闭"
+                    iconName: "close"
+                    glyphSize: 23
+                    tonal: true
+                    foregroundColor: Theme.textSecondary
+                    border.width: 0
                     radius: height / 2
-                    color: closeMouse.containsMouse && closeMouse.enabled
+                    color: hovered && enabled
                            ? Theme.surfaceContainerHigh : "transparent"
-
-                    MaterialIcon {
-                        anchors.centerIn: parent
-                        icon: "close"
-                        iconSize: 23
-                        color: Theme.textSecondary
-                        opacity: closeMouse.enabled ? 1 : 0.38
-                    }
-                    MouseArea {
-                        id: closeMouse
-                        anchors.fill: parent
-                        enabled: !root.controller.pluginInstalling
-                        hoverEnabled: true
-                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: root.close()
-                    }
+                    enabled: !root.controller.pluginInstalling
+                    disabledOpacity: 0.38
+                    onClicked: root.close()
                 }
             }
         }
@@ -211,7 +205,7 @@ AppDialog {
                     implicitWidth: 112
                     implicitHeight: 48
                     text: root.controller.pluginInstalling ? "取消安装" : "取消"
-                    iconName: ""
+                    iconName: "close"
                     tonal: true
                     enabled: !root.cancelRequested
                     onClicked: root.cancel()

@@ -3,10 +3,9 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-Rectangle {
+PrimaryButton {
     id: root
     required property var controller
-    property color foregroundColor: Theme.primary
     property color backgroundColor: "transparent"
     property color hoverColor: Theme.primaryContainerHover
     readonly property var options: [
@@ -18,9 +17,17 @@ Rectangle {
 
     implicitWidth: 40
     implicitHeight: 40
-    radius: Theme.radiusMedium
-    color: buttonMouse.containsMouse || sortPopup.opened
+    compact: true
+    text: "排序：" + root.controller.toolSortModeLabel
+    iconName: "sort"
+    glyphSize: 24
+    tonal: true
+    foregroundColor: Theme.primary
+    border.width: 0
+    radius: Theme.radiusSmall
+    color: root.hovered || sortPopup.opened
            ? root.hoverColor : root.backgroundColor
+    onClicked: root.openMenu()
 
     function openMenu() {
         var point = root.mapToItem(Overlay.overlay, 0, root.height)
@@ -29,25 +36,6 @@ Rectangle {
         sortPopup.y = Math.max(12, Math.min(point.y + 6,
                                            Overlay.overlay.height - sortPopup.height - 12))
         sortPopup.open()
-    }
-
-    MaterialIcon {
-        anchors.centerIn: parent
-        icon: "sort"
-        iconSize: 24
-        color: root.foregroundColor
-    }
-
-    ToolTip.visible: buttonMouse.containsMouse
-    ToolTip.text: "排序：" + root.controller.toolSortModeLabel
-    ToolTip.delay: 450
-
-    MouseArea {
-        id: buttonMouse
-        anchors.fill: parent
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: root.openMenu()
     }
 
     Popup {

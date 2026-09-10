@@ -9,6 +9,7 @@ ColumnLayout {
     required property var controller
     required property var parentWindow
     required property var parameterValues
+    property var androidController: null
     property bool scrcpySelected: false
     property bool overlaysVisible: false
     readonly property int parameterCount:
@@ -32,6 +33,7 @@ ColumnLayout {
         property bool geometryReady: false
         property int stableGeometryFrames: 0
         property string lastGeometryKey: ""
+        readonly property real nativeContentInset: Math.max(2, radius / 2)
         visible: root.scrcpySelected
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -40,13 +42,23 @@ ColumnLayout {
         color: Theme.consoleBackground
         clip: true
 
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+            preventStealing: true
+            onPressed: function(mouse) { mouse.accepted = true }
+            onReleased: function(mouse) { mouse.accepted = true }
+            onDoubleClicked: function(mouse) { mouse.accepted = true }
+        }
+
         function geometrySnapshot() {
-            const point = mapToItem(null, 0, 0)
+            const inset = nativeContentInset
+            const point = mapToItem(null, inset, inset)
             return {
                 x: Math.round(point.x),
                 y: Math.round(point.y),
-                width: Math.round(width),
-                height: Math.round(height)
+                width: Math.round(Math.max(0, width - inset * 2)),
+                height: Math.round(Math.max(0, height - inset * 2))
             }
         }
 
@@ -99,7 +111,7 @@ ColumnLayout {
         }
 
         Timer {
-            interval: scrcpyHost.geometryReady ? 100 : 16
+            interval: 16
             repeat: true
             running: scrcpyHost.visible
             onTriggered: scrcpyHost.syncGeometry()
@@ -113,7 +125,26 @@ ColumnLayout {
         Component.onCompleted: hideUntilLayoutSettles()
     }
 
-    ScrollView {
+    PrimaryButton {
+        visible: root.scrcpySelected
+        Layout.alignment: Qt.AlignRight
+        Layout.preferredWidth: 168
+        Layout.preferredHeight: 40
+        enabled: root.controller.running
+                 || (root.androidController
+                     && root.androidController.selectedAndroidDevice.length > 0)
+        text: root.controller.running ? "结束投屏" : "开始投屏"
+        iconName: root.controller.running ? "stop" : "cast_connected"
+        dangerStyle: root.controller.running
+        onClicked: {
+            if (root.controller.running)
+                root.controller.stopExecution()
+            else
+                root.controller.runSelected({})
+        }
+    }
+
+    DesktopScrollView {
         id: commandParameterScroll
         visible: !root.scrcpySelected
         Layout.fillWidth: true
@@ -173,7 +204,7 @@ ColumnLayout {
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontBody
                                 leftPadding: Theme.space16
-                                rightPadding: defaultButtonVisible
+                                rightPadding: defaultButtonVisible || modelData.kind === "file"
                                     ? Theme.space40 : Theme.space16
                                 echoMode: modelData.kind === "secret"
                                           ? TextInput.Password : TextInput.Normal
@@ -184,12 +215,15 @@ ColumnLayout {
                                         ? Theme.primary : Theme.outline
                                     border.width: parent.activeFocus || fileDropArea.containsDrag ? 2 : 1
                                 }
+                                AppTextEditMenu { target: normalTextField }
                                 onTextChanged: root.parameterValues[modelData.id] = text
 
                                 DropArea {
                                     id: fileDropArea
                                     anchors.fill: parent
                                     enabled: modelData.kind === "text"
+                                        || modelData.kind === "file"
+                                        || modelData.kind === "directory"
 
                                     onEntered: function(drag) {
                                         if (!drag.hasUrls || drag.urls.length === 0
@@ -211,36 +245,54 @@ ColumnLayout {
                                     }
                                 }
 
-                                Rectangle {
+                                PrimaryButton {
                                     anchors.right: parent.right
                                     anchors.rightMargin: Theme.space8
                                     anchors.verticalCenter: parent.verticalCenter
                                     visible: normalTextField.defaultButtonVisible
                                     width: 32
                                     height: 32
+                                    compact: true
+                                    text: "设为默认值"
+                                    iconName: "save"
+                                    glyphSize: 20
+                                    tonal: true
+                                    foregroundColor: Theme.primaryText
+                                    border.width: 0
                                     radius: Theme.radiusSmall
-                                    color: defaultValueMouse.containsMouse
+                                    color: hovered
                                         ? Theme.primaryContainerHover
                                         : Theme.primaryContainer
+                                    onClicked: root.controller.setParameterDefault(
+                                        modelData.id, normalTextField.text)
+                                }
 
-                                    MaterialIcon {
-                                        anchors.centerIn: parent
-                                        icon: "save"
-                                        iconSize: 20
-                                        color: Theme.primaryText
-                                    }
-
-                                    ToolTip.visible: defaultValueMouse.containsMouse
-                                    ToolTip.text: "设为默认值"
-                                    ToolTip.delay: 450
-
-                                    MouseArea {
-                                        id: defaultValueMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: root.controller.setParameterDefault(
-                                            modelData.id, normalTextField.text)
+                                PrimaryButton {
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: Theme.space8
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: modelData.kind === "file"
+                                    width: 32
+                                    height: 32
+                                    compact: true
+                                    text: "选择文件"
+                                    iconName: "folder_open"
+                                    glyphSize: 20
+                                    tonal: true
+                                    foregroundColor: Theme.primaryText
+                                    border.width: 0
+                                    radius: Theme.radiusSmall
+                                    z: 2
+                                    color: hovered
+                                        ? Theme.primaryContainerHover
+                                        : Theme.primaryContainer
+                                    onClicked: {
+                                        const selectedPath = root.controller.chooseParameterFile(
+                                            normalTextField.text)
+                                        if (selectedPath.length > 0) {
+                                            normalTextField.text = selectedPath
+                                            normalTextField.forceActiveFocus()
+                                        }
                                     }
                                 }
                             }
@@ -249,6 +301,7 @@ ColumnLayout {
                         Component {
                             id: multilineField
                             TextArea {
+                                id: multilineTextArea
                                 implicitHeight: parameterInputLoader.singleLineHeight
                                 text: String(modelData.default || "")
                                 placeholderText: modelData.placeholder || ""
@@ -265,6 +318,7 @@ ColumnLayout {
                                     border.color: parent.activeFocus ? Theme.primary : Theme.outline
                                     border.width: parent.activeFocus ? 2 : 1
                                 }
+                                AppTextEditMenu { target: multilineTextArea }
                                 onTextChanged: root.parameterValues[modelData.id] = text
                             }
                         }

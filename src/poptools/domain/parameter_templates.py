@@ -8,7 +8,7 @@ from poptools.domain.models import ParameterDefinition, ParameterKind, Parameter
 
 PLACEHOLDER_PATTERN = re.compile(r"\$\{([^{}]+)\}")
 DECLARATION_PATTERN = re.compile(
-    r"^[ \t]*pVal[ \t]+(?P<id>[^\s:=]+)[ \t]*(?::|=)[ \t]*"
+    r"^[ \t]*(?:Var|pVal)[ \t]+(?P<id>[^\s:=]+)[ \t]*(?::|=)[ \t]*"
     r"\$\{(?P<definition>[^{}\r\n]+)\}[ \t]*(?:\r?\n|$)",
     re.MULTILINE,
 )
@@ -18,6 +18,7 @@ DECLARATION_PATTERN = re.compile(
 class _ParsedPlaceholder:
     parameter_id: str
     default: str | None
+    kind: ParameterKind = ParameterKind.TEXT
     options: tuple[ParameterOption, ...] = ()
 
 
@@ -27,6 +28,18 @@ def _validate_parameter_id(parameter_id: str) -> None:
             f"参数名称“{parameter_id}”只能包含中文、字母、数字或下划线；"
             "如需设置默认值，请使用 ${参数名:默认值}"
         )
+
+
+def _parse_parameter_name(name: str) -> tuple[str, ParameterKind]:
+    parameter_id, type_separator, parameter_type = name.strip().partition("@")
+    _validate_parameter_id(parameter_id)
+    if not type_separator:
+        return parameter_id, ParameterKind.TEXT
+    if parameter_type.strip() != ParameterKind.FILE.value:
+        raise ValueError(
+            f"参数“{parameter_id}”使用了不支持的控件类型“{parameter_type.strip()}”"
+        )
+    return parameter_id, ParameterKind.FILE
 
 
 def _parse_choice_options(content: str) -> tuple[ParameterOption, ...]:
@@ -56,12 +69,18 @@ def _parse_placeholder(content: str) -> _ParsedPlaceholder:
     equals_index = content.find("=")
     if colon_index >= 0 and (equals_index < 0 or colon_index < equals_index):
         name, _, definition = content.partition(":")
-        parameter_id = name.strip()
-        _validate_parameter_id(parameter_id)
+        parameter_id, parameter_kind = _parse_parameter_name(name)
         options = _parse_choice_options(definition)
         if options:
-            return _ParsedPlaceholder(parameter_id, options[0].value, options)
-        return _ParsedPlaceholder(parameter_id, definition)
+            if parameter_kind != ParameterKind.TEXT:
+                raise ValueError("文件参数不能同时定义为下拉选择框")
+            return _ParsedPlaceholder(
+                parameter_id,
+                options[0].value,
+                ParameterKind.CHOICE,
+                options,
+            )
+        return _ParsedPlaceholder(parameter_id, definition, parameter_kind)
 
     # Compatibility with templates created before the title/definition separator
     # changed to ':', including ${name=default} and ${on=1|off=0}.
@@ -69,18 +88,24 @@ def _parse_placeholder(content: str) -> _ParsedPlaceholder:
     if legacy_options:
         parameter_id = legacy_options[0].label
         _validate_parameter_id(parameter_id)
-        return _ParsedPlaceholder(parameter_id, legacy_options[0].value, legacy_options)
+        return _ParsedPlaceholder(
+            parameter_id,
+            legacy_options[0].value,
+            ParameterKind.CHOICE,
+            legacy_options,
+        )
 
     name, separator, default = content.partition("=")
-    parameter_id = name.strip()
-    _validate_parameter_id(parameter_id)
-    return _ParsedPlaceholder(parameter_id, default if separator else None)
+    parameter_id, parameter_kind = _parse_parameter_name(name)
+    return _ParsedPlaceholder(parameter_id, default if separator else None, parameter_kind)
 
 
 def _parse_declarations(
     template: str,
-) -> list[tuple[str, str, str | None, tuple[ParameterOption, ...]]]:
-    declarations: list[tuple[str, str, str | None, tuple[ParameterOption, ...]]] = []
+) -> list[tuple[str, str, str | None, ParameterKind, tuple[ParameterOption, ...]]]:
+    declarations: list[
+        tuple[str, str, str | None, ParameterKind, tuple[ParameterOption, ...]]
+    ] = []
     for match in DECLARATION_PATTERN.finditer(template):
         parameter = _parse_placeholder(match.group("id"))
         definition = _parse_placeholder(match.group("definition"))
@@ -89,6 +114,7 @@ def _parse_declarations(
                 parameter.parameter_id,
                 definition.parameter_id,
                 definition.default,
+                definition.kind,
                 definition.options,
             )
         )
@@ -96,7 +122,7 @@ def _parse_declarations(
 
 
 def _script_body(template: str) -> str:
-    """Remove pVal metadata lines before a script is executed or scanned."""
+    """Remove Var metadata lines before a script is executed or scanned."""
 
     return DECLARATION_PATTERN.sub("", template)
 
@@ -106,7 +132,7 @@ def extract_parameter_ids(templates: Iterable[str]) -> list[str]:
 
     result: list[str] = []
     for template in templates:
-        for parameter_id, _, _, _ in _parse_declarations(template):
+        for parameter_id, _, _, _, _ in _parse_declarations(template):
             if parameter_id not in result:
                 result.append(parameter_id)
         for match in PLACEHOLDER_PATTERN.finditer(_script_body(template)):
@@ -125,14 +151,14 @@ def synchronize_parameters(
     existing_by_id = {parameter.id: parameter for parameter in existing}
     parameters: list[ParameterDefinition] = []
     parsed: dict[
-        str, tuple[str, str | None, bool, tuple[ParameterOption, ...]]
+        str, tuple[str, str | None, bool, ParameterKind, tuple[ParameterOption, ...]]
     ] = {}
     materialized_templates = list(templates)
 
     for template in materialized_templates:
-        for parameter_id, label, default, options in _parse_declarations(template):
+        for parameter_id, label, default, kind, options in _parse_declarations(template):
             current = parsed.get(parameter_id)
-            declaration = (label, default, True, options)
+            declaration = (label, default, True, kind, options)
             if current is not None and current != declaration:
                 raise ValueError(f"参数“{parameter_id}”设置了多个不同的声明")
             parsed[parameter_id] = declaration
@@ -147,16 +173,37 @@ def synchronize_parameters(
                     parameter_id,
                     default,
                     False,
+                    placeholder.kind,
                     placeholder.options,
                 )
             elif default is not None:
-                label, current_default, declared, options = parsed[parameter_id]
+                label, current_default, declared, kind, options = parsed[parameter_id]
                 if current_default is None:
-                    parsed[parameter_id] = (label, default, declared, placeholder.options)
-                elif current_default != default or options != placeholder.options:
+                    parsed[parameter_id] = (
+                        label,
+                        default,
+                        declared,
+                        placeholder.kind,
+                        placeholder.options,
+                    )
+                elif current_default != default:
                     raise ValueError(f"参数“{parameter_id}”设置了多个不同的默认值")
+                elif kind != placeholder.kind:
+                    raise ValueError(f"参数“{parameter_id}”设置了多个不同的控件类型")
+                elif options != placeholder.options:
+                    raise ValueError(f"参数“{parameter_id}”设置了多个不同的选项")
+            else:
+                label, current_default, declared, kind, options = parsed[parameter_id]
+                # A declared parameter is referenced in the executable body as
+                # `${internalName}` without repeating the declaration's kind.
+                if declared and placeholder.kind == ParameterKind.TEXT:
+                    continue
+                if kind != placeholder.kind:
+                    raise ValueError(f"参数“{parameter_id}”设置了多个不同的控件类型")
+                if options != placeholder.options:
+                    raise ValueError(f"参数“{parameter_id}”设置了多个不同的选项")
 
-    for parameter_id, (label, default, declared, options) in parsed.items():
+    for parameter_id, (label, default, declared, kind, options) in parsed.items():
         existing_parameter = existing_by_id.get(parameter_id)
         if existing_parameter is not None:
             # Default, choice kind and options are derived from the current
@@ -169,9 +216,9 @@ def synchronize_parameters(
             }
             if declared:
                 updates["label"] = label
-            if options:
-                updates["kind"] = ParameterKind.CHOICE
-            elif existing_parameter.kind == ParameterKind.CHOICE:
+            if kind != ParameterKind.TEXT:
+                updates["kind"] = kind
+            elif existing_parameter.kind in (ParameterKind.CHOICE, ParameterKind.FILE):
                 updates["kind"] = ParameterKind.TEXT
             parameters.append(existing_parameter.model_copy(update=updates))
             continue
@@ -182,7 +229,7 @@ def synchronize_parameters(
                 required=True,
                 default=default or "",
                 placeholder=f"请输入{parameter_id}",
-                kind=ParameterKind.CHOICE if options else ParameterKind.TEXT,
+                kind=kind,
                 options=list(options),
             )
         )
@@ -215,9 +262,10 @@ def update_parameter_default(template: str, parameter_id: str, default: str) -> 
         definition = _parse_placeholder(match.group("definition"))
         if definition.options:
             raise ValueError("选择框不能通过文本默认值按钮修改")
-        replacement = (
-            f"{definition.parameter_id}:{default}" if default else definition.parameter_id
-        )
+        definition_name = definition.parameter_id
+        if definition.kind == ParameterKind.FILE:
+            definition_name += "@file"
+        replacement = f"{definition_name}:{default}" if default else definition_name
         parsed_replacement = _parse_placeholder(replacement)
         if parsed_replacement.options:
             raise ValueError("该默认值会被识别成选择框，请修改字符串内容")
@@ -234,7 +282,10 @@ def update_parameter_default(template: str, parameter_id: str, default: str) -> 
                 continue
             if placeholder.options:
                 raise ValueError("选择框不能通过文本默认值按钮修改")
-            replacement = f"{parameter_id}:{default}" if default else parameter_id
+            placeholder_name = parameter_id
+            if placeholder.kind == ParameterKind.FILE:
+                placeholder_name += "@file"
+            replacement = f"{placeholder_name}:{default}" if default else placeholder_name
             parsed_replacement = _parse_placeholder(replacement)
             if parsed_replacement.options:
                 raise ValueError("该默认值会被识别成选择框，请修改字符串内容")

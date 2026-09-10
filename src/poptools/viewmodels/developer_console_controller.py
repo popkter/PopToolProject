@@ -12,6 +12,7 @@ from PySide6.QtCore import (
     QObject,
     QThread,
     QTimer,
+    QUrl,
     Signal,
     Slot,
 )
@@ -53,7 +54,8 @@ class PowerShellPluginInstallThread(QThread):
 @dataclass
 class TerminalTabState:
     tab_id: str
-    title: str
+    shell_title: str
+    custom_title: str | None = None
     session: ConPtySession | None = None
     output: str = ""
     exit_code: int = 0
@@ -62,6 +64,10 @@ class TerminalTabState:
     output_decoder: codecs.IncrementalDecoder = field(
         default_factory=lambda: codecs.getincrementaldecoder("utf-8")(errors="replace")
     )
+
+    @property
+    def title(self) -> str:
+        return self.custom_title or self.shell_title
 
 
 class DeveloperConsoleController(QObject):
@@ -86,13 +92,13 @@ class DeveloperConsoleController(QObject):
     def __init__(
         self,
         python_environment: PythonEnvironment,
-        working_directory: Path,
+        working_directory: Path | None = None,
         powershell_plugin: PowerShellPlugin | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self.python_environment = python_environment
-        self.working_directory = working_directory
+        self.working_directory = working_directory or Path.home()
         self._tabs: list[TerminalTabState] = []
         self._closing_tabs: dict[str, TerminalTabState] = {}
         self._active_tab_id = ""
@@ -125,6 +131,7 @@ class DeveloperConsoleController(QObject):
             {
                 "tabId": tab.tab_id,
                 "title": tab.title,
+                "hasCustomTitle": tab.custom_title is not None,
                 "active": tab.tab_id == self._active_tab_id,
                 "running": tab.session is not None,
             }
@@ -260,9 +267,10 @@ class DeveloperConsoleController(QObject):
                 if not tab.output.endswith(message):
                     self._append_to_tab(tab, message)
                 return False
+            # Keep PowerShell's normal startup behavior so the four standard
+            # $PROFILE scopes are loaded before the PopTools bootstrap script.
             arguments = [
                 "-NoLogo",
-                "-NoProfile",
                 "-NoExit",
                 "-ExecutionPolicy",
                 "Bypass",
@@ -286,6 +294,7 @@ class DeveloperConsoleController(QObject):
             }
         )
 
+        tab.shell_title = self._terminal_name()
         session = ConPtySession(self)
         tab.output_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         session.outputReceived.connect(self._on_terminal_output)
@@ -355,6 +364,61 @@ class DeveloperConsoleController(QObject):
         if tab is None:
             return False
         return self._write_input_to_tab(tab, data)
+
+    @Slot("QVariantList", result=str)
+    def formatDroppedPaths(self, urls: list[object]) -> str:
+        """Return local file URLs as safely quoted PowerShell arguments."""
+        quoted_paths: list[str] = []
+        for value in urls:
+            url = value if isinstance(value, QUrl) else QUrl(str(value))
+            if not url.isLocalFile():
+                continue
+            path = url.toLocalFile()
+            if not path:
+                continue
+            quoted_paths.append("'" + path.replace("'", "''") + "'")
+        if not quoted_paths:
+            return ""
+        # PSReadLine's current buffer is owned by the child process. Prefixing
+        # a separator safely appends arguments, and is harmless at an empty prompt.
+        return " " + " ".join(quoted_paths)
+
+    @Slot(str, str, result=bool)
+    def updateTerminalTitle(self, tab_id: str, title: str) -> bool:
+        tab = self._tab_by_id(tab_id)
+        if tab is None:
+            return False
+        shell_title = title.strip() or self._terminal_name()
+        if tab.shell_title == shell_title:
+            return True
+        tab.shell_title = shell_title
+        self.terminalTabsChanged.emit()
+        return True
+
+    @Slot(str, str, result=bool)
+    def renameTerminalTab(self, tab_id: str, title: str) -> bool:
+        tab = self._tab_by_id(tab_id)
+        if tab is None:
+            return False
+        custom_title = title.strip() or None
+        if tab.custom_title == custom_title:
+            return True
+        tab.custom_title = custom_title
+        self.terminalTabsChanged.emit()
+        return True
+
+    @Slot(str, result=bool)
+    def resetTerminalTabTitle(self, tab_id: str) -> bool:
+        return self.renameTerminalTab(tab_id, "")
+
+    @Slot(int, result=bool)
+    def activateRelativeTerminalTab(self, offset: int) -> bool:
+        if not self._tabs:
+            return False
+        active = self._active_tab()
+        current_index = self._tabs.index(active) if active is not None else 0
+        target = self._tabs[(current_index + offset) % len(self._tabs)]
+        return self.activateTerminalTab(target.tab_id)
 
     def _write_input_to_tab(self, tab: TerminalTabState, data: str) -> bool:
         if tab is None or not self._ensure_tab_started(tab) or tab.session is None:
@@ -486,6 +550,26 @@ class DeveloperConsoleController(QObject):
                 QTimer.singleShot(0, lambda: self._ensure_tab_started(active))
         return True
 
+    @Slot(str, result=bool)
+    def closeOtherTerminalTabs(self, tab_id: str) -> bool:
+        if self._tab_by_id(tab_id) is None:
+            return False
+        other_ids = [tab.tab_id for tab in self._tabs if tab.tab_id != tab_id]
+        for other_id in other_ids:
+            self.closeTerminalTab(other_id)
+        return True
+
+    @Slot(str, result=bool)
+    def closeTerminalTabsToRight(self, tab_id: str) -> bool:
+        tab = self._tab_by_id(tab_id)
+        if tab is None:
+            return False
+        index = self._tabs.index(tab)
+        right_ids = [item.tab_id for item in self._tabs[index + 1 :]]
+        for other_id in right_ids:
+            self.closeTerminalTab(other_id)
+        return True
+
     @Slot(bytes)
     def _on_terminal_output(self, payload: bytes) -> None:
         tab = self._tab_for_session(self.sender())
@@ -552,7 +636,7 @@ class DeveloperConsoleController(QObject):
         self._next_tab_number += 1
         tab = TerminalTabState(
             tab_id=f"terminal-{tab_number}",
-            title=self._terminal_name(),
+            shell_title=self._terminal_name(),
         )
         self._tabs.append(tab)
         if activate:
