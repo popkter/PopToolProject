@@ -222,7 +222,7 @@ adb devices
 - 开启“接收测试版本”后，从最近 5 个正式版或 prerelease 中按版本号选择最高版本；
 - 发现更新时在弹窗中直接显示该 Release 的 Markdown Release Notes；
 - 弹窗高度随说明内容调整，最长内容使用滚动区域；
-- 可以下次提醒、跳过当前版本、立即下载、取消下载、稍后安装或安装并重启；
+- 可以下次提醒、跳过当前版本、立即下载、取消下载、稍后安装或安装并重启；选择“稍后安装”后，下次启动会先校验并自动应用已下载的更新；
 - 下载文件会校验大小以及 GitHub digest 或配套 SHA-256。
 
 Windows 更新资产为 `PopTools.exe`，macOS 根据架构使用 `PopTools-macos-arm64.zip` 或 `PopTools-macos-x64.zip`。

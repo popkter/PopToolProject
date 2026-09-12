@@ -262,7 +262,8 @@ Rectangle {
                                     foregroundColor: Theme.primaryText
                                     border.width: 0
                                     radius: 6
-                                    z: 101
+                                    // Above AppTextEditMenu's input-event overlay (z: 200).
+                                    z: 201
                                     color: hovered
                                         ? Theme.primaryContainerHover
                                         : Theme.primaryContainer

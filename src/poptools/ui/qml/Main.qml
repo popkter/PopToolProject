@@ -294,20 +294,85 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        // Break the initial Screen-based bindings so interactive resizing owns
+        // the window geometry after startup.
+        window.width = Math.max(window.minimumWidth,
+                                Math.round(Screen.width * 0.8))
+        window.height = Math.max(window.minimumHeight,
+                                 Math.round(Screen.height * 0.8))
         resetParameters()
         if (settingsController.terminalEnabled
                 && !developerConsoleController.pluginInstalled)
             settingsController.saveTerminalEnabled(false)
         if (!settingsController.userGuideSeen)
             window.openUserGuideDialog()
-        updateController.checkForUpdatesAutomatically()
+        if (updateController.state === "downloaded")
+            window.queueUpdateDialog()
+        else
+            updateController.checkForUpdatesAutomatically()
     }
 
     component ResizeHandle: MouseArea {
         required property int resizeEdges
+        property real resizeStartGlobalX: 0
+        property real resizeStartGlobalY: 0
+        property real resizeStartX: 0
+        property real resizeStartY: 0
+        property real resizeStartWidth: 0
+        property real resizeStartHeight: 0
+
         visible: window.visibility !== Window.Maximized
         z: 1000
-        onPressed: window.startSystemResize(resizeEdges)
+        hoverEnabled: true
+        preventStealing: true
+
+        onPressed: function(mouse) {
+            const globalPoint = mapToGlobal(mouse.x, mouse.y)
+            resizeStartGlobalX = globalPoint.x
+            resizeStartGlobalY = globalPoint.y
+            resizeStartX = window.x
+            resizeStartY = window.y
+            resizeStartWidth = window.width
+            resizeStartHeight = window.height
+            mouse.accepted = true
+        }
+
+        onPositionChanged: function(mouse) {
+            if (!pressed)
+                return
+
+            const globalPoint = mapToGlobal(mouse.x, mouse.y)
+            const deltaX = globalPoint.x - resizeStartGlobalX
+            const deltaY = globalPoint.y - resizeStartGlobalY
+            const resizeLeft = (resizeEdges & Qt.LeftEdge) !== 0
+            const resizeRight = (resizeEdges & Qt.RightEdge) !== 0
+            const resizeTop = (resizeEdges & Qt.TopEdge) !== 0
+            const resizeBottom = (resizeEdges & Qt.BottomEdge) !== 0
+
+            if (resizeLeft || resizeRight) {
+                const requestedWidth = resizeLeft
+                    ? resizeStartWidth - deltaX
+                    : resizeStartWidth + deltaX
+                const newWidth = Math.max(
+                    window.minimumWidth,
+                    Math.min(window.maximumWidth, requestedWidth))
+                window.width = newWidth
+                if (resizeLeft)
+                    window.x = resizeStartX + resizeStartWidth - newWidth
+            }
+
+            if (resizeTop || resizeBottom) {
+                const requestedHeight = resizeTop
+                    ? resizeStartHeight - deltaY
+                    : resizeStartHeight + deltaY
+                const newHeight = Math.max(
+                    window.minimumHeight,
+                    Math.min(window.maximumHeight, requestedHeight))
+                window.height = newHeight
+                if (resizeTop)
+                    window.y = resizeStartY + resizeStartHeight - newHeight
+            }
+        }
     }
 
     ResizeHandle {
@@ -681,7 +746,9 @@ ApplicationWindow {
                     dense: window.compactHeight
                     selected: window.settingsSelected
                     actionText: updateController.state === "available"
-                                ? "有新版本可用" : ""
+                                ? "有新版本可用"
+                                : updateController.state === "downloaded"
+                                  ? "更新已准备好" : ""
                     onActionClicked: window.queueUpdateDialog()
                     onClicked: window.openSettingsDialog()
                 }

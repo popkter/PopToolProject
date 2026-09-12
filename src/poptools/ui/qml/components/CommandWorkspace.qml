@@ -254,6 +254,8 @@ ColumnLayout {
                                     height: 32
                                     compact: true
                                     text: "设为默认值"
+                                    // Above AppTextEditMenu's input-event overlay (z: 200).
+                                    z: 201
                                     iconName: "save"
                                     glyphSize: 20
                                     tonal: true
@@ -282,7 +284,8 @@ ColumnLayout {
                                     foregroundColor: Theme.primaryText
                                     border.width: 0
                                     radius: Theme.radiusSmall
-                                    z: 2
+                                    // Above AppTextEditMenu's input-event overlay (z: 200).
+                                    z: 201
                                     color: hovered
                                         ? Theme.primaryContainerHover
                                         : Theme.primaryContainer

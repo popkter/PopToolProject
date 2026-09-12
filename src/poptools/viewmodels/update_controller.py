@@ -16,7 +16,9 @@ from poptools.infrastructure.app_updater import (
     GitHubReleaseClient,
     UpdateInstaller,
     UpdateRelease,
+    file_sha256,
     is_newer_version,
+    validate_pending_update,
 )
 from poptools.infrastructure.config_store import ConfigStore
 
@@ -51,7 +53,7 @@ class UpdateCheckThread(QThread):
 
 class UpdateDownloadThread(QThread):
     progressChanged = Signal(int, int)
-    completed = Signal(bool, str, str)
+    completed = Signal(bool, str, str, str)
 
     def __init__(
         self,
@@ -73,14 +75,20 @@ class UpdateDownloadThread(QThread):
                 self._report_progress,
                 self.isInterruptionRequested,
             )
+            checksum = file_sha256(result)
         except InterruptedError:
-            self.completed.emit(False, "更新下载已取消", "")
+            self.completed.emit(False, "更新下载已取消", "", "")
         except urllib.error.URLError as exc:
-            self.completed.emit(False, f"更新下载失败：{exc.reason}", "")
+            self.completed.emit(False, f"更新下载失败：{exc.reason}", "", "")
         except Exception as exc:
-            self.completed.emit(False, f"更新下载失败：{exc}", "")
+            self.completed.emit(False, f"更新下载失败：{exc}", "", "")
         else:
-            self.completed.emit(True, "更新下载完成，可以安装并重启。", str(result))
+            self.completed.emit(
+                True,
+                "更新下载完成，可以安装并重启。",
+                str(result),
+                checksum,
+            )
 
     def _report_progress(self, received: int, total: int) -> None:
         self.progressChanged.emit(received, total)
@@ -117,6 +125,8 @@ class UpdateController(QObject):
         self._received_bytes = 0
         self._total_bytes = 0
         self._downloaded_path = ""
+        self._downloaded_sha256 = ""
+        self._pending_version = ""
         self._check_thread: UpdateCheckThread | None = None
         self._download_thread: UpdateDownloadThread | None = None
         self._check_is_manual = False
@@ -124,6 +134,7 @@ class UpdateController(QObject):
         self._schedule_timer.setInterval(60_000)
         self._schedule_timer.timeout.connect(self.checkForUpdatesAutomatically)
         self._schedule_timer.start()
+        self._restore_pending_update()
 
     @Property(str, notify=stateChanged)
     def updateCheckFrequency(self) -> str:
@@ -150,7 +161,7 @@ class UpdateController(QObject):
 
     @Property(str, notify=stateChanged)
     def availableVersion(self) -> str:
-        return self._release.version if self._release else ""
+        return self._release.version if self._release else self._pending_version
 
     @Property(str, notify=stateChanged)
     def releaseName(self) -> str:
@@ -253,6 +264,8 @@ class UpdateController(QObject):
         self._received_bytes = 0
         self._total_bytes = release.asset_size
         self._downloaded_path = ""
+        self._downloaded_sha256 = ""
+        self._pending_version = ""
         self._set_state("downloading", "正在下载更新…")
         thread = UpdateDownloadThread(self.client, release, destination, self)
         self._download_thread = thread
@@ -282,6 +295,8 @@ class UpdateController(QObject):
     def installAndRestart(self) -> bool:
         if self._state != "downloaded" or not self._downloaded_path:
             return False
+        if not self._persist_downloaded_update():
+            return False
         try:
             launched = UpdateInstaller.launch(Path(self._downloaded_path))
         except OSError as exc:
@@ -293,6 +308,23 @@ class UpdateController(QObject):
         self._set_state("installing", "正在退出并安装更新…")
         QCoreApplication.quit()
         return True
+
+    @Slot(result=bool)
+    def installLater(self) -> bool:
+        if self._state != "downloaded" or not self._downloaded_path:
+            return False
+        if not self._persist_downloaded_update():
+            return False
+        self._status = "更新将在下次启动时自动安装。"
+        self.stateChanged.emit()
+        return True
+
+    @Slot(result=bool)
+    def retryUpdate(self) -> bool:
+        if self._downloaded_path:
+            self._set_state("downloaded", "更新已准备好，可以重新尝试安装。")
+            return self.installAndRestart()
+        return self.downloadUpdate()
 
     @Slot()
     def shutdown(self) -> None:
@@ -348,12 +380,20 @@ class UpdateController(QObject):
         )
         self.stateChanged.emit()
 
-    @Slot(bool, str, str)
-    def _on_download_completed(self, success: bool, message: str, path: str) -> None:
+    @Slot(bool, str, str, str)
+    def _on_download_completed(
+        self,
+        success: bool,
+        message: str,
+        path: str,
+        checksum: str = "",
+    ) -> None:
         self._download_thread = None
         if success:
             self._progress = 100
             self._downloaded_path = path
+            self._downloaded_sha256 = checksum
+            self._pending_version = self._release.version if self._release else ""
             self._set_state("downloaded", message)
         elif message == "更新下载已取消":
             self._set_state("available", message)
@@ -364,6 +404,41 @@ class UpdateController(QObject):
         self._state = state
         self._status = status
         self.stateChanged.emit()
+
+    def _persist_downloaded_update(self) -> bool:
+        path = Path(self._downloaded_path)
+        version = self._release.version if self._release else self._pending_version
+        try:
+            size = path.stat().st_size
+            checksum = self._downloaded_sha256 or file_sha256(path)
+            self.config_store.set_pending_update(
+                version,
+                path.name,
+                size,
+                checksum,
+            )
+        except (OSError, ValueError) as exc:
+            self._set_state("error", f"无法保存待安装更新：{exc}")
+            return False
+        self._downloaded_sha256 = checksum
+        self._pending_version = version
+        return True
+
+    def _restore_pending_update(self) -> None:
+        result, pending = validate_pending_update(
+            self.config_store,
+            self._current_version,
+        )
+        if result != "ready" or pending is None:
+            return
+        self._downloaded_path = str(pending.path)
+        self._downloaded_sha256 = pending.sha256
+        self._pending_version = pending.version
+        self._progress = 100
+        self._received_bytes = pending.size
+        self._total_bytes = pending.size
+        self._state = "downloaded"
+        self._status = "更新已下载，将在下次启动时自动安装。"
 
     @staticmethod
     def _format_size(value: int) -> str:

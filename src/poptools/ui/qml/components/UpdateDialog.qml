@@ -247,7 +247,10 @@ AppDialog {
                 visible: root.controller.state === "downloaded"
                 implicitWidth: 116; implicitHeight: 48; radius: height / 2
                 text: "稍后安装"; iconName: "schedule"; tonal: true
-                onClicked: root.close()
+                onClicked: {
+                    if (root.controller.installLater())
+                        root.close()
+                }
             }
             PrimaryButton {
                 visible: root.controller.state === "downloaded"
@@ -265,7 +268,7 @@ AppDialog {
                 visible: root.controller.state === "error"
                 implicitWidth: 112; implicitHeight: 48; radius: height / 2
                 text: "重试"; iconName: "refresh"
-                onClicked: root.controller.downloadUpdate()
+                onClicked: root.controller.retryUpdate()
             }
         }
     }

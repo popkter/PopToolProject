@@ -11,7 +11,7 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Protocol
 
 from PySide6.QtCore import QProcess
 
@@ -57,6 +57,28 @@ class UpdateRelease:
     checksum_url: str = ""
 
 
+@dataclass(frozen=True)
+class PendingUpdate:
+    version: str
+    path: Path
+    size: int
+    sha256: str
+
+
+PendingUpdateResult = Literal["none", "ready", "launched", "stale", "invalid", "failed"]
+
+
+class PendingUpdateStore(Protocol):
+    @property
+    def paths(self) -> Any: ...
+
+    def pending_update(self) -> object | None: ...
+
+    def clear_pending_update(self) -> None: ...
+
+    def set_last_auto_update_check_at(self, value: float) -> None: ...
+
+
 def version_key(
     value: str,
 ) -> tuple[tuple[int, int, int, int], int, int, int, str, int]:
@@ -100,6 +122,66 @@ def version_key(
 
 def is_newer_version(candidate: str, current: str) -> bool:
     return version_key(candidate) > version_key(current)
+
+
+def file_sha256(path: Path) -> str:
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest().lower()
+
+
+def validate_pending_update(
+    store: PendingUpdateStore,
+    current_version: str,
+) -> tuple[PendingUpdateResult, PendingUpdate | None]:
+    raw = store.pending_update()
+    if raw is None:
+        return "none", None
+    if not isinstance(raw, dict):
+        return _discard_invalid_pending_update(store)
+
+    version = raw.get("version")
+    file_name = raw.get("file_name")
+    size = raw.get("size")
+    checksum = raw.get("sha256")
+    if not isinstance(version, str) or not version.strip():
+        return _discard_invalid_pending_update(store)
+    if not is_newer_version(version, current_version):
+        store.clear_pending_update()
+        return "stale", None
+    if (
+        not isinstance(file_name, str)
+        or not file_name
+        or file_name in {".", ".."}
+        or "/" in file_name
+        or "\\" in file_name
+    ):
+        return _discard_invalid_pending_update(store)
+    if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+        return _discard_invalid_pending_update(store)
+    if (
+        not isinstance(checksum, str)
+        or re.fullmatch(r"[0-9a-fA-F]{64}", checksum) is None
+    ):
+        return _discard_invalid_pending_update(store)
+
+    updates_dir = Path(store.paths.updates_dir).resolve()
+    path = (updates_dir / file_name).resolve()
+    if path.parent != updates_dir or not path.is_file():
+        return _discard_invalid_pending_update(store)
+    try:
+        if path.stat().st_size != size or file_sha256(path) != checksum.lower():
+            return _discard_invalid_pending_update(store)
+    except OSError:
+        return _discard_invalid_pending_update(store)
+    return "ready", PendingUpdate(version.strip(), path, size, checksum.lower())
+
+
+def _discard_invalid_pending_update(
+    store: PendingUpdateStore,
+) -> tuple[PendingUpdateResult, None]:
+    store.clear_pending_update()
+    store.set_last_auto_update_check_at(0.0)
+    return "invalid", None
 
 
 class GitHubReleaseClient:
@@ -391,6 +473,20 @@ fi
             str(app_bundle.parent),
         )
         return result[0] if isinstance(result, tuple) else bool(result)
+
+
+def apply_pending_update(
+    store: PendingUpdateStore,
+    current_version: str,
+    launcher: Callable[[Path], bool] = UpdateInstaller.launch,
+) -> PendingUpdateResult:
+    result, pending = validate_pending_update(store, current_version)
+    if result != "ready" or pending is None:
+        return result
+    try:
+        return "launched" if launcher(pending.path) else "failed"
+    except OSError:
+        return "failed"
 
 
 def _https_url(value: object) -> str:

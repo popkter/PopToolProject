@@ -26,6 +26,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "prerelease_updates_enabled": False,
         "last_update_check_at": 0.0,
         "last_auto_update_check_at": 0.0,
+        "pending_update": None,
     },
     "execution": {
         "max_parallel": 3,
@@ -150,6 +151,58 @@ class ConfigStore:
             app = {}
             config["app"] = app
         app["skipped_update_version"] = version.strip()
+        self.save_config(config)
+
+    def pending_update(self) -> object | None:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            return None
+        value = app.get("pending_update")
+        return dict(value) if isinstance(value, dict) else value
+
+    def set_pending_update(
+        self,
+        version: str,
+        file_name: str,
+        size: int,
+        sha256: str,
+    ) -> None:
+        if not version.strip():
+            raise ValueError("待安装更新缺少版本号")
+        if (
+            not file_name
+            or file_name in {".", ".."}
+            or "/" in file_name
+            or "\\" in file_name
+        ):
+            raise ValueError("待安装更新文件名无效")
+        if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+            raise ValueError("待安装更新文件大小无效")
+        if re.fullmatch(r"[0-9a-fA-F]{64}", sha256.strip()) is None:
+            raise ValueError("待安装更新校验值无效")
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+        app["pending_update"] = {
+            "version": version.strip(),
+            "file_name": file_name,
+            "size": int(size),
+            "sha256": sha256.strip().lower(),
+        }
+        self.save_config(config)
+
+    def clear_pending_update(self) -> None:
+        config = self.load_config()
+        app = config.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            config["app"] = app
+        if app.get("pending_update") is None:
+            return
+        app["pending_update"] = None
         self.save_config(config)
 
     def prerelease_updates_enabled(self) -> bool:

@@ -568,11 +568,12 @@ ColumnLayout {
                             Text { text: "定时推送"; color: Theme.textPrimary; font.pixelSize: Theme.fontSectionTitle; font.weight: Font.DemiBold }
                             Text { text: "应用运行期间，每 30 秒检查一次到点方案。"; color: Theme.textSecondary; font.pixelSize: Theme.fontSupporting }
                         }
-                        Switch {
+                        ToggleControl {
                             id: scheduleEnabled
-                            text: checked ? "已启用" : "未启用"
-                            palette.text: Theme.textPrimary
-                            onToggled: controller.updateField("schedule", "enabled", checked)
+                            onToggled: function(value) {
+                                checked = value
+                                controller.updateField("schedule", "enabled", value)
+                            }
                         }
                     }
                     GridLayout {

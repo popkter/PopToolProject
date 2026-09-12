@@ -15,6 +15,8 @@ from PySide6.QtWidgets import QApplication
 from poptools import __version__
 from poptools.application import build_components
 from poptools.infrastructure.app_logging import configure_application_logging
+from poptools.infrastructure.app_updater import apply_pending_update
+from poptools.infrastructure.config_store import ConfigStore
 from poptools.infrastructure.python_environment import prepare_managed_python
 from poptools.infrastructure.single_instance import SingleInstanceLock
 from poptools.infrastructure.system_tray import SystemTrayController
@@ -103,6 +105,19 @@ def main() -> int:
 
     try:
         app = QApplication(sys.argv)
+        pending_update_result = apply_pending_update(
+            ConfigStore(paths),
+            __version__,
+        )
+        if pending_update_result == "launched":
+            logger.info("已启动待安装更新，当前进程即将退出")
+            return 0
+        if pending_update_result == "failed":
+            logger.warning("待安装更新启动失败，将打开当前版本供用户重试")
+        elif pending_update_result == "invalid":
+            logger.warning("待安装更新无效，已清除记录")
+        elif pending_update_result == "stale":
+            logger.info("待安装更新已应用或已过期，已清除记录")
         register_terminal_type()
         if not instance_lock.start_activation_server():
             logger.error("无法启动单实例激活服务")
