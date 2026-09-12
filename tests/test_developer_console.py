@@ -305,12 +305,13 @@ def test_dropped_paths_are_quoted_as_powershell_arguments(tmp_path: Path) -> Non
     assert "\n" not in result
 
 
-def test_custom_terminal_title_overrides_shell_title_until_reset(tmp_path: Path) -> None:
+def test_terminal_title_stays_stable_until_manually_renamed(tmp_path: Path) -> None:
     controller = make_controller(tmp_path)
     tab_id = controller.activeTerminalTabId
+    default_title = controller._default_tab_title()
 
     assert controller.updateTerminalTitle(tab_id, "project shell")
-    assert controller.terminalTabs[0]["title"] == "project shell"
+    assert controller.terminalTabs[0]["title"] == default_title
     assert controller.renameTerminalTab(tab_id, "  build logs  ")
     assert controller.terminalTabs[0]["title"] == "build logs"
     assert controller.terminalTabs[0]["hasCustomTitle"] is True
@@ -318,8 +319,21 @@ def test_custom_terminal_title_overrides_shell_title_until_reset(tmp_path: Path)
     assert controller.updateTerminalTitle(tab_id, "changed by shell")
     assert controller.terminalTabs[0]["title"] == "build logs"
     assert controller.resetTerminalTabTitle(tab_id)
-    assert controller.terminalTabs[0]["title"] == "changed by shell"
+    assert controller.terminalTabs[0]["title"] == default_title
     assert controller.terminalTabs[0]["hasCustomTitle"] is False
+
+
+def test_terminal_tabs_have_no_application_limit(tmp_path: Path) -> None:
+    controller = make_controller(tmp_path)
+
+    for _ in range(12):
+        assert controller.createTerminalTab()
+
+    assert len(controller.terminalTabs) == 13
+    assert controller.canCreateTerminalTab is True
+    controller._active_tab().output = "already used"  # type: ignore[union-attr]
+    assert controller.openTerminalAtDirectory(str(tmp_path / "more"))
+    assert len(controller.terminalTabs) == 14
 
 
 def test_relative_terminal_tab_switching_wraps_at_both_ends(tmp_path: Path) -> None:

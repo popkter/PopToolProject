@@ -360,60 +360,90 @@ Rectangle {
     Item {
         id: actionArea
         objectName: "customActionArea"
-        x: 23
-        y: consolePanel.y - height - 8
-        width: parent.width - 47
-        height: root.narrowManagementLayout ? 80 : 41
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: consolePanel.top
+        anchors.leftMargin: 23
+        anchors.rightMargin: 24
+        anchors.bottomMargin: 8
+        height: actionFlow.implicitHeight
 
-        PrimaryButton {
-            id: editButton
-            objectName: "customEditButton"
-            visible: root.allowManagement
-            x: 0
-            y: 0
-            width: root.narrowManagementLayout ? (parent.width - 8) / 2 : 108
-            height: 36
-            radius: 7
-            text: "编辑脚本"
-            iconName: "edit"
-            tonal: true
-            color: hovered ? Theme.surfaceContainer : Theme.surfaceContainerLow
-            border.color: Theme.outline
-            foregroundColor: Theme.textPrimary
-            labelFontSize: 13
-            labelFontWeight: Font.Normal
-            glyphSize: 18
-            contentSpacing: 7
-            enabled: !!root.displayedTool.editable && !root.controller.running
-            onClicked: root.editRequested()
-        }
+        Flow {
+            id: actionFlow
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            spacing: 8
+            layoutDirection: root.allowManagement ? Qt.LeftToRight : Qt.RightToLeft
 
+            readonly property real halfButtonWidth: (width - spacing) / 2
+            readonly property real thirdButtonWidth: (width - spacing * 2) / 3
 
-        PrimaryButton {
-            id: runButton
-            objectName: "customRunButton"
-            x: root.narrowManagementLayout ? 0 : parent.width - width
-            y: root.narrowManagementLayout ? 44 : 0
-            width: root.narrowManagementLayout ? parent.width : 152
-            height: 36
-            radius: 7
-            text: root.controller.running ? "停止运行" : "运行脚本"
-            iconName: root.controller.running ? "stop" : "play_arrow"
-            tonal: true
-            color: hovered ? Theme.primaryHover : Theme.primary
-            border.width: 0
-            foregroundColor: "white"
-            labelFontSize: 13
-            labelFontWeight: Font.Medium
-            glyphSize: 18
-            contentSpacing: 10
-            enabled: !!root.displayedTool.id
-            onClicked: root.runSelectedTool()
-        }
+            PrimaryButton {
+                id: editButton
+                objectName: "customEditButton"
+                visible: root.allowManagement
+                width: root.narrowManagementLayout
+                    ? actionFlow.halfButtonWidth : actionFlow.thirdButtonWidth
+                height: 36
+                radius: 7
+                text: "编辑"
+                iconName: "edit"
+                tonal: true
+                color: hovered ? Theme.surfaceContainer : Theme.surfaceContainerLow
+                border.color: Theme.outline
+                foregroundColor: Theme.textPrimary
+                labelFontSize: 13
+                labelFontWeight: Font.Normal
+                glyphSize: 18
+                contentSpacing: 7
+                enabled: !!root.displayedTool.editable && !root.controller.running
+                onClicked: root.editRequested()
+            }
 
-        PrimaryButton { objectName: "customDeleteButton"; visible: root.allowManagement; x: root.narrowManagementLayout ? (parent.width + 8) / 2 : 120; y: 0; width: root.narrowManagementLayout ? (parent.width - 8) / 2 : 108; height: 36; radius: 7; tonal: true; color: Theme.errorContainer; border.color: Theme.errorColor
-            text: "删除"; iconName: "delete"; foregroundColor: Theme.errorColor; labelFontSize: 13; labelFontWeight: Font.Normal; glyphSize: 18; contentSpacing: 7
-            enabled: !!root.displayedTool.id && !root.controller.running; onClicked: root.deleteRequested()
+            PrimaryButton {
+                objectName: "customDeleteButton"
+                visible: root.allowManagement
+                width: root.narrowManagementLayout
+                    ? actionFlow.halfButtonWidth : actionFlow.thirdButtonWidth
+                height: 36
+                radius: 7
+                tonal: true
+                color: Theme.errorContainer
+                border.color: Theme.errorColor
+                text: "删除"
+                iconName: "delete"
+                foregroundColor: Theme.errorColor
+                labelFontSize: 13
+                labelFontWeight: Font.Normal
+                glyphSize: 18
+                contentSpacing: 7
+                enabled: !!root.displayedTool.id && !root.controller.running
+                onClicked: root.deleteRequested()
+            }
+
+            PrimaryButton {
+                id: runButton
+                objectName: "customRunButton"
+                width: root.allowManagement
+                    ? (root.narrowManagementLayout
+                        ? actionFlow.width : actionFlow.thirdButtonWidth)
+                    : Math.min(152, actionFlow.width)
+                height: 36
+                radius: 7
+                text: root.controller.running ? "停止运行" : "运行脚本"
+                iconName: root.controller.running ? "stop" : "play_arrow"
+                tonal: true
+                color: hovered ? Theme.primaryHover : Theme.primary
+                border.width: 0
+                foregroundColor: "white"
+                labelFontSize: 13
+                labelFontWeight: Font.Medium
+                glyphSize: 18
+                contentSpacing: 10
+                enabled: !!root.displayedTool.id
+                onClicked: root.runSelectedTool()
+            }
         }
     }
 

@@ -67,4 +67,15 @@ if(BUILD_TESTING)
     add_executable(poptools_libvterm_test terminal_core_test.c)
     target_link_libraries(poptools_libvterm_test PRIVATE poptools_libvterm)
     add_test(NAME poptools_libvterm_test COMMAND poptools_libvterm_test)
+    add_executable(poptools_terminal_resize_test terminal_resize_test.cpp terminalitem.h)
+    target_compile_definitions(poptools_terminal_resize_test PRIVATE POPTOOLS_TERMINAL_LIBRARY)
+    target_link_libraries(poptools_terminal_resize_test PRIVATE
+        Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick poptools_libvterm)
+    add_test(NAME poptools_terminal_resize_test COMMAND poptools_terminal_resize_test)
+    set_tests_properties(poptools_terminal_resize_test PROPERTIES
+        TIMEOUT 20 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    if(WIN32)
+        set_property(TEST poptools_terminal_resize_test APPEND PROPERTY
+            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+    endif()
 endif()

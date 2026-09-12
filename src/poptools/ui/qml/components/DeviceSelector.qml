@@ -9,6 +9,7 @@ Rectangle {
     required property var controller
     property bool compact: false
     property bool dense: false
+    property real popupWidth: width
     readonly property int popupGap: 8
     readonly property int popupDeviceCount: Math.min(3, root.controller.androidDevices.length)
     readonly property bool popupIconOnly: root.compact || devicePopup.width < 220
@@ -97,7 +98,7 @@ Rectangle {
     Popup {
         id: devicePopup
         parent: Overlay.overlay
-        width: root.width
+        width: root.popupWidth
         height: Math.min(devicePopup.contentItem.implicitHeight,
             Overlay.overlay.height - Theme.space24)
         padding: Theme.space0

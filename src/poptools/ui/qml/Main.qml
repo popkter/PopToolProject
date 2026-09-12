@@ -33,7 +33,8 @@ ApplicationWindow {
 
     property var parameterValues: ({})
     property string toolSearchQuery: ""
-    readonly property real primaryNavWidth: Theme.primaryNavigationWidth
+    readonly property real primaryNavWidth: compactPrimaryNav
+        ? Theme.primaryNavigationCompactWidth : Theme.primaryNavigationWidth
     readonly property real toolListWidth: Math.max(
         minimumToolListWidth,
         Math.min(maximumNavigationWidth,
@@ -46,7 +47,7 @@ ApplicationWindow {
     readonly property real maximumNavigationWidth: Theme.navigationMaximumWidth
     readonly property real minimumContentWidth: 480
     readonly property real minimumContentHeight: 480
-    readonly property bool compactPrimaryNav: false
+    property bool compactPrimaryNav: false
     readonly property bool compactToolList: toolListWidth < 190
     readonly property bool compactContentActions: width < 760
     readonly property bool compactHeight: height < 620
@@ -467,9 +468,10 @@ ApplicationWindow {
         }
 
         MouseArea {
-            anchors.fill: parent
+            anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
+            width: window.developerSelected ? window.primaryNavWidth : parent.width
             onPressed: window.startSystemMove()
             onDoubleClicked: {
                 if (window.visibility === Window.Maximized)
@@ -532,6 +534,31 @@ ApplicationWindow {
                 }
             }
         }
+
+        PrimaryButton {
+            id: primaryNavModeButton
+            objectName: "primaryNavModeButton"
+            z: 3
+            x: window.primaryNavWidth - width - Theme.space12
+            anchors.top: parent.top
+            anchors.topMargin: Theme.space20
+            width: 28
+            height: 28
+            radius: Theme.radiusSmall
+            compact: true
+            tonal: true
+            text: window.compactPrimaryNav ? "展开导航栏" : "收起导航栏"
+            iconName: window.compactPrimaryNav ? "chevron_right" : "chevron_left"
+            glyphSize: 20
+            foregroundColor: Theme.textSecondary
+            color: hovered ? Theme.surfaceContainerHigh : "transparent"
+            border.width: 0
+            onClicked: window.compactPrimaryNav = !window.compactPrimaryNav
+
+            ToolTip.visible: hovered
+            ToolTip.text: text
+            ToolTip.delay: 450
+        }
     }
 
     Item {
@@ -583,7 +610,7 @@ ApplicationWindow {
     }
 
     RowLayout {
-        anchors.top: customTitleBar.bottom
+        anchors.top: window.developerSelected ? parent.top : customTitleBar.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -595,14 +622,16 @@ ApplicationWindow {
             Layout.maximumWidth: window.primaryNavWidth
             Layout.fillHeight: true
             color: Theme.sidebar
-            clip: true
+            clip: false
+            z: 2
 
             ColumnLayout {
                 anchors.fill: parent
                 anchors.leftMargin: Theme.space20
                 anchors.rightMargin: Theme.space20
-                anchors.topMargin: window.compactHeight
-                    ? Theme.panelPaddingCompact : Theme.space20
+                anchors.topMargin: (window.developerSelected ? customTitleBar.height : 0)
+                    + (window.compactHeight
+                        ? Theme.panelPaddingCompact : Theme.space20)
                 anchors.bottomMargin: window.compactHeight
                     ? Theme.panelPaddingCompact : Theme.space24
                 spacing: window.compactHeight
@@ -631,6 +660,7 @@ ApplicationWindow {
                             fillMode: Image.PreserveAspectFit
                             smooth: true
                             mipmap: true
+                            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
 
                             MouseArea {
                                 anchors.fill: parent
@@ -765,6 +795,7 @@ ApplicationWindow {
                     controller: androidController
                     compact: window.compactPrimaryNav
                     dense: window.compactHeight
+                    popupWidth: Theme.primaryNavigationWidth - Theme.space20 * 2
                 }
             }
         }
@@ -836,6 +867,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     controller: developerConsoleController
+                    parentWindow: window
                 }
 
                 SettingsPage {

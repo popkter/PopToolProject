@@ -105,8 +105,6 @@ class DeveloperConsoleController(QObject):
     terminalTabsChanged = Signal()
     powerShellHistoryListViewEnabledChanged = Signal()
 
-    MAX_TERMINAL_TABS = 7
-
     def __init__(
         self,
         python_environment: PythonEnvironment,
@@ -164,7 +162,7 @@ class DeveloperConsoleController(QObject):
 
     @Property(bool, notify=terminalTabsChanged)
     def canCreateTerminalTab(self) -> bool:
-        return len(self._tabs) < self.MAX_TERMINAL_TABS
+        return True
 
     @Property(str, constant=True)
     def pythonExecutable(self) -> str:
@@ -209,6 +207,10 @@ class DeveloperConsoleController(QObject):
     @staticmethod
     def _terminal_name() -> str:
         return "PowerShell 7" if sys.platform == "win32" else "macOS Shell"
+
+    @staticmethod
+    def _default_tab_title() -> str:
+        return "PowerShell" if sys.platform == "win32" else "macOS Shell"
 
     @Property(int, constant=True)
     def windowsBuildNumber(self) -> int:
@@ -325,7 +327,7 @@ class DeveloperConsoleController(QObject):
                 }
             )
 
-        tab.shell_title = self._terminal_name()
+        tab.shell_title = self._default_tab_title()
         session = ConPtySession(self)
         tab.output_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         session.outputReceived.connect(self._on_terminal_output)
@@ -455,15 +457,9 @@ class DeveloperConsoleController(QObject):
 
     @Slot(str, str, result=bool)
     def updateTerminalTitle(self, tab_id: str, title: str) -> bool:
-        tab = self._tab_by_id(tab_id)
-        if tab is None:
-            return False
-        shell_title = title.strip() or self._terminal_name()
-        if tab.shell_title == shell_title:
-            return True
-        tab.shell_title = shell_title
-        self.terminalTabsChanged.emit()
-        return True
+        # Keep the slot connected for native terminal compatibility, but do not
+        # let shell-reported paths replace the stable default tab title.
+        return self._tab_by_id(tab_id) is not None
 
     @Slot(str, str, result=bool)
     def renameTerminalTab(self, tab_id: str, title: str) -> bool:
@@ -567,8 +563,6 @@ class DeveloperConsoleController(QObject):
 
     @Slot(result=bool)
     def createTerminalTab(self) -> bool:
-        if len(self._tabs) >= self.MAX_TERMINAL_TABS:
-            return False
         tab = self._create_tab(activate=True)
         if self._terminal_ready:
             self._display_active_tab()
@@ -584,8 +578,6 @@ class DeveloperConsoleController(QObject):
             if self._terminal_ready:
                 QTimer.singleShot(0, lambda: self._ensure_tab_started(active))
             return True
-        if len(self._tabs) >= self.MAX_TERMINAL_TABS:
-            return False
         tab = self._create_tab(activate=True, working_directory=target)
         if self._terminal_ready:
             self._display_active_tab()
@@ -729,7 +721,7 @@ class DeveloperConsoleController(QObject):
         self._next_tab_number += 1
         tab = TerminalTabState(
             tab_id=f"terminal-{tab_number}",
-            shell_title=self._terminal_name(),
+            shell_title=self._default_tab_title(),
             working_directory=self._normalize_working_directory(working_directory),
         )
         self._tabs.append(tab)

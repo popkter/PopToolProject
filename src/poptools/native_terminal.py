@@ -33,9 +33,10 @@ def register_terminal_type() -> None:
     library_path = terminal_library_path()
     if sys.platform == "win32":
         # A loaded DLL can be renamed but not deleted. Native rebuilds leave
-        # this backup behind so the next process can load the replacement.
-        with suppress(OSError):
-            library_path.with_name(f"{library_path.name}.previous").unlink()
+        # backups behind so the next process can load the replacement.
+        for previous_library in library_path.parent.glob(f"{library_path.name}.previous*"):
+            with suppress(OSError):
+                previous_library.unlink()
     if not library_path.is_file():
         raise RuntimeError(
             "原生终端组件不存在："

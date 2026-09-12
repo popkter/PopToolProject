@@ -96,6 +96,7 @@ QtObject {
     property int controlSpacing: 8
     property int terminalContentPadding: 20
     readonly property int primaryNavigationWidth: 246
+    readonly property int primaryNavigationCompactWidth: 134
     property int navigationMaximumWidth: 306
     property int borderWidthThin: 1
     property int borderWidthMedium: 2

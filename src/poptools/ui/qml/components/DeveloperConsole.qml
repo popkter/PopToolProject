@@ -3,13 +3,36 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 import PopTools.Terminal 1.0
 import "../theme"
 
 Item {
     id: root
     required property var controller
+    required property var parentWindow
     readonly property int terminalToolbarControlHeight: 40
+    readonly property real terminalTabMaximumWidth: 146
+    readonly property real terminalTabMinimumWidth: 96
+    readonly property real terminalTabMaximumFontSize: Theme.fontBody
+    readonly property real terminalTabMinimumFontSize: 11
+    readonly property real responsiveTerminalTabWidth: {
+        var tabCount = Math.max(1, root.controller.terminalTabs.length)
+        var addButtonWidth = 36
+        var totalSpacing = terminalTabs.spacing * tabCount
+        var fittedWidth = (terminalTabStrip.width - addButtonWidth - totalSpacing) / tabCount
+        return Math.max(root.terminalTabMinimumWidth,
+            Math.min(root.terminalTabMaximumWidth, fittedWidth))
+    }
+    readonly property real responsiveTerminalTabFontSize: {
+        var widthRange = root.terminalTabMaximumWidth - root.terminalTabMinimumWidth
+        var widthProgress = widthRange > 0
+            ? (root.responsiveTerminalTabWidth - root.terminalTabMinimumWidth) / widthRange
+            : 1
+        return root.terminalTabMinimumFontSize
+            + (root.terminalTabMaximumFontSize - root.terminalTabMinimumFontSize)
+                * Math.max(0, Math.min(1, widthProgress))
+    }
     property string renamingTabId: ""
     property string lastPressedTabId: ""
     property double lastTabPressTime: 0
@@ -54,6 +77,36 @@ Item {
                 return index
         }
         return -1
+    }
+    function ensureActiveTerminalTabVisible() {
+        if (terminalTabFlick.width <= 0)
+            return
+        var maximumContentX = Math.max(0,
+            terminalTabFlick.contentWidth - terminalTabFlick.width)
+        if (maximumContentX <= 0) {
+            terminalTabFlick.contentX = 0
+            return
+        }
+        terminalTabFlick.contentX = Math.max(0,
+            Math.min(maximumContentX, terminalTabFlick.contentX))
+        var index = root.tabIndex(root.controller.activeTerminalTabId)
+        if (index < 0)
+            return
+        var tabLeft = index * (root.responsiveTerminalTabWidth + terminalTabs.spacing)
+        var tabRight = tabLeft + root.responsiveTerminalTabWidth
+        var viewportLeft = terminalTabFlick.contentX
+        var viewportRight = viewportLeft + terminalTabFlick.width
+        if (tabLeft < viewportLeft)
+            terminalTabFlick.contentX = Math.max(0, tabLeft)
+        else if (tabRight > viewportRight)
+            terminalTabFlick.contentX = Math.min(maximumContentX,
+                tabRight - terminalTabFlick.width)
+    }
+    function scrollTerminalTabs(delta) {
+        var maximumContentX = Math.max(0,
+            terminalTabFlick.contentWidth - terminalTabFlick.width)
+        terminalTabFlick.contentX = Math.max(0,
+            Math.min(maximumContentX, terminalTabFlick.contentX + delta))
     }
     function syncTerminalSyntaxColors() {
         root.controller.configureTerminalSyntaxColors({
@@ -113,30 +166,19 @@ Item {
         function onTerminalSnapshotData(tabId, data) { terminalView.feed(tabId, data) }
         function onTerminalResetRequested(tabId) { terminalView.resetSession(tabId) }
         function onTerminalSessionRemoved(tabId) { terminalView.removeSession(tabId) }
+        function onTerminalTabsChanged() {
+            Qt.callLater(root.ensureActiveTerminalTabVisible)
+        }
     }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.leftMargin: Theme.space28
-        anchors.rightMargin: Theme.space28
-        anchors.topMargin: 0
-        anchors.bottomMargin: Theme.space28
-        spacing: Theme.space16
-
-        WorkspacePageHeader {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 68
-            Layout.minimumHeight: 68
-            Layout.maximumHeight: 68
-            title: "终端"
-            description: "这是一个Windows上很牛来的终端，PowerShell 7"
-            titlePixelSize: 28
-        }
+        spacing: 0
 
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: Theme.radiusMedium
+            radius: 0
             color: Theme.consoleBackground
             clip: true
 
@@ -147,16 +189,8 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 56
-                    radius: Theme.radiusMedium
+                    radius: 0
                     color: Theme.consoleHeaderBackground
-
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.bottom: parent.bottom
-                        height: Theme.radiusMedium
-                        color: parent.color
-                    }
 
                     RowLayout {
                         z: 1
@@ -165,110 +199,208 @@ Item {
                         anchors.rightMargin: 14
                         spacing: 10
 
-                        Flickable {
+                        Item {
+                            id: terminalTabStrip
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            contentWidth: terminalTabs.implicitWidth
-                            contentHeight: height
                             clip: true
-                            boundsBehavior: Flickable.StopAtBounds
-                            Row {
-                                id: terminalTabs
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 10
-                                Repeater {
-                                    model: root.controller.terminalTabs
-                                    delegate: Rectangle {
-                                        id: tab
-                                        required property var modelData
-                                        width: 146; height: root.terminalToolbarControlHeight; radius: 8
-                                        color: modelData.active ? "#313947" : "transparent"
-                                        RowLayout {
-                                            z: 1
-                                            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 8
-                                            Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: tab.modelData.active ? Theme.consoleText : Theme.consoleMuted }
-                                            Text {
-                                                Layout.fillWidth: true
-                                                visible: root.renamingTabId !== tab.modelData.tabId
-                                                text: tab.modelData.title || "Android 调试"
-                                                color: Theme.consoleText
-                                                font.pixelSize: Theme.fontBody
-                                                elide: Text.ElideRight
-                                            }
-                                            TextField {
-                                                id: renameField
-                                                Layout.fillWidth: true
-                                                Layout.preferredHeight: 28
-                                                visible: root.renamingTabId === tab.modelData.tabId
-                                                color: Theme.consoleText
-                                                font.pixelSize: Theme.fontBody
-                                                leftPadding: 6; rightPadding: 6; topPadding: 0; bottomPadding: 0
-                                                selectByMouse: true
-                                                background: Rectangle {
+                            onWidthChanged: Qt.callLater(root.ensureActiveTerminalTabVisible)
+
+                            Flickable {
+                                id: terminalTabFlick
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: Math.max(0,
+                                    terminalTabAddButton.x - terminalTabs.spacing)
+                                contentWidth: terminalTabs.implicitWidth
+                                contentHeight: height
+                                clip: true
+                                interactive: contentWidth > width
+                                flickableDirection: Flickable.HorizontalFlick
+                                boundsBehavior: Flickable.StopAtBounds
+                                onWidthChanged: Qt.callLater(root.ensureActiveTerminalTabVisible)
+                                onContentWidthChanged: Qt.callLater(root.ensureActiveTerminalTabVisible)
+                                Row {
+                                    id: terminalTabs
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 10
+                                    Repeater {
+                                        model: root.controller.terminalTabs
+                                        delegate: Rectangle {
+                                            id: tab
+                                            required property int index
+                                            required property var modelData
+                                            width: root.responsiveTerminalTabWidth
+                                            height: root.terminalToolbarControlHeight
+                                            radius: 8
+                                            color: modelData.active ? "#313947" : "transparent"
+                                            RowLayout {
+                                                z: 1
+                                                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 8
+                                                Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: tab.modelData.active ? Theme.consoleText : Theme.consoleMuted }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    visible: root.renamingTabId !== tab.modelData.tabId
+                                                    text: tab.modelData.title || "Android 调试"
+                                                    color: Theme.consoleText
+                                                    font.pixelSize: root.responsiveTerminalTabFontSize
+                                                    elide: Text.ElideRight
+                                                }
+                                                TextField {
+                                                    id: renameField
+                                                    Layout.fillWidth: true
+                                                    Layout.preferredHeight: 28
+                                                    visible: root.renamingTabId === tab.modelData.tabId
+                                                    color: Theme.consoleText
+                                                    font.pixelSize: root.responsiveTerminalTabFontSize
+                                                    leftPadding: 6; rightPadding: 6; topPadding: 0; bottomPadding: 0
+                                                    selectByMouse: true
+                                                    background: Rectangle {
+                                                        radius: 4
+                                                        color: "#202733"
+                                                        border.color: Theme.primary
+                                                        border.width: 1
+                                                    }
+                                                    onVisibleChanged: if (visible) {
+                                                        text = tab.modelData.title
+                                                        forceActiveFocus()
+                                                        selectAll()
+                                                    }
+                                                    onEditingFinished: root.finishRename(tab.modelData.tabId, text)
+                                                    Keys.onReturnPressed: function(event) {
+                                                        root.finishRename(tab.modelData.tabId, text)
+                                                        event.accepted = true
+                                                    }
+                                                    Keys.onEscapePressed: function(event) {
+                                                        root.cancelRename(tab.modelData.tabId)
+                                                        event.accepted = true
+                                                    }
+                                                }
+                                                PrimaryButton {
+                                                    visible: root.controller.terminalTabs.length > 1
+                                                    Layout.preferredWidth: 20
+                                                    Layout.preferredHeight: 20
+                                                    compact: true
+                                                    text: "关闭终端标签"
+                                                    iconName: "close"
+                                                    glyphSize: 15
+                                                    tonal: true
+                                                    foregroundColor: Theme.consoleMuted
+                                                    color: hovered ? "#3A4657" : "transparent"
+                                                    border.width: 0
                                                     radius: 4
-                                                    color: "#202733"
-                                                    border.color: Theme.primary
-                                                    border.width: 1
-                                                }
-                                                onVisibleChanged: if (visible) {
-                                                    text = tab.modelData.title
-                                                    forceActiveFocus()
-                                                    selectAll()
-                                                }
-                                                onEditingFinished: root.finishRename(tab.modelData.tabId, text)
-                                                Keys.onReturnPressed: function(event) {
-                                                    root.finishRename(tab.modelData.tabId, text)
-                                                    event.accepted = true
-                                                }
-                                                Keys.onEscapePressed: function(event) {
-                                                    root.cancelRename(tab.modelData.tabId)
-                                                    event.accepted = true
+                                                    onClicked: root.controller.closeTerminalTab(tab.modelData.tabId)
                                                 }
                                             }
-                                            PrimaryButton {
-                                                visible: root.controller.terminalTabs.length > 1
-                                                Layout.preferredWidth: 20
-                                                Layout.preferredHeight: 20
-                                                compact: true
-                                                text: "关闭终端标签"
-                                                iconName: "close"
-                                                glyphSize: 15
-                                                tonal: true
-                                                foregroundColor: Theme.consoleMuted
-                                                color: hovered ? "#3A4657" : "transparent"
-                                                border.width: 0
-                                                radius: 4
-                                                onClicked: root.controller.closeTerminalTab(tab.modelData.tabId)
-                                            }
-                                        }
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            z: 0
-                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                            cursorShape: Qt.PointingHandCursor
-                                            onPressed: function(mouse) {
-                                                if (mouse.button === Qt.LeftButton)
-                                                    root.handleTabPress(tab.modelData.tabId)
-                                            }
-                                            onClicked: function(mouse) {
-                                                if (mouse.button === Qt.RightButton) {
-                                                    root.controller.activateTerminalTab(tab.modelData.tabId)
-                                                    terminalTabContextMenu.tabId = tab.modelData.tabId
-                                                    var position = tab.mapToItem(root, mouse.x, mouse.y)
-                                                    terminalTabContextMenu.popup(position.x, position.y)
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                z: 0
+                                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                cursorShape: Qt.PointingHandCursor
+                                                onPressed: function(mouse) {
+                                                    if (mouse.button === Qt.LeftButton)
+                                                        root.handleTabPress(tab.modelData.tabId)
                                                 }
+                                                onClicked: function(mouse) {
+                                                    if (mouse.button === Qt.RightButton) {
+                                                        root.controller.activateTerminalTab(tab.modelData.tabId)
+                                                        terminalTabContextMenu.tabId = tab.modelData.tabId
+                                                        terminalTabContextMenu.popup(tab, mouse.x, mouse.y)
+                                                    }
+                                                }
+                                            }
+                                            Rectangle {
+                                                z: 2
+                                                anchors.right: parent.right
+                                                anchors.rightMargin: -Math.floor(terminalTabs.spacing / 2)
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                width: 1
+                                                height: 20
+                                                color: Theme.consoleMuted
+                                                opacity: 0.45
+                                                visible: !tab.modelData.active
+                                                    && tab.index < root.controller.terminalTabs.length - 1
+                                                    && !root.controller.terminalTabs[tab.index + 1].active
                                             }
                                         }
                                     }
                                 }
-                                PrimaryButton {
-                                    width: 36; height: root.terminalToolbarControlHeight; radius: 8
-                                    compact: true; text: "新增终端标签"; iconName: "add"; glyphSize: 20
-                                    tonal: true; foregroundColor: Theme.consoleText; border.width: 0
-                                    color: hovered ? "#3A4657" : "#313947"
-                                    enabled: root.controller.canCreateTerminalTab
-                                    disabledOpacity: 1
-                                    onClicked: root.controller.createTerminalTab()
+                            }
+
+                            PrimaryButton {
+                                id: terminalTabAddButton
+                                z: 4
+                                x: Math.max(0, Math.min(
+                                    terminalTabs.implicitWidth + terminalTabs.spacing,
+                                    parent.width - width))
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 36
+                                height: root.terminalToolbarControlHeight
+                                radius: 8
+                                compact: true
+                                text: "新增终端标签"
+                                iconName: "add"
+                                glyphSize: 20
+                                tonal: true
+                                foregroundColor: Theme.consoleText
+                                border.width: 0
+                                color: hovered ? "#3A4657" : "#313947"
+                                enabled: root.controller.canCreateTerminalTab
+                                disabledOpacity: 1
+                                onClicked: root.controller.createTerminalTab()
+                            }
+
+                            MouseArea {
+                                z: 3
+                                anchors.fill: parent
+                                acceptedButtons: Qt.NoButton
+                                onWheel: function(wheel) {
+                                    if (!terminalTabFlick.interactive) {
+                                        wheel.accepted = false
+                                        return
+                                    }
+                                    var angleDelta = wheel.angleDelta.y !== 0
+                                        ? wheel.angleDelta.y : wheel.angleDelta.x
+                                    root.scrollTerminalTabs(-angleDelta)
+                                    wheel.accepted = true
+                                }
+                            }
+
+                            MouseArea {
+                                id: terminalWindowDragArea
+                                objectName: "terminalWindowDragArea"
+                                property point pressPosition: Qt.point(0, 0)
+                                property bool systemMoveStarted: false
+                                z: 2
+                                x: Math.max(0, Math.min(parent.width,
+                                    terminalTabAddButton.x + terminalTabAddButton.width
+                                        + terminalTabs.spacing))
+                                width: Math.max(0, parent.width - x)
+                                height: parent.height
+                                acceptedButtons: Qt.LeftButton
+                                onPressed: function(mouse) {
+                                    pressPosition = Qt.point(mouse.x, mouse.y)
+                                    systemMoveStarted = false
+                                    mouse.accepted = true
+                                }
+                                onPositionChanged: function(mouse) {
+                                    if (!pressed || systemMoveStarted)
+                                        return
+                                    var distance = Math.abs(mouse.x - pressPosition.x)
+                                        + Math.abs(mouse.y - pressPosition.y)
+                                    if (distance < Application.styleHints.startDragDistance)
+                                        return
+                                    systemMoveStarted = true
+                                    root.parentWindow.startSystemMove()
+                                }
+                                onReleased: systemMoveStarted = false
+                                onCanceled: systemMoveStarted = false
+                                onDoubleClicked: {
+                                    if (root.parentWindow.visibility === Window.Maximized)
+                                        root.parentWindow.showNormal()
+                                    else
+                                        root.parentWindow.showMaximized()
                                 }
                             }
                         }

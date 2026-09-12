@@ -87,7 +87,7 @@ def main() -> int:
     app.aboutToQuit.connect(developer_console_controller.shutdown)
     app.aboutToQuit.connect(jira_feishu_controller.shutdown)
     capture_terminal_tabs = int(os.environ.get("POPTOOLS_CAPTURE_TERMINAL_TABS", "1"))
-    for _ in range(max(1, min(capture_terminal_tabs, 7)) - 1):
+    for _ in range(max(1, capture_terminal_tabs) - 1):
         developer_console_controller.createTerminalTab()
     update_controller = UpdateController(config_store, auto_check_enabled=False)
     capture_update_status = os.environ.get("POPTOOLS_CAPTURE_UPDATE_STATUS")
@@ -205,6 +205,8 @@ def main() -> int:
     if capture_primary_nav_width:
         window.setProperty("primaryNavWidth", int(capture_primary_nav_width))
         QMetaObject.invokeMethod(window, "clampPanelWidths")
+    if os.environ.get("POPTOOLS_CAPTURE_COMPACT_PRIMARY_NAV") == "1":
+        window.setProperty("compactPrimaryNav", True)
     if os.environ.get("POPTOOLS_CAPTURE_CUSTOM_DRAWER") == "1":
         custom_tools = registry.for_section("custom")
         if custom_tools:

@@ -284,7 +284,7 @@ AppDialog {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: "点击左侧“终端”即可进入；Windows 首次使用时按提示安装应用专用 PowerShell 7，macOS 使用系统 Shell。终端最多支持 7 个独立会话，并与自定义 Python 脚本共用应用专属 python、pip 和 ADB。Ctrl+C 有选区时复制、无选区时停止当前命令，Ctrl+V 粘贴，Ctrl+L 清屏。"
+                            text: "点击左侧“终端”即可进入；Windows 首次使用时按提示安装应用专用 PowerShell 7，macOS 使用系统 Shell。终端支持多个独立会话，并与自定义 Python 脚本共用应用专属 python、pip 和 ADB。Ctrl+C 有选区时复制、无选区时停止当前命令，Ctrl+V 粘贴，Ctrl+L 清屏。"
                             color: Theme.textSecondary
                             font.pixelSize: Theme.fontSupporting
                             wrapMode: Text.WordWrap

@@ -212,7 +212,7 @@ Python Doctor 支持内联源码和 `.py` 文件路径，解析 import、排除�
 
 终端由 `app.terminal_enabled` 控制，默认关闭。Windows 首次启用时，`PowerShellPlugin` 根据架构清单下载官方 PowerShell ZIP，校验 SHA-256、安全解压并写入安装清单；macOS 直接使用用户系统 Shell。
 
-`DeveloperConsoleController` 最多维护 7 个 `TerminalTabState`，每个标签页独立持有 Shell 会话、解码器、输出快照和退出状态。切换应用页面不会销毁会话；关闭标签、重启当前会话、关闭终端功能或退出应用时按作用域回收资源。
+`DeveloperConsoleController` 维护多个 `TerminalTabState`，每个标签页独立持有 Shell 会话、解码器、输出快照和退出状态。切换应用页面不会销毁会话；关闭标签、重启当前会话、关闭终端功能或退出应用时按作用域回收资源。
 
 `TerminalItem` 基于 libvterm 渲染字符网格并处理键盘、输入法、鼠标、选区、剪贴板和滚动。Windows 使用 ConPTY 与 Job Object，macOS 使用 POSIX PTY。控制器输出快照上限为 131,072 字符，原生终端每个会话保留最多 10,000 行回滚记录。
 

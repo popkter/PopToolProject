@@ -6,8 +6,71 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BuildDirectory = Join-Path $ProjectRoot "build\native-windows-msvc2022"
 $InstallDirectory = Join-Path $ProjectRoot "src\poptools\native"
+$StagingInstallDirectory = Join-Path $BuildDirectory "install\$Configuration"
 $VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 $ManagedQtRoot = Join-Path $ProjectRoot "build\qt-sdk"
+
+function Install-NativeLibrary {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+
+    try {
+        Copy-Item -LiteralPath $Source -Destination $Destination -Force
+        return
+    }
+    catch {
+        $CopyError = $_
+    }
+
+    if (-not (Test-Path -LiteralPath $Destination -PathType Leaf)) {
+        throw $CopyError
+    }
+
+    # Windows does not allow an in-use DLL to be overwritten, but it does allow
+    # the loaded file to be renamed. Keep that mapped image alive for the current
+    # process and put the new build at the canonical path for the next launch.
+    $Backup = "$Destination.previous"
+    if (Test-Path -LiteralPath $Backup) {
+        try {
+            Remove-Item -LiteralPath $Backup -Force
+        }
+        catch {
+            $Backup = "$Destination.previous.$([guid]::NewGuid().ToString('N'))"
+        }
+    }
+
+    try {
+        Move-Item -LiteralPath $Destination -Destination $Backup
+    }
+    catch {
+        throw (
+            "Native terminal deployment failed because the existing DLL could not be " +
+            "replaced or renamed: $Destination. Close processes using the project DLL " +
+            "and retry. Original error: $($_.Exception.Message)"
+        )
+    }
+
+    try {
+        Copy-Item -LiteralPath $Source -Destination $Destination
+    }
+    catch {
+        $DeployError = $_
+        if (-not (Test-Path -LiteralPath $Destination)) {
+            try {
+                Move-Item -LiteralPath $Backup -Destination $Destination
+            }
+            catch {
+                Write-Warning "Could not restore the previous native terminal DLL from $Backup"
+            }
+        }
+        throw $DeployError
+    }
+
+    Write-Host "Replaced the in-use native terminal DLL; old image retained at $Backup" `
+        -ForegroundColor Yellow
+}
 
 # MSBuild adds a mixed-case `Path` entry internally. Some shells (including
 # automation hosts) expose the inherited variable as `PATH`, which causes
@@ -141,7 +204,19 @@ if (-not $CTest) { throw "CTest was not found beside CMake" }
 & $CTest --test-dir $BuildDirectory --build-config $Configuration --output-on-failure
 if ($LASTEXITCODE -ne 0) { throw "Native terminal tests failed" }
 
-& $CMake --install $BuildDirectory --config $Configuration --prefix $InstallDirectory
+if (Test-Path -LiteralPath $StagingInstallDirectory) {
+    Remove-Item -LiteralPath $StagingInstallDirectory -Recurse -Force
+}
+New-Item -ItemType Directory -Path $StagingInstallDirectory -Force | Out-Null
+
+& $CMake --install $BuildDirectory --config $Configuration --prefix $StagingInstallDirectory
 if ($LASTEXITCODE -ne 0) { throw "Native terminal install failed" }
 
-Write-Host "Native terminal installed at $InstallDirectory"
+$StagedLibrary = Join-Path $StagingInstallDirectory "poptools_terminal.dll"
+if (-not (Test-Path -LiteralPath $StagedLibrary -PathType Leaf)) {
+    throw "Native terminal install did not produce the expected library: $StagedLibrary"
+}
+$InstalledLibrary = Join-Path $InstallDirectory "poptools_terminal.dll"
+Install-NativeLibrary -Source $StagedLibrary -Destination $InstalledLibrary
+
+Write-Host "Native terminal installed at $InstalledLibrary"

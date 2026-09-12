@@ -200,6 +200,14 @@ struct TerminalSession
             return 0;
         const CellLine line = std::move(session->scrollback.back());
         session->scrollback.pop_back();
+        // libvterm reuses this buffer and advances through it by cell.width.
+        // Historical rows can be narrower than the current screen: initialize
+        // the whole requested row so its tail cannot contain zero-width cells
+        // (an infinite backfill loop) or stale text from another history line.
+        VTermScreenCell blank{};
+        blank.width = 1;
+        vterm_state_get_default_colors(session->state, &blank.fg, &blank.bg);
+        std::fill_n(cells, columns, blank);
         const int count = std::min(columns, static_cast<int>(line.size()));
         std::copy_n(line.begin(), count, cells);
         return 1;
@@ -261,6 +269,15 @@ TerminalItem::TerminalItem(QQuickItem *parent)
     connect(&m_cursorTimer, &QTimer::timeout, this, [this] {
         m_cursorBlinkOn = !m_cursorBlinkOn;
         update();
+    });
+    // Window maximize/restore can deliver a burst of geometry changes. Resizing
+    // every libvterm session for each intermediate size repeats screen reflow
+    // and scrollback transfers unnecessarily.
+    m_geometryUpdateTimer.setSingleShot(true);
+    m_geometryUpdateTimer.setInterval(40);
+    connect(&m_geometryUpdateTimer, &QTimer::timeout, this, [this] {
+        updateTextureSize();
+        updateTerminalSize();
     });
     updateMetrics();
 }
@@ -493,8 +510,7 @@ void TerminalItem::updateTerminalSize()
 void TerminalItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
 {
     QQuickPaintedItem::geometryChange(newGeometry, oldGeometry);
-    updateTextureSize();
-    updateTerminalSize();
+    m_geometryUpdateTimer.start();
 }
 
 QColor terminalColor(VTermScreen *screen, VTermColor color, const QColor &fallback)

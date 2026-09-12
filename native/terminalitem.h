@@ -120,6 +120,7 @@ private:
     QString m_preedit;
     bool m_cursorBlinkOn = true;
     QTimer m_cursorTimer;
+    QTimer m_geometryUpdateTimer;
 };
 
 extern "C" POPTOOLS_TERMINAL_EXPORT void poptools_register_terminal_type();
