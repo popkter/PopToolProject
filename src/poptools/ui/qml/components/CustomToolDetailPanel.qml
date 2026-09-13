@@ -132,9 +132,6 @@ Rectangle {
             iconName: "file_upload"
             compact: root.compactHeaderActions
             Accessible.name: "分享脚本"
-            ToolTip.visible: compact && hovered
-            ToolTip.text: text
-            ToolTip.delay: 450
             tonal: true
             color: hovered ? Theme.surfaceContainer : Theme.surfaceContainerLow
             border.color: Theme.outline
@@ -514,9 +511,6 @@ Rectangle {
                     iconName: "content_copy"
                     compact: root.compactConsoleActions
                     Accessible.name: "复制控制台输出"
-                    ToolTip.visible: compact && hovered
-                    ToolTip.text: text
-                    ToolTip.delay: 450
                     tonal: true
                     color: "transparent"
                     border.width: 0
@@ -537,9 +531,6 @@ Rectangle {
                     iconName: "delete_sweep"
                     compact: root.compactConsoleActions
                     Accessible.name: "清空控制台输出"
-                    ToolTip.visible: compact && hovered
-                    ToolTip.text: text
-                    ToolTip.delay: 450
                     tonal: true
                     color: "transparent"
                     border.width: 0
@@ -559,9 +550,6 @@ Rectangle {
                     iconName: root.consoleExpanded ? "expand_more" : "expand_less"
                     compact: root.compactConsoleActions
                     Accessible.name: root.consoleExpanded ? "收起控制台输出" : "展开控制台输出"
-                    ToolTip.visible: compact && hovered
-                    ToolTip.text: text
-                    ToolTip.delay: 450
                     tonal: true
                     color: hovered ? Theme.consoleBackground : "transparent"
                     border.width: 0

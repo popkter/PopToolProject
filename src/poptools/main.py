@@ -73,7 +73,22 @@ def _terminal_working_directory(arguments: list[str]) -> Path | None:
     return candidate if candidate.is_dir() else Path.home().resolve()
 
 
+def _prepare_installed_runtime() -> int:
+    paths = AppPaths.from_environment()
+    try:
+        paths.ensure()
+        prepare_bundled_android_tools(paths)
+        prepare_managed_python(paths)
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"runtime preparation failed: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def main() -> int:
+    if "--prepare-runtime" in sys.argv:
+        return _prepare_installed_runtime()
+
     if "--worker-code" in sys.argv:
         index = sys.argv.index("--worker-code")
         return _run_worker_code(sys.argv[index + 1 :])

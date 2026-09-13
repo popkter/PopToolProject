@@ -328,7 +328,7 @@ macOS：
 
 版本以 `pyproject.toml` 为语义版本来源。构建时生成 `YYYY-MM-DD_x.x.x` 完整版本，Git 标签为 `vYYYY-MM-DD_x.x.x`。GitHub Actions 并行构建：
 
-- Windows x64：`PopTools.exe`、安装包和 SHA-256；
+- Windows x64：包含展开后运行时的安装包和 SHA-256；one-folder 目录仅作为安装器构建输入；
 - macOS arm64：`PopTools-macos-arm64.zip` 和 SHA-256；
 - macOS x64：`PopTools-macos-x64.zip` 和 SHA-256。
 

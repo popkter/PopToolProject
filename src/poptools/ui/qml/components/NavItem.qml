@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
@@ -16,10 +15,12 @@ Rectangle {
     signal clicked()
     signal actionClicked()
 
-    implicitHeight: dense ? 48 : 52
-    radius: Theme.radiusMedium
-    color: selected ? Theme.navigationSelected
-                   : (mouseArea.containsMouse ? Theme.surfaceContainerHigh : "transparent")
+    implicitHeight: compact ? 40 : (dense ? 48 : 52)
+    radius: compact ? Theme.radiusSmall : Theme.radiusMedium
+    color: selected ? "#E8F2FF"
+                   : (mouseArea.containsMouse ? "#EEF1F5" : "transparent")
+    border.width: compact ? 1 : 0
+    border.color: selected ? "#88BFFF" : "#E0E5EB"
 
     RowLayout {
         z: 1
@@ -33,8 +34,8 @@ Rectangle {
         Item { visible: root.compact; Layout.fillWidth: true }
         MaterialIcon {
             icon: root.iconName
-            iconSize: 21
-            color: root.selected ? Theme.primary : Theme.textPrimary
+            iconSize: root.compact ? 20 : 21
+            color: root.selected ? "#1478E8" : "#53606F"
             Layout.preferredWidth: 24
             Layout.preferredHeight: 32
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
@@ -81,9 +82,10 @@ Rectangle {
             font.pixelSize: Theme.fontCaption
             font.weight: Font.DemiBold
         }
-        ToolTip.visible: root.compact && actionMouse.containsMouse
-        ToolTip.text: root.actionText
-        ToolTip.delay: 450
+        HoverTips {
+            visible: root.compact && actionMouse.containsMouse
+            text: root.actionText
+        }
         MouseArea {
             id: actionMouse
             anchors.fill: parent
@@ -93,9 +95,10 @@ Rectangle {
         }
     }
 
-    ToolTip.visible: root.compact && mouseArea.containsMouse
-    ToolTip.text: root.label
-    ToolTip.delay: 450
+    HoverTips {
+        visible: root.compact && mouseArea.containsMouse
+        text: root.label
+    }
 
     MouseArea {
         id: mouseArea

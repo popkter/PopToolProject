@@ -88,9 +88,11 @@ PrimaryButton {
                         ? Theme.primary : Theme.textSecondary
                 }
 
-                ToolTip.visible: choiceMouse.containsMouse
-                ToolTip.text: iconChoice.modelData
-                ToolTip.delay: 350
+                HoverTips {
+                    visible: choiceMouse.containsMouse
+                    text: iconChoice.modelData
+                    delay: 350
+                }
 
                 MouseArea {
                     id: choiceMouse

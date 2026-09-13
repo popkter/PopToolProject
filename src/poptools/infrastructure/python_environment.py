@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from poptools.infrastructure.config_store import ConfigStore
-from poptools.paths import AppPaths, resource_path
+from poptools.paths import AppPaths, installed_runtime_path, resource_path
 
 MANAGED_PROVIDER = "managed"
 
@@ -44,6 +44,9 @@ class PythonEnvironment:
     @property
     def managed_runtime_executable(self) -> Path:
         if sys.platform == "win32":
+            installed = installed_runtime_path("python", "python.exe")
+            if installed.is_file():
+                return installed
             return self.paths.python_runtime_dir / "python.exe"
         candidates = sorted((self.paths.python_runtime_dir / "bin").glob("python3.*"))
         return candidates[-1] if candidates else self.paths.python_runtime_dir / "bin" / "python3"
@@ -180,13 +183,39 @@ class PythonEnvironment:
 
 
 def prepare_managed_python(paths: AppPaths) -> Path:
-    """Install the bundled private CPython and create its disposable venv."""
+    """Create the user venv from installed Python or the legacy bundled runtime."""
 
     venv_python = paths.python_venv_dir / (
         "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
     )
     if venv_python.is_file():
         return venv_python
+
+    installed_runtime = installed_runtime_path("python")
+    installed_python = installed_runtime / "python.exe"
+    if sys.platform == "win32" and installed_python.is_file():
+        runtime_python = installed_python
+    else:
+        runtime_python = _prepare_legacy_managed_runtime(paths)
+
+    paths.python_venv_dir.parent.mkdir(parents=True, exist_ok=True)
+    completed = subprocess.run(
+        [str(runtime_python), "-m", "venv", str(paths.python_venv_dir)],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    if completed.returncode != 0 or not venv_python.is_file():
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise RuntimeError(f"专用 Python 虚拟环境创建失败：{detail}")
+    return venv_python
+
+
+def _prepare_legacy_managed_runtime(paths: AppPaths) -> Path:
+    """Keep archive extraction as a compatibility fallback outside Windows installers."""
 
     vendor_dir = resource_path("vendor", "python")
     manifest_name = (
@@ -224,20 +253,7 @@ def prepare_managed_python(paths: AppPaths) -> Path:
             if staging.exists():
                 shutil.rmtree(staging)
 
-    paths.python_venv_dir.parent.mkdir(parents=True, exist_ok=True)
-    completed = subprocess.run(
-        [str(runtime_python), "-m", "venv", str(paths.python_venv_dir)],
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-    )
-    if completed.returncode != 0 or not venv_python.is_file():
-        detail = completed.stderr.strip() or completed.stdout.strip()
-        raise RuntimeError(f"专用 Python 虚拟环境创建失败：{detail}")
-    return venv_python
+    return runtime_python
 
 
 def _sha256(path: Path) -> str:

@@ -71,6 +71,13 @@ UNUSED_CONTROL_STYLE_BINARIES = (
 def keep_qt_entry(entry):
     destination = entry[0].replace("\\", "/").lower()
     destination = destination.replace("pyside6/qt/qml/", "pyside6/qml/")
+    # Qt uses the Windows ICU compatibility DLLs from System32. Build-machine
+    # tools such as Poppler may prepend incompatible ICU DLLs to PATH, which
+    # PyInstaller would otherwise collect beside the application.
+    if destination == "icuuc.dll" or destination == "icuin.dll" or (
+        destination.startswith("icudt") and destination.endswith(".dll")
+    ):
+        return False
     if destination.startswith(
         (
             "pyside6/qt6webengine",
@@ -149,14 +156,19 @@ python_package = python_vendor / json.loads(python_manifest.read_text(encoding="
 vendor_datas = [
     (str(vendor / "scrcpy-LICENSE.txt"), "poptools/resources/vendor"),
     (str(scrcpy_manifest), "poptools/resources/vendor"),
-    (str(scrcpy_package), "poptools/resources/vendor"),
     (str(python_vendor / "PYTHON-LICENSE.txt"), "poptools/resources/vendor/python"),
     (str(python_manifest), "poptools/resources/vendor/python"),
-    (str(python_package), "poptools/resources/vendor/python"),
 ]
 if sys.platform == "win32":
     vendor_datas.append(
         (str(vendor / "powershell-plugin.json"), "poptools/resources/vendor")
+    )
+else:
+    vendor_datas.extend(
+        [
+            (str(scrcpy_package), "poptools/resources/vendor"),
+            (str(python_package), "poptools/resources/vendor/python"),
+        ]
     )
 datas = [
     *common_datas,
@@ -194,10 +206,8 @@ pyz = PYZ(analysis.pure)
 exe = EXE(
     pyz,
     analysis.scripts,
-    analysis.binaries if sys.platform == "win32" else [],
-    analysis.datas if sys.platform == "win32" else [],
     [],
-    exclude_binaries=sys.platform == "darwin",
+    exclude_binaries=True,
     name="泡泡工具箱",
     debug=False,
     bootloader_ignore_signals=False,
@@ -208,15 +218,16 @@ exe = EXE(
     icon=str(icon_file),
 )
 
+collected = COLLECT(
+    exe,
+    analysis.binaries,
+    analysis.datas,
+    strip=False,
+    upx=sys.platform == "win32",
+    name="泡泡工具箱",
+)
+
 if sys.platform == "darwin":
-    collected = COLLECT(
-        exe,
-        analysis.binaries,
-        analysis.datas,
-        strip=False,
-        upx=False,
-        name="泡泡工具箱",
-    )
     app = BUNDLE(
         collected,
         name="泡泡工具箱.app",

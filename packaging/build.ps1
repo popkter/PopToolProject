@@ -12,6 +12,20 @@ $PythonVendorDir = Join-Path $ProjectRoot "src\poptools\resources\vendor\python"
 $PythonManifestPath = Join-Path $PythonVendorDir "python-runtime.json"
 $PythonManifest = Get-Content -LiteralPath $PythonManifestPath -Raw | ConvertFrom-Json
 $PythonRuntimePackage = Join-Path $PythonVendorDir $PythonManifest.file
+$PythonRuntimeInnerDirectory = if ($PythonManifest.directory) {
+    [string]$PythonManifest.directory
+} else {
+    "tools"
+}
+$ScrcpyVendorDir = Join-Path $ProjectRoot "src\poptools\resources\vendor"
+$ScrcpyManifestPath = Join-Path $ScrcpyVendorDir "scrcpy-manifest.json"
+$ScrcpyManifest = Get-Content -LiteralPath $ScrcpyManifestPath -Raw | ConvertFrom-Json
+$ScrcpyRuntimePackage = Join-Path $ScrcpyVendorDir $ScrcpyManifest.archive
+$ScrcpyRuntimeInnerDirectory = if ($ScrcpyManifest.directory) {
+    [string]$ScrcpyManifest.directory
+} else {
+    "scrcpy-win64-v$($ScrcpyManifest.version)"
+}
 
 function Find-UvExecutable {
     $UvCommand = Get-Command "uv" -ErrorAction SilentlyContinue
@@ -84,6 +98,82 @@ function Remove-SingleFileOutput {
     }
 }
 
+function Remove-OneFolderOutput {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return }
+    $PackagedExe = Join-Path $Path "泡泡工具箱.exe"
+    $NormalizedExe = [IO.Path]::GetFullPath($PackagedExe)
+    $RunningProcesses = @(
+        Get-Process | ForEach-Object {
+            try {
+                if ([string]::Equals(
+                    [IO.Path]::GetFullPath($_.Path),
+                    $NormalizedExe,
+                    [StringComparison]::OrdinalIgnoreCase
+                )) {
+                    $_
+                }
+            }
+            catch {
+                # Access to unrelated system process paths can be denied.
+            }
+        }
+    )
+    if ($RunningProcesses.Count -gt 0) {
+        $ProcessSummary = ($RunningProcesses | ForEach-Object {
+            "$($_.ProcessName) (PID $($_.Id))"
+        }) -join ", "
+        if ($KeepRunningApp) {
+            throw (
+                "The previous build is still running: $ProcessSummary. " +
+                "Close it or omit -KeepRunningApp so the build can stop it automatically."
+            )
+        }
+        Write-Host "Stopping previous build: $ProcessSummary" -ForegroundColor Yellow
+        $RunningProcesses | Stop-Process -Force
+        $RunningProcesses | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+    }
+    for ($Attempt = 1; $Attempt -le 20; $Attempt++) {
+        try {
+            Remove-Item -LiteralPath $Path -Recurse -Force
+            return
+        }
+        catch {
+            if ($Attempt -eq 20) { throw }
+            Start-Sleep -Milliseconds 250
+        }
+    }
+}
+
+function Expand-VerifiedRuntime {
+    param(
+        [Parameter(Mandatory = $true)][string]$Archive,
+        [Parameter(Mandatory = $true)][string]$InnerDirectory,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+
+    $Staging = Join-Path $ProjectRoot ("build\runtime-" + [guid]::NewGuid().ToString("N"))
+    try {
+        New-Item -ItemType Directory -Path $Staging -Force | Out-Null
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($Archive, $Staging)
+        $Source = Join-Path $Staging $InnerDirectory
+        if (-not (Test-Path -LiteralPath $Source -PathType Container)) {
+            throw "Runtime package does not contain the expected directory: $InnerDirectory"
+        }
+        if (Test-Path -LiteralPath $Destination) {
+            Remove-Item -LiteralPath $Destination -Recurse -Force
+        }
+        Copy-Item -LiteralPath $Source -Destination $Destination -Recurse
+    }
+    finally {
+        if (Test-Path -LiteralPath $Staging) {
+            Remove-Item -LiteralPath $Staging -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 if (-not (Test-Path -LiteralPath $PythonRuntimePackage)) {
     New-Item -ItemType Directory -Path $PythonVendorDir -Force | Out-Null
     Write-Host "Downloading the private Python runtime package..."
@@ -92,6 +182,13 @@ if (-not (Test-Path -LiteralPath $PythonRuntimePackage)) {
 $PythonRuntimePackageHash = (Get-FileHash -LiteralPath $PythonRuntimePackage -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($PythonRuntimePackageHash -ne $PythonManifest.sha256) {
     throw "Private Python runtime package checksum mismatch: $PythonRuntimePackage"
+}
+if (-not (Test-Path -LiteralPath $ScrcpyRuntimePackage -PathType Leaf)) {
+    throw "Bundled scrcpy package is missing: $ScrcpyRuntimePackage"
+}
+$ScrcpyRuntimePackageHash = (Get-FileHash -LiteralPath $ScrcpyRuntimePackage -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($ScrcpyRuntimePackageHash -ne $ScrcpyManifest.sha256) {
+    throw "Bundled scrcpy package checksum mismatch: $ScrcpyRuntimePackage"
 }
 
 if (-not (Test-Path -LiteralPath $VenvPython)) {
@@ -171,12 +268,18 @@ try {
     & (Join-Path $PSScriptRoot "build-native.ps1")
     if ($LASTEXITCODE -ne 0) { throw "Failed to build the native terminal component" }
 
-    $LegacyOutput = Join-Path $ProjectRoot "dist\泡泡工具箱"
-    $SingleFileOutput = Join-Path $ProjectRoot "dist\泡泡工具箱.exe"
-    if (Test-Path -LiteralPath $LegacyOutput) {
-        Remove-Item -LiteralPath $LegacyOutput -Recurse -Force
-    }
-    Remove-SingleFileOutput $SingleFileOutput
+    $OneFolderOutput = Join-Path $ProjectRoot "dist\泡泡工具箱"
+    $LegacySingleFileOutput = Join-Path $ProjectRoot "dist\泡泡工具箱.exe"
+    $LegacyPortableArchive = Join-Path $ProjectRoot "dist\泡泡工具箱-windows-x64.zip"
+    $LegacyPortableChecksum = "$LegacyPortableArchive.sha256"
+    $InstallerOutput = Join-Path $ProjectRoot "dist\泡泡工具箱-Setup.exe"
+    $InstallerChecksum = "$InstallerOutput.sha256"
+    Remove-OneFolderOutput $OneFolderOutput
+    Remove-SingleFileOutput $LegacySingleFileOutput
+    Remove-Item -LiteralPath $LegacyPortableArchive -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $LegacyPortableChecksum -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $InstallerOutput -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $InstallerChecksum -Force -ErrorAction SilentlyContinue
 
     if (-not $SkipTests) {
         $PytestBaseTemp = Join-Path $TestWorkspace "tmp"
@@ -261,16 +364,39 @@ try {
     & $VenvPython -m PyInstaller --noconfirm --clean "packaging\poptools.spec"
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 
-    $BuiltExe = Join-Path $ProjectRoot "dist\泡泡工具箱.exe"
-    $BuiltExeHash = (Get-FileHash -LiteralPath $BuiltExe -Algorithm SHA256).Hash.ToLowerInvariant()
-    $ChecksumFile = Join-Path $ProjectRoot "dist\泡泡工具箱.exe.sha256"
-    [System.IO.File]::WriteAllText(
-        $ChecksumFile,
-        "$BuiltExeHash  泡泡工具箱.exe`n",
-        [System.Text.UTF8Encoding]::new($false)
+    $BuiltExe = Join-Path $OneFolderOutput "泡泡工具箱.exe"
+    if (-not (Test-Path -LiteralPath $BuiltExe -PathType Leaf)) {
+        throw "PyInstaller one-folder entry point is missing: $BuiltExe"
+    }
+    $RuntimeOutput = Join-Path $OneFolderOutput "runtime"
+    New-Item -ItemType Directory -Path $RuntimeOutput -Force | Out-Null
+    Expand-VerifiedRuntime `
+        -Archive $PythonRuntimePackage `
+        -InnerDirectory $PythonRuntimeInnerDirectory `
+        -Destination (Join-Path $RuntimeOutput "python")
+    Expand-VerifiedRuntime `
+        -Archive $ScrcpyRuntimePackage `
+        -InnerDirectory $ScrcpyRuntimeInnerDirectory `
+        -Destination (Join-Path $RuntimeOutput "scrcpy")
+    Copy-Item -LiteralPath $PythonManifestPath `
+        -Destination (Join-Path $RuntimeOutput "python\manifest.json")
+    Copy-Item -LiteralPath (Join-Path $PythonVendorDir "PYTHON-LICENSE.txt") `
+        -Destination (Join-Path $RuntimeOutput "python\LICENSE.txt")
+    Copy-Item -LiteralPath $ScrcpyManifestPath `
+        -Destination (Join-Path $RuntimeOutput "scrcpy\manifest.json")
+    Copy-Item -LiteralPath (Join-Path $ScrcpyVendorDir "scrcpy-LICENSE.txt") `
+        -Destination (Join-Path $RuntimeOutput "scrcpy\LICENSE.txt")
+    if (-not (Test-Path -LiteralPath (Join-Path $RuntimeOutput "python\python.exe"))) {
+        throw "Prepared Python runtime is missing python.exe"
+    }
+    foreach ($RequiredScrcpyFile in @("adb.exe", "scrcpy.exe", "scrcpy-server", "SDL3.dll")) {
+        if (-not (Test-Path -LiteralPath (Join-Path $RuntimeOutput "scrcpy\$RequiredScrcpyFile"))) {
+            throw "Prepared scrcpy runtime is missing $RequiredScrcpyFile"
+        }
+    }
+    Write-Host (
+        "One-folder application and installed runtimes created at dist\泡泡工具箱"
     )
-    Write-Host "Self-contained single-file application created at dist\泡泡工具箱.exe"
-    Write-Host "OTA checksum created at dist\泡泡工具箱.exe.sha256"
 
     if (-not $SkipInstaller) {
         $InnoCompiler = (Get-Command "ISCC.exe" -ErrorAction SilentlyContinue).Source
@@ -282,15 +408,19 @@ try {
             ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
         }
         if (-not $InnoCompiler) {
-            Write-Host (
-                "Inno Setup 6 was not found; portable EXE build succeeded, " +
-                "installer creation was skipped."
-            ) -ForegroundColor Yellow
+            throw "Inno Setup 6 was not found; the required Windows installer cannot be created."
         }
         else {
             & $InnoCompiler "/DMyAppVersion=$BuildVersion" "/DMyAppVersionInfoVersion=$VersionInfoVersion" "packaging\poptools.iss"
             if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed" }
+            $InstallerHash = (Get-FileHash -LiteralPath $InstallerOutput -Algorithm SHA256).Hash.ToLowerInvariant()
+            [System.IO.File]::WriteAllText(
+                $InstallerChecksum,
+                "$InstallerHash  泡泡工具箱-Setup.exe`n",
+                [System.Text.UTF8Encoding]::new($false)
+            )
             Write-Host "Per-user installer created at dist\泡泡工具箱-Setup.exe"
+            Write-Host "Installer checksum created at dist\泡泡工具箱-Setup.exe.sha256"
         }
     }
 }
@@ -300,4 +430,3 @@ finally {
     }
     Pop-Location
 }
-

@@ -12,13 +12,13 @@ Item {
     required property var controller
     required property var parentWindow
     readonly property int terminalToolbarControlHeight: 40
-    readonly property real terminalTabMaximumWidth: 146
-    readonly property real terminalTabMinimumWidth: 96
-    readonly property real terminalTabMaximumFontSize: Theme.fontBody
-    readonly property real terminalTabMinimumFontSize: 11
+    readonly property real terminalTabMaximumWidth: 620
+    readonly property real terminalTabMinimumWidth: 160
+    readonly property real terminalTabMaximumFontSize: 13
+    readonly property real terminalTabMinimumFontSize: 12
     readonly property real responsiveTerminalTabWidth: {
         var tabCount = Math.max(1, root.controller.terminalTabs.length)
-        var addButtonWidth = 36
+        var addButtonWidth = 40
         var totalSpacing = terminalTabs.spacing * tabCount
         var fittedWidth = (terminalTabStrip.width - addButtonWidth - totalSpacing) / tabCount
         return Math.max(root.terminalTabMinimumWidth,
@@ -110,14 +110,14 @@ Item {
     }
     function syncTerminalSyntaxColors() {
         root.controller.configureTerminalSyntaxColors({
-            "default": Theme.consoleText.toString(),
-            "command": Theme.consoleTag.toString(),
-            "warning": Theme.consoleWarning.toString(),
-            "string": Theme.success.toString(),
-            "semantic": Theme.tertiaryText.toString(),
-            "operator": Theme.teal.toString(),
-            "error": Theme.consoleError.toString(),
-            "muted": Theme.consoleMuted.toString()
+            "default": "#E5E7EB",
+            "command": "#8CC8FF",
+            "warning": "#FFD166",
+            "string": "#9BE3B1",
+            "semantic": "#D7B5FF",
+            "operator": "#80DED9",
+            "error": "#FF9B93",
+            "muted": "#AAB4C3"
         })
     }
     function setHistoryListViewEnabled(value) {
@@ -179,7 +179,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             radius: 0
-            color: Theme.consoleBackground
+            color: "#10151D"
             clip: true
 
             ColumnLayout {
@@ -188,16 +188,19 @@ Item {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 56
+                    Layout.preferredHeight: 80
                     radius: 0
-                    color: Theme.consoleHeaderBackground
+                    color: "#F0F1F3"
 
                     RowLayout {
                         z: 1
-                        anchors.fill: parent
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 14
-                        spacing: 10
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: root.terminalToolbarControlHeight
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 0
 
                         Item {
                             id: terminalTabStrip
@@ -224,7 +227,7 @@ Item {
                                 Row {
                                     id: terminalTabs
                                     anchors.verticalCenter: parent.verticalCenter
-                                    spacing: 10
+                                    spacing: 4
                                     Repeater {
                                         model: root.controller.terminalTabs
                                         delegate: Rectangle {
@@ -232,18 +235,19 @@ Item {
                                             required property int index
                                             required property var modelData
                                             width: root.responsiveTerminalTabWidth
-                                            height: root.terminalToolbarControlHeight
-                                            radius: 8
-                                            color: modelData.active ? "#313947" : "transparent"
+                                            height: 30
+                                            radius: 12
+                                            color: modelData.active ? "#FFFFFF" : "transparent"
+                                            border.width: modelData.active ? 1 : 0
+                                            border.color: "#E1E5EA"
                                             RowLayout {
                                                 z: 1
-                                                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 8
-                                                Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: tab.modelData.active ? Theme.consoleText : Theme.consoleMuted }
+                                                anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 8; spacing: 6
                                                 Text {
                                                     Layout.fillWidth: true
                                                     visible: root.renamingTabId !== tab.modelData.tabId
                                                     text: tab.modelData.title || "Android 调试"
-                                                    color: Theme.consoleText
+                                                    color: tab.modelData.active ? "#404750" : "#6B737D"
                                                     font.pixelSize: root.responsiveTerminalTabFontSize
                                                     elide: Text.ElideRight
                                                 }
@@ -252,14 +256,14 @@ Item {
                                                     Layout.fillWidth: true
                                                     Layout.preferredHeight: 28
                                                     visible: root.renamingTabId === tab.modelData.tabId
-                                                    color: Theme.consoleText
+                                                    color: "#404750"
                                                     font.pixelSize: root.responsiveTerminalTabFontSize
                                                     leftPadding: 6; rightPadding: 6; topPadding: 0; bottomPadding: 0
                                                     selectByMouse: true
                                                     background: Rectangle {
                                                         radius: 4
-                                                        color: "#202733"
-                                                        border.color: Theme.primary
+                                                        color: "#FFFFFF"
+                                                        border.color: "#1478E8"
                                                         border.width: 1
                                                     }
                                                     onVisibleChanged: if (visible) {
@@ -279,6 +283,7 @@ Item {
                                                 }
                                                 PrimaryButton {
                                                     visible: root.controller.terminalTabs.length > 1
+                                                        && tabHoverArea.containsMouse
                                                     Layout.preferredWidth: 20
                                                     Layout.preferredHeight: 20
                                                     compact: true
@@ -286,16 +291,18 @@ Item {
                                                     iconName: "close"
                                                     glyphSize: 15
                                                     tonal: true
-                                                    foregroundColor: Theme.consoleMuted
-                                                    color: hovered ? "#3A4657" : "transparent"
+                                                    foregroundColor: "#7A838D"
+                                                    color: hovered ? "#E8ECF1" : "transparent"
                                                     border.width: 0
                                                     radius: 4
                                                     onClicked: root.controller.closeTerminalTab(tab.modelData.tabId)
                                                 }
                                             }
                                             MouseArea {
+                                                id: tabHoverArea
                                                 anchors.fill: parent
                                                 z: 0
+                                                hoverEnabled: true
                                                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                                                 cursorShape: Qt.PointingHandCursor
                                                 onPressed: function(mouse) {
@@ -317,8 +324,8 @@ Item {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 width: 1
                                                 height: 20
-                                                color: Theme.consoleMuted
-                                                opacity: 0.45
+                                                color: "#D8DDE3"
+                                                opacity: 1
                                                 visible: !tab.modelData.active
                                                     && tab.index < root.controller.terminalTabs.length - 1
                                                     && !root.controller.terminalTabs[tab.index + 1].active
@@ -335,17 +342,17 @@ Item {
                                     terminalTabs.implicitWidth + terminalTabs.spacing,
                                     parent.width - width))
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: 36
+                                width: 40
                                 height: root.terminalToolbarControlHeight
-                                radius: 8
+                                radius: 0
                                 compact: true
                                 text: "新增终端标签"
                                 iconName: "add"
                                 glyphSize: 20
                                 tonal: true
-                                foregroundColor: Theme.consoleText
+                                foregroundColor: "#5B6570"
                                 border.width: 0
-                                color: hovered ? "#3A4657" : "#313947"
+                                color: hovered ? "#E3E7EC" : "transparent"
                                 enabled: root.controller.canCreateTerminalTab
                                 disabledOpacity: 1
                                 onClicked: root.controller.createTerminalTab()
@@ -367,88 +374,6 @@ Item {
                                 }
                             }
 
-                            MouseArea {
-                                id: terminalWindowDragArea
-                                objectName: "terminalWindowDragArea"
-                                property point pressPosition: Qt.point(0, 0)
-                                property bool systemMoveStarted: false
-                                z: 2
-                                x: Math.max(0, Math.min(parent.width,
-                                    terminalTabAddButton.x + terminalTabAddButton.width
-                                        + terminalTabs.spacing))
-                                width: Math.max(0, parent.width - x)
-                                height: parent.height
-                                acceptedButtons: Qt.LeftButton
-                                onPressed: function(mouse) {
-                                    pressPosition = Qt.point(mouse.x, mouse.y)
-                                    systemMoveStarted = false
-                                    mouse.accepted = true
-                                }
-                                onPositionChanged: function(mouse) {
-                                    if (!pressed || systemMoveStarted)
-                                        return
-                                    var distance = Math.abs(mouse.x - pressPosition.x)
-                                        + Math.abs(mouse.y - pressPosition.y)
-                                    if (distance < Application.styleHints.startDragDistance)
-                                        return
-                                    systemMoveStarted = true
-                                    root.parentWindow.startSystemMove()
-                                }
-                                onReleased: systemMoveStarted = false
-                                onCanceled: systemMoveStarted = false
-                                onDoubleClicked: {
-                                    if (root.parentWindow.visibility === Window.Maximized)
-                                        root.parentWindow.showNormal()
-                                    else
-                                        root.parentWindow.showMaximized()
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            Layout.preferredWidth: 104
-                            Layout.preferredHeight: root.terminalToolbarControlHeight
-                            visible: root.controller.terminalName === "PowerShell 7"
-                            radius: 8
-                            color: root.controller.powerShellHistoryListViewEnabled ? "#3A4657" : "#343C48"
-
-                            RowLayout {
-                                anchors.centerIn: parent
-                                spacing: 7
-
-                                Text {
-                                    text: "历史"
-                                    color: Theme.consoleText
-                                    font.pixelSize: Theme.fontCaption
-                                }
-                                ToggleControl {
-                                    id: historyToggle
-                                    checked: root.controller.powerShellHistoryListViewEnabled
-                                    activeFocusOnTab: true
-                                    Accessible.role: Accessible.CheckBox
-                                    Accessible.name: "显示 PowerShell 历史预测列表"
-                                    Accessible.checked: checked
-                                    onToggled: function(value) { root.setHistoryListViewEnabled(value) }
-                                    Keys.onSpacePressed: function(event) {
-                                        root.setHistoryListViewEnabled(!checked)
-                                        event.accepted = true
-                                    }
-                                }
-                            }
-                        }
-                        PrimaryButton {
-                            Layout.preferredWidth: 54; Layout.preferredHeight: root.terminalToolbarControlHeight; radius: 8
-                            text: "清空"; iconName: "delete_sweep"; glyphSize: 14; contentSpacing: 3
-                            tonal: true; foregroundColor: Theme.consoleText; labelFontSize: Theme.fontCaption; labelFontWeight: Font.Normal
-                            border.width: 0; color: hovered ? "#3A4657" : "#343C48"
-                            onClicked: root.clearTerminal()
-                        }
-                        PrimaryButton {
-                            Layout.preferredWidth: 80; Layout.preferredHeight: root.terminalToolbarControlHeight; radius: 8
-                            text: "重启终端"; iconName: "restart_alt"; glyphSize: 14; contentSpacing: 3
-                            tonal: true; foregroundColor: Theme.consoleText; labelFontSize: Theme.fontCaption; labelFontWeight: Font.Normal
-                            border.width: 0; color: hovered ? "#3A4657" : "#343C48"
-                            onClicked: root.controller.restart()
                         }
                     }
                 }
@@ -460,7 +385,10 @@ Item {
                     TerminalView {
                         id: terminalView
                         anchors.fill: parent
-                        anchors.margins: 16
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        anchors.topMargin: 8
+                        anchors.bottomMargin: 10
                         sessionId: root.controller.activeTerminalTabId
                         fontSize: 14
                         focus: true
@@ -529,6 +457,14 @@ Item {
                         AppMenuItem { text: "粘贴"; onTriggered: root.pasteClipboard() }
                         AppMenuItem { text: "全选"; onTriggered: terminalView.selectAll() }
                         AppMenuItem { text: "清屏"; onTriggered: root.clearTerminal() }
+                        AppMenuItem { text: "重启终端"; onTriggered: root.controller.restart() }
+                        AppMenuItem {
+                            visible: root.controller.terminalName === "PowerShell 7"
+                            text: root.controller.powerShellHistoryListViewEnabled
+                                ? "关闭历史预测列表" : "显示历史预测列表"
+                            onTriggered: root.setHistoryListViewEnabled(
+                                !root.controller.powerShellHistoryListViewEnabled)
+                        }
                         AppMenuItem { text: "停止当前命令"; destructive: true; enabled: root.controller.running; onTriggered: root.controller.interrupt() }
                     }
                 }

@@ -225,7 +225,7 @@ adb devices
 - 可以下次提醒、跳过当前版本、立即下载、取消下载、稍后安装或安装并重启；选择“稍后安装”后，下次启动会先校验并自动应用已下载的更新；
 - 下载文件会校验大小以及 GitHub digest 或配套 SHA-256。
 
-Windows 更新资产为 `PopTools.exe`，macOS 根据架构使用 `PopTools-macos-arm64.zip` 或 `PopTools-macos-x64.zip`。
+Windows 仅发布 `PopTools-Setup.exe`。安装器会一次性释放应用、Qt、独立 Python 和 scrcpy，后续启动直接使用安装目录中的文件；应用内更新同样下载并静默运行该安装器。macOS 根据架构使用 `PopTools-macos-arm64.zip` 或 `PopTools-macos-x64.zip`。
 
 ## 数据位置与隐私
 

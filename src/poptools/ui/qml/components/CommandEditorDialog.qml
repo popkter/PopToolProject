@@ -356,8 +356,10 @@ AppDialog {
                                                 color: root.selectedIcon === iconChoice.modelData.value
                                                        ? Theme.primary : Theme.textSecondary
                                             }
-                                            ToolTip.visible: iconMouse.containsMouse
-                                            ToolTip.text: modelData.label
+                                            HoverTips {
+                                                visible: iconMouse.containsMouse
+                                                text: iconChoice.modelData.label
+                                            }
                                             MouseArea {
                                                 id: iconMouse
                                                 anchors.fill: parent

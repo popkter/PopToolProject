@@ -33,8 +33,7 @@ ApplicationWindow {
 
     property var parameterValues: ({})
     property string toolSearchQuery: ""
-    readonly property real primaryNavWidth: compactPrimaryNav
-        ? Theme.primaryNavigationCompactWidth : Theme.primaryNavigationWidth
+    readonly property real primaryNavWidth: 64
     readonly property real toolListWidth: Math.max(
         minimumToolListWidth,
         Math.min(maximumNavigationWidth,
@@ -47,7 +46,7 @@ ApplicationWindow {
     readonly property real maximumNavigationWidth: Theme.navigationMaximumWidth
     readonly property real minimumContentWidth: 480
     readonly property real minimumContentHeight: 480
-    property bool compactPrimaryNav: false
+    property bool compactPrimaryNav: true
     readonly property bool compactToolList: toolListWidth < 190
     readonly property bool compactContentActions: width < 760
     readonly property bool compactHeight: height < 620
@@ -454,8 +453,8 @@ ApplicationWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 38
-        color: "transparent"
+        height: 40
+        color: window.developerSelected ? "#F7F8FA" : Theme.surface
         z: 900
 
         Rectangle {
@@ -463,7 +462,7 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: window.primaryNavWidth
-            color: Theme.sidebar
+            color: "#F7F8FA"
             z: -1
         }
 
@@ -471,7 +470,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            width: window.developerSelected ? window.primaryNavWidth : parent.width
+            width: parent.width
             onPressed: window.startSystemMove()
             onDoubleClicked: {
                 if (window.visibility === Window.Maximized)
@@ -484,16 +483,16 @@ ApplicationWindow {
         RowLayout {
             id: windowButtons
             anchors.left: parent.left
-            anchors.leftMargin: 20
+            anchors.leftMargin: 12
             anchors.top: parent.top
-            anchors.topMargin: 26
-            spacing: 10
+            anchors.topMargin: 14
+            spacing: 6
             z: 2
 
             Rectangle {
-                Layout.preferredWidth: 16
-                Layout.preferredHeight: 16
-                radius: 8
+                Layout.preferredWidth: 12
+                Layout.preferredHeight: 12
+                radius: 6
                 color: "#FF5F57"
                 MaterialIcon {
                     anchors.centerIn: parent; icon: "close"; iconSize: 9
@@ -504,9 +503,9 @@ ApplicationWindow {
                 }
             }
             Rectangle {
-                Layout.preferredWidth: 16
-                Layout.preferredHeight: 16
-                radius: 8
+                Layout.preferredWidth: 12
+                Layout.preferredHeight: 12
+                radius: 6
                 color: "#FFBD2E"
                 MaterialIcon {
                     anchors.centerIn: parent; icon: "remove"; iconSize: 9
@@ -517,9 +516,9 @@ ApplicationWindow {
                 }
             }
             Rectangle {
-                Layout.preferredWidth: 16
-                Layout.preferredHeight: 16
-                radius: 8
+                Layout.preferredWidth: 12
+                Layout.preferredHeight: 12
+                radius: 6
                 color: "#28C840"
                 MaterialIcon {
                     anchors.centerIn: parent
@@ -535,29 +534,15 @@ ApplicationWindow {
             }
         }
 
-        PrimaryButton {
-            id: primaryNavModeButton
-            objectName: "primaryNavModeButton"
-            z: 3
-            x: window.primaryNavWidth - width - Theme.space12
-            anchors.top: parent.top
-            anchors.topMargin: Theme.space20
-            width: 28
-            height: 28
-            radius: Theme.radiusSmall
-            compact: true
-            tonal: true
-            text: window.compactPrimaryNav ? "展开导航栏" : "收起导航栏"
-            iconName: window.compactPrimaryNav ? "chevron_right" : "chevron_left"
-            glyphSize: 20
-            foregroundColor: Theme.textSecondary
-            color: hovered ? Theme.surfaceContainerHigh : "transparent"
-            border.width: 0
-            onClicked: window.compactPrimaryNav = !window.compactPrimaryNav
-
-            ToolTip.visible: hovered
-            ToolTip.text: text
-            ToolTip.delay: 450
+        Text {
+            visible: window.developerSelected
+            anchors.left: parent.left
+            anchors.leftMargin: window.primaryNavWidth + 12
+            anchors.verticalCenter: parent.verticalCenter
+            text: "UTerminal"
+            color: "#252A31"
+            font.pixelSize: 14
+            font.weight: Font.DemiBold
         }
     }
 
@@ -621,39 +606,34 @@ ApplicationWindow {
             Layout.minimumWidth: window.primaryNavWidth
             Layout.maximumWidth: window.primaryNavWidth
             Layout.fillHeight: true
-            color: Theme.sidebar
+            color: "#F7F8FA"
             clip: false
             z: 2
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.space20
-                anchors.rightMargin: Theme.space20
+                anchors.leftMargin: Theme.space12
+                anchors.rightMargin: Theme.space12
                 anchors.topMargin: (window.developerSelected ? customTitleBar.height : 0)
-                    + (window.compactHeight
-                        ? Theme.panelPaddingCompact : Theme.space20)
-                anchors.bottomMargin: window.compactHeight
-                    ? Theme.panelPaddingCompact : Theme.space24
-                spacing: window.compactHeight
-                    ? Theme.controlSpacing : Theme.space12
+                    + Theme.space8
+                anchors.bottomMargin: Theme.space12
+                spacing: Theme.space8
 
                 Item {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: window.compactHeight ? 68 : 90
+                    Layout.preferredHeight: 40
 
                     RowLayout {
                         anchors.top: parent.top
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        height: window.compactHeight ? 68 : 82
-                        spacing: window.compactPrimaryNav ? 0 : Theme.sectionSpacing
+                        height: 40
+                        spacing: 0
 
                         Image {
                             id: appLogo
-                            Layout.preferredWidth: window.compactPrimaryNav
-                                ? Theme.space32 : 48
-                            Layout.preferredHeight: window.compactPrimaryNav
-                                ? Theme.space32 : 48
+                            Layout.preferredWidth: 40
+                            Layout.preferredHeight: 40
                             source: Qt.resolvedUrl("../../resources/icons/app-icon-ui.png")
                             sourceSize.width: 116
                             sourceSize.height: 116
@@ -717,6 +697,28 @@ ApplicationWindow {
                 NavItem {
                     Layout.fillWidth: true
                     Layout.minimumWidth: 0
+                    visible: true
+                    label: "终端"
+                    iconName: "terminal"
+                    compact: window.compactPrimaryNav
+                    dense: window.compactHeight
+                    selected: window.developerSelected && !window.settingsSelected
+                    onClicked: {
+                        if (!developerConsoleController.pluginInstalled) {
+                            window.requestTerminalEnable()
+                            return
+                        }
+                        // scrcpy is a native child window and would otherwise
+                        // cover QML dialogs regardless of their z value.
+                        window.hideScrcpyWindow()
+                        window.developerSelected = true
+                        window.settingsSelected = false
+                        developerConsoleController.ensureStarted()
+                    }
+                }
+                NavItem {
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 0
                     label: "自定义"
                     iconName: "build"
                     compact: window.compactPrimaryNav
@@ -742,28 +744,6 @@ ApplicationWindow {
                         window.developerSelected = false
                         window.settingsSelected = false
                         appController.navigate("preset")
-                    }
-                }
-                NavItem {
-                    Layout.fillWidth: true
-                    Layout.minimumWidth: 0
-                    visible: true
-                    label: "终端"
-                    iconName: "terminal"
-                    compact: window.compactPrimaryNav
-                    dense: window.compactHeight
-                    selected: window.developerSelected && !window.settingsSelected
-                    onClicked: {
-                        if (!developerConsoleController.pluginInstalled) {
-                            window.requestTerminalEnable()
-                            return
-                        }
-                        // scrcpy is a native child window and would otherwise
-                        // cover QML dialogs regardless of their z value.
-                        window.hideScrcpyWindow()
-                        window.developerSelected = true
-                        window.settingsSelected = false
-                        developerConsoleController.ensureStarted()
                     }
                 }
 

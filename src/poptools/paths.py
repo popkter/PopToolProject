@@ -42,9 +42,20 @@ def resource_path(*parts: str) -> Path:
     return package_root().joinpath("resources", *parts)
 
 
+def installed_runtime_path(*parts: str) -> Path:
+    if getattr(sys, "frozen", False) and sys.platform == "win32":
+        return Path(sys.executable).resolve().parent.joinpath("runtime", *parts)
+    return package_root().joinpath("runtime", *parts)
+
+
 def bundled_android_tools_dir() -> Path:
     override = os.environ.get(ANDROID_TOOLS_DIR_ENV)
-    return Path(override) if override else resource_path("scrcpy")
+    if override:
+        return Path(override)
+    installed = installed_runtime_path("scrcpy")
+    if installed.is_dir():
+        return installed
+    return resource_path("scrcpy")
 
 
 def bundled_adb_path() -> Path:
@@ -56,7 +67,15 @@ def bundled_scrcpy_path() -> Path:
 
 
 def prepare_bundled_android_tools(paths: AppPaths) -> Path:
-    """Extract the verified official archive to a persistent versioned directory."""
+    """Use installed tools, with legacy archive extraction as a fallback."""
+
+    installed = installed_runtime_path("scrcpy")
+    if sys.platform == "win32" and installed.is_dir():
+        required_files = ("adb.exe", "scrcpy.exe", "scrcpy-server", "SDL3.dll")
+        if not all((installed / name).is_file() for name in required_files):
+            raise ValueError("安装目录中的 scrcpy 运行时不完整")
+        os.environ[ANDROID_TOOLS_DIR_ENV] = str(installed)
+        return installed
 
     vendor_dir = resource_path("vendor")
     manifest_name = (

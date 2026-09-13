@@ -28,7 +28,7 @@ def update_asset_name(
 ) -> str:
     host = (system or sys.platform).lower()
     if host in {"win32", "windows"}:
-        return "PopTools.exe"
+        return "PopTools-Setup.exe"
     if host in {"darwin", "macos"}:
         architecture = "arm64" if (machine or platform.machine()).lower() in {
             "arm64",
@@ -350,7 +350,7 @@ class GitHubReleaseClient:
 
 
 class UpdateInstaller:
-    """Replace the running Windows executable or macOS app, then restart it."""
+    """Run the Windows installer or replace the macOS bundle, then restart."""
 
     @staticmethod
     def launch(downloaded: Path, current_executable: Path | None = None) -> bool:
@@ -368,7 +368,8 @@ class UpdateInstaller:
 
     @staticmethod
     def _launch_windows(source: Path, target: Path) -> bool:
-
+        if source.suffix.lower() != ".exe":
+            return False
         script = source.parent / "apply-poptools-update.ps1"
         script.write_text(
             """param(
@@ -378,18 +379,15 @@ class UpdateInstaller:
 )
 $ErrorActionPreference = 'Stop'
 try { Wait-Process -Id $ProcessId -Timeout 90 -ErrorAction SilentlyContinue } catch {}
-$installed = $false
-for ($attempt = 0; $attempt -lt 30; $attempt++) {
-    try {
-        Copy-Item -LiteralPath $Source -Destination $Target -Force
-        $installed = $true
-        break
-    } catch {
-        Start-Sleep -Seconds 1
-    }
-}
-if (-not $installed) { exit 1 }
-$env:PYINSTALLER_RESET_ENVIRONMENT = '1'
+$targetDirectory = Split-Path -Parent $Target
+$arguments = @(
+    '/VERYSILENT',
+    '/SUPPRESSMSGBOXES',
+    '/NORESTART',
+    ('/DIR="' + $targetDirectory + '"')
+)
+$installer = Start-Process -FilePath $Source -ArgumentList $arguments -Wait -PassThru
+if ($installer.ExitCode -ne 0) { exit $installer.ExitCode }
 Start-Process -FilePath $Target
 Remove-Item -LiteralPath $Source -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue

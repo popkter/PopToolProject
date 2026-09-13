@@ -83,9 +83,11 @@ Rectangle {
         Item { visible: root.compact; Layout.fillWidth: true }
     }
 
-    ToolTip.visible: root.compact && selectorMouse.containsMouse
-    ToolTip.text: root.controller.selectedAndroidDeviceLabel
-    ToolTip.delay: 400
+    HoverTips {
+        visible: root.compact && selectorMouse.containsMouse
+        text: root.controller.selectedAndroidDeviceLabel
+        delay: 400
+    }
 
     MouseArea {
         id: selectorMouse

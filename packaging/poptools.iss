@@ -44,7 +44,11 @@ VersionInfoProductName={#MyAppName}
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加任务："; Flags: unchecked
 
 [Files]
-Source: "..\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\{#MyAppName}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\_internal"
+Type: filesandordirs; Name: "{app}\runtime"
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; AppUserModelID: "{#MyAppUserModelId}"
@@ -58,6 +62,7 @@ Root: HKCU; Subkey: "Software\Classes\Directory\shell\PoTerminal"; ValueType: st
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\PoTerminal\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" --terminal --cwd ""%1"""
 
 [Run]
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--prepare-runtime"; StatusMsg: "正在准备 Python 与 Android 工具运行环境…"; Flags: runhidden waituntilterminated
 Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]

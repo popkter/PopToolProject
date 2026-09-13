@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
@@ -9,6 +8,7 @@ Rectangle {
     property string iconName: "play_arrow"
     property bool tonal: false
     property bool compact: false
+    property bool showHoverTips: compact
     property bool successStyle: false
     property bool dangerStyle: false
     property bool iconSpinning: false
@@ -97,9 +97,10 @@ Rectangle {
         }
     }
 
-/*    ToolTip.visible: root.compact && mouseArea.containsMouse
-    ToolTip.text: root.text
-    ToolTip.delay: 450*/
+    HoverTips {
+        visible: root.showHoverTips && root.enabled && mouseArea.containsMouse
+        text: root.text
+    }
 
     MouseArea {
         id: mouseArea

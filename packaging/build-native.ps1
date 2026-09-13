@@ -192,7 +192,9 @@ New-Item -ItemType Directory -Path $InstallDirectory -Force | Out-Null
     "-DCMAKE_PREFIX_PATH=$QtPrefix"
 if ($LASTEXITCODE -ne 0) { throw "Native terminal configure failed" }
 
-& $CMake --build $BuildDirectory --config $Configuration --parallel
+# Keep the outer build serialized on Windows. The native project is small, and
+# this avoids nested MSBuild/CMake process bursts on restricted build hosts.
+& $CMake --build $BuildDirectory --config $Configuration --parallel 1
 if ($LASTEXITCODE -ne 0) { throw "Native terminal build failed" }
 
 $CTest = Join-Path (Split-Path -Parent $CMake) "ctest.exe"
