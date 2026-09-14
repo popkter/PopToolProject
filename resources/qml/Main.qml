@@ -6,7 +6,7 @@ ApplicationWindow {
     id: window
     width: 1362; height: 1024; minimumWidth: 1000; minimumHeight: 700
     visible: true
-    title: "UTerminal"
+    title: App.elevated ? "UTerminal · 管理员" : "UTerminal"
     color: Theme.background
     palette.window: Theme.background; palette.base: Theme.surface; palette.text: Theme.text; palette.windowText: Theme.text
     palette.button: Theme.surface; palette.buttonText: Theme.text; palette.highlight: Theme.accent; palette.highlightedText: "white"

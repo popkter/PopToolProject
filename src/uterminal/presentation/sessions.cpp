@@ -1,4 +1,5 @@
 #include "sessions.h"
+#include <utility>
 #include "application/plugins.h"
 #include "settings.h"
 #include "scripts.h"
@@ -76,16 +77,31 @@ bool Sessions::startShell(Pane *pane,const QString &directory){
     if(!ok)release(pane);else pane->captureRuntime();return ok;
 }
 void Sessions::release(Pane *pane){m_plugins->release("powershell",pane->powerShellVersion);m_plugins->release("python",pane->pythonVersion);pane->powerShellVersion.clear();pane->pythonVersion.clear();}
-void Sessions::appendTab(Pane *pane,const QString &title,bool fixedTitle){beginInsertRows({},int(m_tabs.size()),int(m_tabs.size()));m_tabs.append({title,fixedTitle,false,{pane}});endInsertRows();setCurrentIndex(int(m_tabs.size())-1);}
-void Sessions::newTab(){openDirectory(m_pendingDirectory);}
+void Sessions::appendTab(Pane *pane,const QString &title,bool fixedTitle,bool activate){beginInsertRows({},int(m_tabs.size()),int(m_tabs.size()));m_tabs.append({title,fixedTitle,false,{pane}});endInsertRows();if(activate)setCurrentIndex(int(m_tabs.size())-1);else emit changed();}
+void Sessions::activatePaneTab(Pane *pane){for(int i=0;i<m_tabs.size();++i)if(m_tabs[i].panes.contains(pane)){setCurrentIndex(i);return;}}
+void Sessions::newTab(){
+    if(!m_pendingDirectories.isEmpty()){
+        if(!m_plugins->powerShellReady()){emit pluginRequired("powershell");return;}
+        const auto directories=std::exchange(m_pendingDirectories,{});
+        for(const auto &directory:directories)openDirectory(directory);
+    }else openDirectory({});
+}
 QString Sessions::resolveDirectory(const QString &path){
     if(path.isEmpty())return QDir::homePath();const QFileInfo info(path);
     if(info.isDir())return info.absoluteFilePath();if(info.isFile())return info.absolutePath();return QDir::homePath();
 }
 void Sessions::openDirectory(const QString &path){
-    m_pendingDirectory=resolveDirectory(path);
-    if(!m_plugins->powerShellReady()){emit pluginRequired("powershell");return;}
-    auto *pane=makePane();if(!startShell(pane,m_pendingDirectory)){delete pane;return;}m_pendingDirectory.clear();appendTab(pane,QStringLiteral("Power'Shell"),true);
+    openDirectoryTab(path,true);
+}
+Pane *Sessions::openDirectoryTab(const QString &path,bool activate,bool notifyMissing){
+    const auto directory=resolveDirectory(path);
+    if(!m_plugins->powerShellReady()){
+        if(m_pendingDirectories.size()<128)m_pendingDirectories.append(directory);
+        else emit error(QStringLiteral("待打开目录过多，请安装 PowerShell 后重试。"));
+        if(notifyMissing)emit pluginRequired("powershell");return nullptr;
+    }
+    auto *pane=makePane();if(!startShell(pane,directory)){delete pane;return nullptr;}
+    appendTab(pane,QStringLiteral("Power'Shell"),true,activate);return pane;
 }
 void Sessions::split(bool vertical){if(m_current<0){newTab();return;}auto *pane=makePane();if(!startShell(pane)){delete pane;return;}m_tabs[m_current].vertical=vertical;m_tabs[m_current].panes.append(pane);emit changed();focusPane(pane);}
 void Sessions::focusPane(Pane *pane){m_focused=pane;if(pane)pane->terminal()->forceActiveFocus();emit focusChanged();}
@@ -100,7 +116,7 @@ void Sessions::copyMenuSelection(){if(!m_menuText.isEmpty())QGuiApplication::cli
 void Sessions::draftFromSelection(){if(m_menuText.trimmed().isEmpty())return;m_scripts->newDraft(m_menuText,m_menuPane?m_menuPane->language:"powershell");emit draftRequested();}
 void Sessions::acceptPaste(){if(m_pastePane&&m_pastePane->running())m_pastePane->terminal()->pasteText(m_pasteText);cancelPaste();}
 void Sessions::cancelPaste(){m_pastePane=nullptr;m_pasteText.clear();}
-void Sessions::closeAll(){while(!m_tabs.isEmpty())closeTab(int(m_tabs.size())-1);}
+void Sessions::closeAll(){m_pendingDirectories.clear();while(!m_tabs.isEmpty())closeTab(int(m_tabs.size())-1);}
 Pane *Sessions::startProgram(const QString &program,const QStringList &args,const QString &cwd,const QProcessEnvironment &env,const QString &language,const QString &title){
     if(m_plugins->pythonReady()&&m_plugins->pythonReserved()){emit error(QStringLiteral("环境正在修改依赖"));return nullptr;}
     auto *pane=makePane();pane->language=language;pane->terminal()->setInputLanguage(language);pane->setTitle(title);

@@ -15,6 +15,8 @@
 #include "presentation/sessions.h"
 #include "presentation/scripts.h"
 #include "presentation/settings.h"
+#include "presentation/app.h"
+#include "infrastructure/instance.h"
 #include "application/plugins.h"
 #include "application/executions.h"
 #include "application/updates.h"
@@ -55,6 +57,65 @@ protected:
 class RuntimeTests:public QObject {
     Q_OBJECT
 private slots:
+    void externalLaunchPreservesModalFocus(){
+        QTemporaryDir temporary;const auto runtime=temporary.path()+"/plugins/powershell/7.0.0-x64";
+        QVERIFY(QDir().mkpath(runtime+"/runtime"));
+        // A tiny process fixture exercises session creation without downloading a shell.
+        QVERIFY(QFile::copy(QCoreApplication::applicationDirPath()+"/uterminal_update_fixture.exe",runtime+"/runtime/pwsh.exe"));
+        QVERIFY(ut::writeJson(runtime+"/installed.json",{{"kind","powershell"},{"version","7.0.0"}}));
+        QVERIFY(ut::writeJson(temporary.path()+"/plugins/active.json",{{"powershell","7.0.0"}}));
+        ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
+        ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
+        ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);
+        QQuickWindow window;window.resize(1000,700);app.attachWindow(&window);
+        QQmlEngine engine;engine.rootContext()->setContextProperty("App",&app);engine.rootContext()->setContextProperty("Settings",&settings);
+        QQmlComponent component(&engine);component.setData(R"(
+            import QtQuick
+            import QtQuick.Controls
+            import "."
+            Item {
+                width: 1000; height: 700
+                AppDialog { id: editor; objectName: "testEditor"; modal: true; width: 500; height: 300
+                    standardButtons: Dialog.Close
+                    contentItem: TextField { id: field; objectName: "draftInput"; text: "unsaved draft" }
+                    onOpened: field.forceActiveFocus()
+                }
+
+            })",QUrl::fromLocalFile(QStringLiteral(UTERMINAL_TEST_SOURCE_DIR "/resources/qml/LaunchTest.qml")));
+        QScopedPointer<QObject> object(component.create());QVERIFY2(object,qPrintable(component.errorString()));
+        auto *page=qobject_cast<QQuickItem*>(object.data());QVERIFY(page);page->setParentItem(window.contentItem());
+        window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));
+        auto *editor=object->findChild<QObject*>("testEditor");auto *field=object->findChild<QQuickItem*>("draftInput");QVERIFY(editor);QVERIFY(field);
+        QVERIFY(QMetaObject::invokeMethod(editor,"open"));QTRY_VERIFY(field->hasActiveFocus());
+        const auto request=ut::Instance::request("openDirectory",temporary.path());
+        app.handleLaunch(request);app.handleLaunch(request); // Each delivered event represents a distinct accepted launch.
+        QCOMPARE(sessions.rowCount(),2);QCOMPARE(sessions.currentIndex(),-1);QCOMPARE(app.page(),0);
+        QVERIFY(editor->property("visible").toBool());QVERIFY(field->hasActiveFocus());QCOMPARE(field->property("text").toString(),QString("unsaved draft"));
+        QObject confirmation;app.setModalOpen(&confirmation,true);
+        QVERIFY(QMetaObject::invokeMethod(editor,"close"));QTest::qWait(30);QCOMPARE(sessions.currentIndex(),-1);QCOMPARE(app.page(),0);
+        app.setModalOpen(&confirmation,false);QTRY_COMPARE(sessions.currentIndex(),1);QCOMPARE(app.page(),1);
+        app.setPage(0);app.handleLaunch(ut::Instance::request("activate"));QCOMPARE(app.page(),0);QCOMPARE(sessions.rowCount(),2);
+        window.showMinimized();app.handleLaunch(ut::Instance::request("activate"));QVERIFY(!(window.windowStates()&Qt::WindowMinimized));QCOMPARE(app.page(),0);
+        app.handleLaunch(ut::Instance::request("openDirectory",temporary.path()));QCOMPARE(sessions.rowCount(),3);QCOMPARE(sessions.currentIndex(),2);QCOMPARE(app.page(),1);
+        sessions.closeAll();
+    }
+    void externalDirectoriesWaitForRuntime(){
+        QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
+        ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
+        ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);
+        QObject editor;app.setModalOpen(&editor,true);QSignalSpy prompts(&app,&ut::App::pluginRequested);
+        app.handleLaunch(ut::Instance::request("openDirectory",temporary.path()));app.handleLaunch(ut::Instance::request("openDirectory",temporary.path()+"/missing"));
+        QCOMPARE(prompts.count(),0);QCOMPARE(sessions.pendingDirectoryCount(),2);QCOMPARE(sessions.rowCount(),0);
+        app.setModalOpen(&editor,false);QTRY_COMPARE(prompts.count(),1);QCOMPARE(app.page(),1);
+        sessions.newTab();QCOMPARE(sessions.pendingDirectoryCount(),2);QCOMPARE(sessions.rowCount(),0);
+        const auto runtime=temporary.path()+"/plugins/powershell/7.0.0-x64";QVERIFY(QDir().mkpath(runtime+"/runtime"));
+        QVERIFY(QFile::copy(QCoreApplication::applicationDirPath()+"/uterminal_update_fixture.exe",runtime+"/runtime/pwsh.exe"));
+        QVERIFY(ut::writeJson(runtime+"/installed.json",{{"kind","powershell"},{"version","7.0.0"}}));
+        QVERIFY(plugins.activate("powershell","7.0.0"));QVERIFY(plugins.powerShellReady());
+        QCOMPARE(sessions.rowCount(),0);QCOMPARE(sessions.pendingDirectoryCount(),2);
+        sessions.newTab();QCOMPARE(sessions.rowCount(),2);QCOMPARE(sessions.pendingDirectoryCount(),0);QCOMPARE(sessions.currentIndex(),1);
+        sessions.closeAll();
+    }
     void scriptSelectionKeepsScrollPosition(){
         QTemporaryDir temporary;QVERIFY(temporary.isValid());
         ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());

@@ -1,4 +1,5 @@
 #include "storage.h"
+#include "instance.h"
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -10,7 +11,8 @@
 namespace ut {
 QString dataDirectory() {
     const auto overridePath = qEnvironmentVariable("UTERMINAL_DATA_DIR");
-    return overridePath.isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) : overridePath;
+    const auto base=overridePath.isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) : overridePath;
+    return profileDirectory(base,processElevated());
 }
 QJsonObject readJson(const QString &path, QString *error) {
     QFile f(path);

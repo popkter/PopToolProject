@@ -1,5 +1,7 @@
 #include <QApplication>
+#include <QMessageBox>
 #include <QDir>
+#include <QFileInfo>
 #include <QFontDatabase>
 #include <QIcon>
 #include <QQmlApplicationEngine>
@@ -16,6 +18,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include "infrastructure/storage.h"
+#include "infrastructure/instance.h"
 #include "presentation/app.h"
 #include "presentation/settings.h"
 #include "presentation/scripts.h"
@@ -30,6 +33,16 @@
 int main(int argc,char **argv){
     QApplication application(argc,argv);
     application.setOrganizationName("UTerminal");application.setApplicationName("UTerminal");application.setApplicationVersion(QStringLiteral(UTERMINAL_VERSION));
+    const auto data=ut::dataDirectory();
+    ut::Instance instance(data);
+    const auto launchArguments=application.arguments();
+    const bool openTerminal=launchArguments.contains("--open-terminal");
+    const int directoryIndex=launchArguments.indexOf("--directory");
+    QString launchDirectory=directoryIndex>=0&&directoryIndex+1<launchArguments.size()?launchArguments[directoryIndex+1]:QString();
+    if(!launchDirectory.isEmpty())launchDirectory=QFileInfo(launchDirectory).absoluteFilePath();
+    const auto result=instance.start(ut::Instance::request(openTerminal?"openDirectory":"activate",launchDirectory));
+    if(result==ut::Instance::Forwarded)return 0;
+    if(result==ut::Instance::Failed){QMessageBox::warning(nullptr,QStringLiteral("UTerminal"),instance.error());return 2;}
     QQuickStyle::setStyle("Basic");
     QString resources=qEnvironmentVariable("UTERMINAL_RESOURCES");
     if(resources.isEmpty())resources=QCoreApplication::applicationDirPath()+"/resources";
@@ -39,7 +52,6 @@ int main(int argc,char **argv){
     QFontDatabase::addApplicationFont(resources+"/fonts/MaterialIconsRound-Regular.otf");
     const QIcon applicationIcon(QStringLiteral(":/uterminal/icons/app-icon-ui.png"));
     application.setFont(QFont("Microsoft YaHei UI",10));application.setWindowIcon(applicationIcon);
-    const auto data=ut::dataDirectory();
     QDir().mkpath(data);
     static QFile log(data+"/application.log");
     log.open(QIODevice::WriteOnly|QIODevice::Append);
@@ -52,6 +64,9 @@ int main(int argc,char **argv){
     QObject::connect(&application,&QCoreApplication::aboutToQuit,&updates,&ut::Updates::launchInstallerAfterExit);
     ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(data,&plugins,&settings,&scripts,&sessions);
     ut::App app(resources,&scripts,&plugins,&sessions,&runs,&python,&updates);
+    QObject::connect(&instance,&ut::Instance::received,&app,&ut::App::handleLaunch);
+    QObject::connect(&app,&ut::App::quitting,&instance,&ut::Instance::stopAccepting);
+    QObject::connect(&application,&QCoreApplication::aboutToQuit,&instance,&ut::Instance::stopAccepting);
     QObject::connect(&settings,&ut::Settings::error,&app,&ut::App::showNotice);
     QObject::connect(&python,&ut::PythonEnvironment::error,&app,&ut::App::showNotice);
     qmlRegisterUncreatableType<TerminalItem>("UTerminal",1,0,"TerminalItem","由会话管理器创建");
@@ -68,12 +83,8 @@ int main(int argc,char **argv){
     QObject::connect(&engine,&QQmlApplicationEngine::objectCreationFailed,&application,[]{QCoreApplication::exit(1);},Qt::QueuedConnection);
     engine.load(QUrl::fromLocalFile(resources+"/qml/Main.qml"));
     if(engine.rootObjects().isEmpty())return 1;
-    if(auto *window=qobject_cast<QQuickWindow*>(engine.rootObjects().first()))window->setIcon(applicationIcon);
-    if(application.arguments().contains("--open-terminal")){
-        const auto arguments=application.arguments();const int directoryIndex=arguments.indexOf("--directory");
-        const auto directory=directoryIndex>=0&&directoryIndex+1<arguments.size()?arguments[directoryIndex+1]:QString();
-        app.setPage(1);sessions.openDirectory(directory);
-    }
+    if(auto *window=qobject_cast<QQuickWindow*>(engine.rootObjects().first())){window->setIcon(applicationIcon);app.attachWindow(window);}
+    instance.setReady();
     if(application.arguments().contains("--smoke-test")){
         const auto args=application.arguments();const int pageIndex=args.indexOf("--smoke-page");
         if(args.contains("--smoke-small"))if(auto *window=qobject_cast<QQuickWindow*>(engine.rootObjects().first()))window->resize(1000,700);

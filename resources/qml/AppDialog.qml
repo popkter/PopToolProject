@@ -4,6 +4,12 @@ import QtQuick.Layouts
 
 Dialog {
     id: control
+    Connections {
+        target: control
+        function onVisibleChanged() { if(typeof App !== "undefined") App.setModalOpen(control,control.visible && control.modal) }
+        function onModalChanged() { if(typeof App !== "undefined") App.setModalOpen(control,control.visible && control.modal) }
+    }
+    Component.onCompleted: { if(typeof App !== "undefined") App.setModalOpen(control,control.visible && control.modal) }
     property string acceptText: "确定"
     property string rejectText: "取消"
     property bool destructive: false

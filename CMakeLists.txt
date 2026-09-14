@@ -46,6 +46,7 @@ add_library(uterminal_vterm STATIC
 target_include_directories(uterminal_vterm PUBLIC ${VTERM}/include PRIVATE ${VTERM}/src)
 target_compile_definitions(uterminal_vterm PRIVATE _CRT_SECURE_NO_WARNINGS)
 qt6_wrap_cpp(UT_CORE_MOC
+  src/uterminal/infrastructure/instance.h
   src/uterminal/presentation/settings.h
   src/uterminal/presentation/scripts.h
   src/uterminal/application/plugins.h
@@ -54,6 +55,7 @@ qt6_wrap_cpp(UT_CORE_MOC
   src/uterminal/infrastructure/processrunner.h
   src/uterminal/infrastructure/conpty.h)
 add_library(uterminal_core STATIC ${UT_CORE_MOC}
+  src/uterminal/infrastructure/instance.cpp
   src/uterminal/domain/parameters.cpp
   src/uterminal/infrastructure/storage.cpp
   src/uterminal/infrastructure/scriptfiles.cpp
@@ -67,7 +69,7 @@ add_library(uterminal_core STATIC ${UT_CORE_MOC}
   src/uterminal/presentation/scripts.cpp)
 target_include_directories(uterminal_core PUBLIC src/uterminal)
 target_compile_definitions(uterminal_core PUBLIC UTERMINAL_VERSION="${PROJECT_VERSION}")
-target_link_libraries(uterminal_core PUBLIC Qt6::Core Qt6::Gui Qt6::Network)
+target_link_libraries(uterminal_core PUBLIC Qt6::Core Qt6::Gui Qt6::Network advapi32 user32)
 qt6_wrap_cpp(UT_TERMINAL_MOC src/uterminal/presentation/terminalitem.h src/uterminal/presentation/sessions.h src/uterminal/application/executions.h src/uterminal/presentation/scripthighlighter.h src/uterminal/presentation/scriptediting.h)
 add_library(uterminal_terminal STATIC ${UT_TERMINAL_MOC}
   src/uterminal/presentation/scripthighlighter.cpp
@@ -102,6 +104,15 @@ install(TARGETS UTerminal UTerminalUpdateRunner UTerminalShell RUNTIME DESTINATI
 install(DIRECTORY resources/ DESTINATION resources)
 include(CTest)
 if(BUILD_TESTING)
+  add_executable(uterminal_instance_fixture tests/cpp/instance_fixture.cpp)
+  target_link_libraries(uterminal_instance_fixture PRIVATE uterminal_core)
+  qt6_generate_moc(tests/cpp/instance_tests.cpp ${CMAKE_CURRENT_BINARY_DIR}/instance_tests.moc)
+  add_executable(uterminal_instance_tests tests/cpp/instance_tests.cpp ${CMAKE_CURRENT_BINARY_DIR}/instance_tests.moc)
+  target_include_directories(uterminal_instance_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+  target_link_libraries(uterminal_instance_tests PRIVATE uterminal_core Qt6::Test)
+  add_dependencies(uterminal_instance_tests uterminal_instance_fixture)
+  add_test(NAME instance COMMAND uterminal_instance_tests -o ${CMAKE_CURRENT_BINARY_DIR}/instance-results.txt,txt)
+  set_tests_properties(instance PROPERTIES TIMEOUT 45 ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
   add_executable(uterminal_terminal_benchmark tests/cpp/terminal_benchmark.cpp)
   target_link_libraries(uterminal_terminal_benchmark PRIVATE uterminal_terminal)
   add_executable(uterminal_render_benchmark tests/cpp/render_benchmark.cpp)
@@ -120,9 +131,10 @@ if(BUILD_TESTING)
   set_tests_properties(core PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
   qt6_generate_moc(tests/cpp/runtime_tests.cpp ${CMAKE_CURRENT_BINARY_DIR}/runtime_tests.moc)
   add_executable(uterminal_runtime_tests tests/cpp/runtime_tests.cpp ${CMAKE_CURRENT_BINARY_DIR}/runtime_tests.moc)
+  target_sources(uterminal_runtime_tests PRIVATE src/uterminal/presentation/app.cpp ${UT_APP_MOC})
   target_include_directories(uterminal_runtime_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
   target_compile_definitions(uterminal_runtime_tests PRIVATE UTERMINAL_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-  target_link_libraries(uterminal_runtime_tests PRIVATE uterminal_terminal Qt6::Test)
+  target_link_libraries(uterminal_runtime_tests PRIVATE uterminal_terminal Qt6::Test Qt6::Widgets)
   add_dependencies(uterminal_runtime_tests UTerminalUpdateRunner uterminal_update_fixture)
   add_test(NAME runtime COMMAND uterminal_runtime_tests -o ${CMAKE_CURRENT_BINARY_DIR}/runtime-results.txt,txt)
   set_tests_properties(runtime PROPERTIES TIMEOUT 45)

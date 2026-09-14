@@ -83,6 +83,9 @@ public:
     Pane *menuPane() const { return m_menuPane; }
     Q_INVOKABLE void newTab();
     Q_INVOKABLE void openDirectory(const QString &path);
+    Pane *openDirectoryTab(const QString &path,bool activate,bool notifyMissing=true);
+    void activatePaneTab(Pane *pane);
+    int pendingDirectoryCount() const { return m_pendingDirectories.size(); }
     static QString resolveDirectory(const QString &path);
     Q_INVOKABLE void nextTab();
     Q_INVOKABLE void split(bool vertical);
@@ -115,13 +118,14 @@ private:
     Pane *makePane();
     bool startShell(Pane *pane,const QString &directory=QString());
     void release(Pane *pane);
-    void appendTab(Pane *pane,const QString &title,bool fixedTitle=false);
+    void appendTab(Pane *pane,const QString &title,bool fixedTitle=false,bool activate=true);
     QList<Tab> m_tabs;
     int m_current=-1;
     Plugins *m_plugins;
     Settings *m_settings;
     Scripts *m_scripts;
     QPointer<Pane> m_focused,m_menuPane,m_pastePane;
-    QString m_menuText,m_pasteText,m_pendingDirectory;
+    QString m_menuText,m_pasteText;
+    QStringList m_pendingDirectories;
 };
 }

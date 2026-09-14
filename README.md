@@ -10,6 +10,8 @@ UTerminal 是面向 Windows 11 x64 的终端与自定义脚本应用，当前 `u
 - 终端页：Windows ConPTY 与 libvterm、多标签、分屏、选区、复制粘贴、查找、路径拖入、配色及会话状态。
 - 设置页：主题、字体、并发限制、受管运行时与依赖、应用更新。
 - 安装器直接注册当前用户的传统右键菜单，在 Windows 11“显示更多选项”中提供“在 UTerminal 中打开”，无需签名或 PowerShell 注册。
+- 每个用户登录会话、权限级别和数据目录只运行一个主窗口。再次启动快捷方式激活原窗口，右键打开目录创建独立终端标签；编辑或确认弹窗关闭后才切换标签。
+- 管理员窗口使用数据目录下独立的 `administrator` 配置，脚本、设置、日志、插件和 Python 环境均不与普通窗口同步。缺少 PowerShell 时目录请求暂存于内存，安装后需手动点击“打开终端”。
 
 设计要求和验收清单见 [UTerminal 设计](docs/UTerminal/README.md)，已验证内容和剩余工作见 [实现记录](docs/UTerminal/IMPLEMENTATION.md)。界面以本机 Figma APP 中的 PopTools 设计为参考，目前仍在逐页对齐。
 
