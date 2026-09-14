@@ -126,6 +126,9 @@ static void scroll(VTermState *state, VTermRect rect, int downward, int rightwar
   else if(rightward < -cols)
     rightward = -cols;
 
+  if(state->callbacks && state->callbacks->prescroll)
+    state->callbacks->prescroll(rect, downward, rightward, state->cbdata);
+
   // Update lineinfo if full line
   if(rect.start_col == 0 && rect.end_col == state->cols && rightward == 0) {
     int height = rect.end_row - rect.start_row - abs(downward);

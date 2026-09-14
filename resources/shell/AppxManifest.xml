@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+ xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+ xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+ xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+ xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+ xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+ xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+ IgnorableNamespaces="uap uap10 desktop4 desktop5 com rescap">
+ <Identity Name="UTerminal.ShellIntegration" Publisher="CN=UTerminal" Version="0.1.0.0" ProcessorArchitecture="x64" />
+ <Properties><DisplayName>UTerminal</DisplayName><PublisherDisplayName>UTerminal</PublisherDisplayName><Logo>resources\icons\app-icon-ui.png</Logo><uap10:AllowExternalContent>true</uap10:AllowExternalContent></Properties>
+ <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0" /></Dependencies>
+ <Applications>
+  <Application Id="UTerminal" Executable="UTerminal.exe" uap10:RuntimeBehavior="win32App" uap10:TrustLevel="mediumIL">
+   <uap:VisualElements DisplayName="UTerminal" Description="Open a terminal in this directory" BackgroundColor="transparent" Square150x150Logo="resources\icons\app-icon-ui.png" Square44x44Logo="resources\icons\app-icon-ui.png" AppListEntry="none" />
+   <Extensions>
+    <com:Extension Category="windows.comServer"><com:ComServer><com:SurrogateServer DisplayName="UTerminal Shell"><com:Class Id="B50EA7D3-701B-4F46-A80D-2B75F7D2A641" Path="UTerminalShell.dll" ThreadingModel="STA" /></com:SurrogateServer></com:ComServer></com:Extension>
+    <desktop4:Extension Category="windows.fileExplorerContextMenus"><desktop4:FileExplorerContextMenus>
+     <desktop5:ItemType Type="Directory"><desktop5:Verb Id="OpenInUTerminal" Clsid="B50EA7D3-701B-4F46-A80D-2B75F7D2A641" /></desktop5:ItemType>
+     <desktop5:ItemType Type="Directory\Background"><desktop5:Verb Id="OpenInUTerminal" Clsid="B50EA7D3-701B-4F46-A80D-2B75F7D2A641" /></desktop5:ItemType>
+     <desktop5:ItemType Type="*"><desktop5:Verb Id="OpenInUTerminal" Clsid="B50EA7D3-701B-4F46-A80D-2B75F7D2A641" /></desktop5:ItemType>
+    </desktop4:FileExplorerContextMenus></desktop4:Extension>
+   </Extensions>
+  </Application>
+ </Applications>
+ <Capabilities><rescap:Capability Name="runFullTrust" /></Capabilities>
+</Package>

@@ -1,0 +1,31 @@
+{
+  "packages": [
+    {
+      "kind": "powershell",
+      "version": "7.6.3",
+      "architecture": "x64",
+      "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.3/PowerShell-7.6.3-win-x64.zip",
+      "sha256": "07ddb0d00b660459560ef82a9841da7705b27cd5dcca5a0d7b025a98eca29eca",
+      "prefix": "",
+      "size": 116931488
+    },
+    {
+      "kind": "python",
+      "version": "3.13.14",
+      "architecture": "x64",
+      "url": "https://www.nuget.org/api/v2/package/python/3.13.14",
+      "sha256": "9ac15cfa6cab1115c83d48f2af55c554efa4d1bb044bbc4ab1c9d17ad426e16c",
+      "prefix": "tools/",
+      "size": 14345376
+    },
+    {
+      "kind": "python",
+      "version": "3.12.10",
+      "architecture": "x64",
+      "url": "https://www.nuget.org/api/v2/package/python/3.12.10",
+      "sha256": "0eb85c2dfccccf1b17352de4c397f69194035b7d37149eacc16f1147d93de3b8",
+      "size": 14515433,
+      "prefix": "tools/"
+    }
+  ]
+}

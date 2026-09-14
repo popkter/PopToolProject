@@ -1,0 +1,33 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {"major": 3, "minor": 25, "patch": 0},
+  "configurePresets": [
+    {
+      "name": "windows-msvc",
+      "displayName": "UTerminal · Windows x64",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/uterminal-debug",
+      "architecture": {"value": "x64", "strategy": "external"},
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_PREFIX_PATH": "$env{QT_ROOT}",
+        "BUILD_TESTING": true
+      },
+      "vendor": {"microsoft.com/VisualStudioSettings/CMake/1.0": {"hostOS": ["Windows"]}}
+    },
+    {
+      "name": "windows-release",
+      "inherits": "windows-msvc",
+      "binaryDir": "${sourceDir}/build/uterminal-release",
+      "cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}
+    }
+  ],
+  "buildPresets": [
+    {"name": "windows-msvc", "configurePreset": "windows-msvc"},
+    {"name": "windows-release", "configurePreset": "windows-release"}
+  ],
+  "testPresets": [
+    {"name": "windows-msvc", "configurePreset": "windows-msvc", "output": {"outputOnFailure": true}},
+    {"name": "windows-release", "configurePreset": "windows-release", "output": {"outputOnFailure": true}}
+  ]
+}

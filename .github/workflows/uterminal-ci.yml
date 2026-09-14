@@ -1,0 +1,58 @@
+name: UTerminal C++ CI
+
+on:
+  push:
+    branches: [u_terminal]
+  pull_request:
+    paths:
+      - 'src/uterminal/**'
+      - 'resources/**'
+      - 'native/third_party/libvterm/**'
+      - 'tests/cpp/**'
+      - 'scripts/**'
+      - 'installer/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - '.github/workflows/uterminal-ci.yml'
+      - '.github/workflows/uterminal-package.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uterminal-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - name: Install Qt SDK
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Build and test
+        shell: pwsh
+        run: ./scripts/build-uterminal.ps1 -Configuration '${{ matrix.configuration }}' -QtRoot $env:QT_ROOT_DIR -Test
+      - name: Preserve test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uterminal-tests-${{ matrix.configuration }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            build/uterminal-vs/*-results.txt
+            build/uterminal-vs/Testing/Temporary/LastTest.log
+            build/uterminal-vs/Testing/Temporary/LastTestsFailed.log
