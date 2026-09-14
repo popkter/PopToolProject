@@ -4,6 +4,8 @@
 
 ## 已建立
 
+- 2026-09-14 Explorer 传统菜单修复：实际界面对照确认 Directory/Background 上的 MultiSelectModel=Single 会隐藏空白处入口，移除后带图标菜单立即显示；重启 Explorer 单独不能解决。安装器直接注册 HKCU 四类静态菜单并通知关联刷新，覆盖安装删除旧版空白处 Single 属性；手动注册脚本同步修正。隔离安装身份用于注册/卸载验证，测试结束恢复实际用户安装目录的菜单。
+
 - 2026-09-14 标签栏溢出定位：ListView.currentIndex 绑定 Sessions.currentIndex，在索引、数量、宽度及内容宽度变化后通过 Qt.callLater 合并定位，forceLayout 后用 ListView.Contain 仅滚动所需距离；空列表跳过。保留现有标签宽度与横向滚动，后端会话逻辑不变。Debug 定向用例覆盖最小窗口连续新增 9 个标签（含第 7 个）、首尾切换、nextTab 快捷键入口、关闭末尾、窗口放大缩小、已可见项不移动及空列表；同时真实鼠标关闭回归通过。记录 build/tab-visibility-tests.txt 与 tab-visibility-resize-tests.txt；Debug 构建已更新，未执行完整回归或重新打包。
 
 - 2026-09-14 终端关闭崩溃与工具按钮：用户使用的 build/uterminal-debug/UTerminal.exe 在关闭 PowerShell 标签时复现退出码 0xC0000374。根因为 Ninja 的 MSVC /showIncludes 前缀编码错误，sessions.cpp 的依赖记录为 0；terminalitem.h 于 07:09 更新，而 sessions.cpp.obj 仍为 00:23 的旧对象。反汇编证实旧 Pane 构造函数按 0x258（600）字节分配 TerminalItem，新布局需要 0x2A8（680）字节，混合链接造成堆损坏，在关闭释放时触发。CMake 现用原始字节探测实际编译器前缀并固定语言环境，不依赖本机缺失的英文语言包；配置无法探测时直接报错。重建污染的 Ninja 产物后，依赖为 299 项并包含 terminalitem.h；原路径 Debug 程序已更新，原 PowerShell 复现退出 0。新增真实 QML 鼠标关闭回归，覆盖后台、当前及最后一个标签，与最后窗格关闭用例共 4 项通过（含初始化/清理），结果 build/tab-close-fixed-tests.txt；依赖证据 tab-close-fixed-dependencies.txt、旧/新对象反汇编 tab-close-old-sessions.asm 和 tab-close-new-sessions.asm。未改动关闭业务逻辑。新增 IconActionButton，三个工具按钮共用 7px 圆角、主题按压色、悬停和焦点边框；实际 Debug 预览的按压态截图 terminal-toolbar-pressed.png 已检查，无 QML 错误。本轮仅重建受影响的 Debug 程序与定向测试，没有重打安装包。

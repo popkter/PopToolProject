@@ -44,7 +44,11 @@ if($Development){
             $label=([char]0x5728)+' UTerminal '+([char]0x4e2d)+([char]0x6253)+([char]0x5f00)
             $key.SetValue('',$label)
             $key.SetValue('Icon','"'+(Join-Path $InstallDirectory 'resources\icons\app-icon.ico')+'"')
-            $key.SetValue('MultiSelectModel','Single')
+            if($target -eq 'Directory\Background'){
+                $key.DeleteValue('MultiSelectModel',$false)
+            }else{
+                $key.SetValue('MultiSelectModel','Single')
+            }
             $command=$key.CreateSubKey('command')
             try {
                 $command.SetValue('','"'+$executable+'" --open-terminal --directory "'+$classicTargets[$target]+'"')
