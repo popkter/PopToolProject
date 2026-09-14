@@ -39,7 +39,7 @@ Ninja/MSVC 配置会探测编译器原始 `/showIncludes` 前缀，避免中文�
 
 真实 Python/PowerShell 插件集成测试需要显式指定测试数据及资源目录，部分测试会下载运行时或依赖，不包含在普通 core/runtime 回归中。不要将测试数据目录指向个人正式数据。
 
-`.github/workflows/uterminal-ci.yml` 配置 Windows Debug/Release 构建及归档、core、runtime 测试，并保存测试日志。工作流已写入本地，尚未提交推送或获得 GitHub 运行结果；它不发布安装包。
+`.github/workflows/uterminal-ci.yml` 配置 Windows Debug/Release 构建及归档、core、runtime 测试，并保存测试日志。安装包和 Release 由下述独立发布工作流生成。
 
 ## 生成安装包
 
@@ -57,7 +57,7 @@ Ninja/MSVC 配置会探测编译器原始 `/showIncludes` 前缀，避免中文�
 
 应用版本以 `CMakeLists.txt` 的 `project(... VERSION ...)` 为准。CMake 同步生成编译版本、Windows 文件版本资源和 `version.json`；打包脚本验证二进制版本后，将同一版本传给 Inno Setup 和菜单身份包，并生成安装器 SHA-256 文件。修改版本后必须重新构建，不能将旧二进制与新版本元数据混合打包。
 
-GitHub 手动工作流 [UTerminal Windows installer](.github/workflows/uterminal-package.yml) 使用相同脚本构建、测试和打包，保存安装器、SHA-256、依赖记录及测试日志作为 14 天有效的 Actions 工件。该工作流生成未签名开发包，不创建 GitHub Release；签名和正式发布流程尚未完成。旧 Python/PyInstaller 与 macOS 打包脚本及旧发布工作流已移除。新工作流仍需推送后执行远程验收。
+GitHub 工作流 [UTerminal Windows installer](.github/workflows/uterminal-package.yml) 使用相同脚本构建、测试和打包，并发布 EXE、SHA-256 和 Release Notes：推送 `u_terminal` 自动生成独立的 `uterminal-dev-<run-id>` 预发布版；推送 `uterminal-v0.1.1` 这类标签发布正式版，标签版本必须与 CMake 一致。手动运行分支工作流也生成预发布版。发布说明由 GitHub 自动生成，并附带安装说明、提交和构建链接。工件上传完成后才公开 Release，测试失败不发布；依赖记录与测试日志保留为 14 天 Actions 工件。安装包目前仍未签名，正式标签不代表已完成代码签名。开发快照使用独立标签，供手动下载，不进入当前应用的语义版本自动更新筛选。
 
 安装器默认按用户安装到 `%LOCALAPPDATA%/Programs/UTerminal`。在本机测试目录已验证实际安装文件与部署目录一致、不依赖开发 SDK 路径的启动，以及卸载测试副本后独立数据目录中的脚本和用户文件保持原哈希。跨版本升级、默认用户目录及干净 Windows 环境验收仍待完成。
 

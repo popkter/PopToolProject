@@ -1,6 +1,9 @@
 name: UTerminal Windows installer
 
 on:
+  push:
+    branches: [u_terminal]
+    tags: ['uterminal-v*']
   workflow_dispatch:
 
 permissions:
@@ -14,8 +17,31 @@ jobs:
   package:
     runs-on: windows-2022
     timeout-minutes: 45
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      title: ${{ steps.release.outputs.title }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v6.0.2
+      - name: Resolve release identity
+        id: release
+        shell: pwsh
+        run: |
+          $source = Get-Content CMakeLists.txt -Raw
+          if ($source -notmatch 'project\(UTerminal\s+VERSION\s+(\d+\.\d+\.\d+)') { throw 'Application version missing.' }
+          $version = $Matches[1]
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            if ($env:GITHUB_REF_NAME -cne "uterminal-v$version") { throw 'Release tag must match the CMake application version.' }
+            $tag = $env:GITHUB_REF_NAME
+            $title = "UTerminal $version"
+            $prerelease = 'false'
+          } else {
+            if ($env:GITHUB_REF_NAME -ne 'u_terminal') { throw 'Development releases must run on u_terminal.' }
+            $tag = "uterminal-dev-$env:GITHUB_RUN_ID"
+            $title = "UTerminal $version · Development $env:GITHUB_RUN_NUMBER"
+            $prerelease = 'true'
+          }
+          "tag=$tag", "title=$title", "prerelease=$prerelease" | Add-Content $env:GITHUB_OUTPUT -Encoding utf8
       - name: Install Qt SDK
         uses: jurplel/install-qt-action@v4
         with:
@@ -36,7 +62,17 @@ jobs:
           if ($installer.Count -ne 1) { throw 'Expected exactly one UTerminal installer.' }
           $hash = (Get-FileHash -LiteralPath $installer[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($installer[0].Name)" | Set-Content build/installer/SHA256SUMS.txt -Encoding ascii
-          'Unsigned development installer. Windows 11 shell identity registration requires a trusted signature.' | Set-Content build/installer/BUILD-NOTES.txt -Encoding utf8
+          @(
+            'Windows 11 x64 安装包（Release 编译配置）。'
+            '安装时展开 Qt、运行库和资源，启动时无需解压。'
+            '当前安装包未签名；Windows 11 右键入口自动降级到“显示更多选项”。'
+            'Python / PowerShell 7 为应用内按需安装的可选插件。'
+            ''
+            "构建提交：$env:GITHUB_SHA"
+            "构建记录：https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+            ''
+            '请使用 SHA256SUMS.txt 校验下载文件。'
+          ) | Set-Content build/installer/BUILD-NOTES.txt -Encoding utf8
       - name: Preserve installer
         uses: actions/upload-artifact@v4
         with:
@@ -55,3 +91,43 @@ jobs:
             build/uterminal-vs/*-results.txt
             build/uterminal-vs/Testing/Temporary/LastTest.log
             build/uterminal-package/resources/licenses/
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.package.outputs.tag }}
+      RELEASE_TITLE: ${{ needs.package.outputs.title }}
+      PRERELEASE: ${{ needs.package.outputs.prerelease }}
+      COMMIT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: uterminal-windows-x64-installer
+          path: installer
+      - name: Publish installer and release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Upload to a draft first, so a failed upload never publishes an empty release.
+          if draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [[ "$draft" == "false" ]]; then
+              echo "Release already published: $RELEASE_TAG"
+              exit 0
+            fi
+          else
+            options=(--target "$COMMIT_SHA" --title "$RELEASE_TITLE" --draft --generate-notes --notes-file installer/BUILD-NOTES.txt)
+            if [[ "$PRERELEASE" == "true" ]]; then options+=(--prerelease); else options+=(--verify-tag); fi
+            gh release create "$RELEASE_TAG" "${options[@]}"
+          fi
+          gh release upload "$RELEASE_TAG" installer/* --clobber
+          if [[ "$PRERELEASE" == "true" ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
+          fi
+          gh release view "$RELEASE_TAG" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"
