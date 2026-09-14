@@ -76,6 +76,10 @@ add_library(uterminal_terminal STATIC ${UT_TERMINAL_MOC}
 target_link_libraries(uterminal_terminal PUBLIC uterminal_core uterminal_vterm Qt6::Quick Qt6::Qml)
 qt6_wrap_cpp(UT_APP_MOC src/uterminal/presentation/app.h)
 add_executable(UTerminal WIN32 src/uterminal/main.cpp src/uterminal/presentation/app.cpp ${UT_APP_MOC})
+configure_file(src/uterminal/app-icon.rc.in ${CMAKE_CURRENT_BINARY_DIR}/uterminal-icon.rc @ONLY)
+target_sources(UTerminal PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/uterminal-icon.rc)
+qt_add_resources(UTerminal "application_icon" PREFIX "/uterminal" BASE "resources"
+  FILES resources/icons/app-icon-ui.png)
 add_executable(UTerminalUpdateRunner WIN32 src/uterminal/update_runner.cpp src/uterminal/infrastructure/updatepackage.cpp)
 target_include_directories(UTerminalUpdateRunner PRIVATE src/uterminal)
 target_link_libraries(UTerminalUpdateRunner PRIVATE Qt6::Core)

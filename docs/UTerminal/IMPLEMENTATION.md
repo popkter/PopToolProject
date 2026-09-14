@@ -4,6 +4,8 @@
 
 ## 已建立
 
+- 2026-09-14 脚本选择与窗口图标：Scripts::select 仅通知旧/新选中行的 SelectedRole，不再重置模型；45 项真实 ScriptsPage 点击回归通过，连续选择屏外滚入的第 33/35/33 行保持 contentY，同项和无效 ID 不重复通知。主程序增加 Windows ICO 资源、内嵌 PNG 并显式设置 QQuickWindow 图标；ExtractIconEx 和 WM_GETICON 大小图标检查通过，隔离实例正常退出。更新 Ninja Debug 构建，仅执行相关回归。
+
 - 2026-09-14 Explorer 传统菜单修复：实际界面对照确认 Directory/Background 上的 MultiSelectModel=Single 会隐藏空白处入口，移除后带图标菜单立即显示；重启 Explorer 单独不能解决。安装器直接注册 HKCU 四类静态菜单并通知关联刷新，覆盖安装删除旧版空白处 Single 属性；手动注册脚本同步修正。隔离安装身份用于注册/卸载验证，测试结束恢复实际用户安装目录的菜单。
 
 - 2026-09-14 标签栏溢出定位：ListView.currentIndex 绑定 Sessions.currentIndex，在索引、数量、宽度及内容宽度变化后通过 Qt.callLater 合并定位，forceLayout 后用 ListView.Contain 仅滚动所需距离；空列表跳过。保留现有标签宽度与横向滚动，后端会话逻辑不变。Debug 定向用例覆盖最小窗口连续新增 9 个标签（含第 7 个）、首尾切换、nextTab 快捷键入口、关闭末尾、窗口放大缩小、已可见项不移动及空列表；同时真实鼠标关闭回归通过。记录 build/tab-visibility-tests.txt 与 tab-visibility-resize-tests.txt；Debug 构建已更新，未执行完整回归或重新打包。

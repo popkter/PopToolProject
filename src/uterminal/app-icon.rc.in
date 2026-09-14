@@ -1,0 +1,2 @@
+// Windows Explorer and taskbar use the executable's embedded icon.
+1 ICON "@CMAKE_CURRENT_SOURCE_DIR@/resources/icons/app-icon.ico"

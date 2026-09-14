@@ -29,7 +29,7 @@ Item {
                         Text { text: "脚本名称"; color: Theme.muted; font.pixelSize: 12; Layout.fillWidth: true }
                         SelectField { model: [{label:"添加时间",value:"added_time"},{label:"名称",value:"name"},{label:"使用次数",value:"usage"},{label:"最近使用",value:"recent"},{label:"自定义",value:"custom"}]; textRole: "label"; valueRole: "value"; currentIndex: ["added_time","name","usage","recent","custom"].indexOf(Scripts.sortMode); implicitWidth: 118; onActivated: Scripts.sortMode=currentValue }
                     }
-                    ListView { id: list; Layout.fillWidth: true; Layout.fillHeight: true; clip: true; model: Scripts; spacing: 3
+                    ListView { id: list; objectName: "scriptList"; Layout.fillWidth: true; Layout.fillHeight: true; clip: true; model: Scripts; spacing: 3
                         property string draggedId: ""
                         property int dropIndex: -1
                         property real pointerY: 0
@@ -44,6 +44,7 @@ Item {
                         ScrollBar.vertical: ScrollBar {}
                         delegate: ItemDelegate {
                             id: scriptRow
+                            objectName: "scriptRow_"+index
                             required property int index
                             required property string scriptId
                             required property string title

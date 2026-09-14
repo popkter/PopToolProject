@@ -208,7 +208,15 @@ void Scripts::rebuild(){
 void Scripts::setQuery(const QString &v){m_query=v.trimmed();rebuild();emit filterChanged();}
 void Scripts::setLanguageFilter(const QString &v){m_filter=v;rebuild();emit filterChanged();}
 void Scripts::setSortMode(const QString &v){if(!QStringList{"name","usage","recent","custom","added_time"}.contains(v))return;m_sort=v;m_state["sortMode"]=v;saveState();rebuild();emit filterChanged();}
-void Scripts::select(const QString &id){if(get(id).isEmpty())return;m_selected=id;rebuild();emit selectionChanged();}
+void Scripts::select(const QString &id){
+    if(id==m_selected||get(id).isEmpty())return;
+    const auto previous=m_selected;m_selected=id;
+    for(int row=0;row<m_visible.size();++row){
+        const auto rowId=m_visible[row]["id"].toString();
+        if(rowId==previous||rowId==id)emit dataChanged(index(row),index(row),{SelectedRole});
+    }
+    emit selectionChanged();
+}
 void Scripts::newDraft(const QString &code,const QString &language){
     m_draft={{"id",""},{"title",""},{"description",""},{"language",languageValid(language)?language:"powershell"},{"code",code},{"icon","terminal"},{"timeoutSeconds",300},{"executionMode","process"},{"workingDirectory",""},{"confirmBeforeRun",false}};
     writeJson(m_directory+"/draft.json",m_draft);emit draftChanged();

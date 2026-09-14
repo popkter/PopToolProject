@@ -37,7 +37,8 @@ int main(int argc,char **argv){
     if(!QFile::exists(resources+"/qml/Main.qml"))resources=QStringLiteral(UTERMINAL_SOURCE_RESOURCES);
 #endif
     QFontDatabase::addApplicationFont(resources+"/fonts/MaterialIconsRound-Regular.otf");
-    application.setFont(QFont("Microsoft YaHei UI",10));application.setWindowIcon(QIcon(resources+"/icons/app-icon.ico"));
+    const QIcon applicationIcon(QStringLiteral(":/uterminal/icons/app-icon-ui.png"));
+    application.setFont(QFont("Microsoft YaHei UI",10));application.setWindowIcon(applicationIcon);
     const auto data=ut::dataDirectory();
     QDir().mkpath(data);
     static QFile log(data+"/application.log");
@@ -67,6 +68,7 @@ int main(int argc,char **argv){
     QObject::connect(&engine,&QQmlApplicationEngine::objectCreationFailed,&application,[]{QCoreApplication::exit(1);},Qt::QueuedConnection);
     engine.load(QUrl::fromLocalFile(resources+"/qml/Main.qml"));
     if(engine.rootObjects().isEmpty())return 1;
+    if(auto *window=qobject_cast<QQuickWindow*>(engine.rootObjects().first()))window->setIcon(applicationIcon);
     if(application.arguments().contains("--open-terminal")){
         const auto arguments=application.arguments();const int directoryIndex=arguments.indexOf("--directory");
         const auto directory=directoryIndex>=0&&directoryIndex+1<arguments.size()?arguments[directoryIndex+1]:QString();

@@ -55,6 +55,46 @@ protected:
 class RuntimeTests:public QObject {
     Q_OBJECT
 private slots:
+    void scriptSelectionKeepsScrollPosition(){
+        QTemporaryDir temporary;QVERIFY(temporary.isValid());
+        ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());
+        ut::Plugins plugins(temporary.path(),temporary.path());ut::Sessions sessions(&plugins,&settings,&scripts);
+        ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
+        for(int i=0;i<45;++i){
+            scripts.newDraft("echo test","cmd");scripts.updateDraft("title",QString("Script %1").arg(i));QVERIFY(scripts.saveDraft());
+        }
+        scripts.select(scripts.data(scripts.index(0),ut::Scripts::IdRole).toString());
+        QQmlEngine engine;engine.rootContext()->setContextProperty("Scripts",&scripts);
+        engine.rootContext()->setContextProperty("Settings",&settings);engine.rootContext()->setContextProperty("Runs",&runs);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(QStringLiteral(UTERMINAL_TEST_SOURCE_DIR "/resources/qml/ScriptsPage.qml")));
+        QScopedPointer<QObject> object(component.create());QVERIFY2(object,qPrintable(component.errorString()));
+        QQuickWindow window;window.resize(1100,900);
+        auto *page=qobject_cast<QQuickItem*>(object.data());QVERIFY(page);page->setParentItem(window.contentItem());page->setSize(window.size());
+        window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));
+        auto findItem=[](auto &&self,QQuickItem *parent,const QString &name)->QQuickItem*{
+            if(parent->objectName()==name)return parent;
+            for(auto *child:parent->childItems())if(auto *found=self(self,child,name))return found;
+            return nullptr;
+        };
+        auto *list=findItem(findItem,page,"scriptList");QVERIFY(list);QTRY_VERIFY(list->height()>0);
+        list->setProperty("contentY",30*43);QTest::qWait(100);
+        QSignalSpy resets(&scripts,&QAbstractItemModel::modelReset);
+        QSignalSpy selections(&scripts,&ut::Scripts::selectionChanged);
+        for(const int row:{32,34,32}){
+            auto *item=findItem(findItem,list,QString("scriptRow_%1").arg(row));QVERIFY(item);
+            const auto offset=list->property("contentY").toReal();QVERIFY(offset>list->height());
+            const auto point=item->mapToScene(QPointF(item->width()/2,item->height()/2));
+            const auto local=list->mapFromScene(point);QVERIFY(local.y()>0&&local.y()<list->height());
+            const auto id=scripts.data(scripts.index(row),ut::Scripts::IdRole).toString();
+            QTest::mouseClick(&window,Qt::LeftButton,Qt::NoModifier,point.toPoint());
+            QTRY_COMPARE(scripts.selected()["id"].toString(),id);QTest::qWait(50);
+            QCOMPARE(list->property("contentY").toReal(),offset);QCOMPARE(resets.count(),0);
+            QVERIFY(scripts.data(scripts.index(row),ut::Scripts::SelectedRole).toBool());
+        }
+        QCOMPARE(selections.count(),3);
+        scripts.select(scripts.selected()["id"].toString());scripts.select("missing-script");
+        QCOMPARE(selections.count(),3);QCOMPARE(resets.count(),0);
+    }
     void powerShellUpgradeWaitsForSelection(){
         QTemporaryDir tmp;CatalogTestNetwork network;const auto data=tmp.path()+"/data";
         const auto previous=data+"/plugins/powershell/7.0.0-x64";
