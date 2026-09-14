@@ -2,6 +2,7 @@ param(
     [ValidateSet('Debug','Release')][string]$Configuration='Debug',
     [string]$QtRoot=$env:QT_ROOT,
     [string]$BuildDirectory,
+    [ValidatePattern('^(0|[1-9][0-9]{0,18})$')][string]$BuildId='0',
     [switch]$Test
 )
 $ErrorActionPreference='Stop'
@@ -21,7 +22,7 @@ $build=if($BuildDirectory){[IO.Path]::GetFullPath($BuildDirectory)}else{Join-Pat
 $utBuildPath=$env:PATH
 Remove-Item Env:PATH -ErrorAction SilentlyContinue
 $env:Path="$QtRoot/bin;$utBuildPath"
-& $cmake -S $projectRoot -B $build -G $generator -A x64 "-DCMAKE_PREFIX_PATH=$QtRoot" -DBUILD_TESTING=ON
+& $cmake -S $projectRoot -B $build -G $generator -A x64 "-DCMAKE_PREFIX_PATH=$QtRoot" -DBUILD_TESTING=ON "-DUTERMINAL_BUILD_ID=$BuildId"
 if($LASTEXITCODE){throw "CMake configure failed: $LASTEXITCODE"}
 & $cmake --build $build --config $Configuration --parallel
 if($LASTEXITCODE){throw "C++ build failed: $LASTEXITCODE"}

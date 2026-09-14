@@ -35,6 +35,22 @@ int compareVersion(const QString &a,const QString &b){
     }
     return aa.size()<bb.size()?-1:1;
 }
+QString versionCore(const QString &version){return version.section('-',0,0);}
+qint64 developmentBuildId(const QString &version){
+    static const QRegularExpression re("^[0-9]+\\.[0-9]+\\.[0-9]+-dev\\.([1-9][0-9]{0,18})$");
+    const auto match=re.match(version);bool ok=false;const auto value=match.hasMatch()?match.captured(1).toLongLong(&ok):0;
+    return ok?value:0;
+}
+bool isNewer(const QString &candidate,const QString &current,qint64 buildId=0){
+    if(buildId<=0)return compareVersion(candidate,current)>0;
+    const int core=QVersionNumber::compare(QVersionNumber::fromString(versionCore(candidate)),QVersionNumber::fromString(versionCore(current)));
+    return core>0||(core==0&&buildId>developmentBuildId(current));
+}
+int compareCandidates(const QString &a,qint64 aBuild,const QString &b,qint64 bBuild){
+    const int core=QVersionNumber::compare(QVersionNumber::fromString(versionCore(a)),QVersionNumber::fromString(versionCore(b)));if(core)return core;
+    if(aBuild||bBuild){if(aBuild!=bBuild)return aBuild>bBuild?1:-1;}
+    return compareVersion(a,b);
+}
 }
 Updates::Updates(QString directory,Settings *settings,Plugins *plugins,QObject *parent,QNetworkAccessManager *transport)
     :QObject(parent),m_directory(std::move(directory)),m_settings(settings),m_plugins(plugins),m_transport(transport?transport:&m_network){
@@ -42,7 +58,7 @@ Updates::Updates(QString directory,Settings *settings,Plugins *plugins,QObject *
     cleanupHelperCache(m_directory+"/updates");
     readInstallationReceipt();
     m_ready=readJson(m_directory+"/updates/pending.json");
-    if(!m_ready.isEmpty()&&(!verifyReady()||!validVersion(m_ready["version"].toString())||compareVersion(m_ready["version"].toString(),currentVersion())<=0))m_ready={};
+    if(!m_ready.isEmpty()&&(!verifyReady()||!validVersion(m_ready["version"].toString())||!isNewer(m_ready["version"].toString(),currentVersion(),m_ready["buildId"].toInteger())))m_ready={};
     if(!m_ready.isEmpty())m_status=QStringLiteral("更新包已下载，可稍后或退出后安装");
     connect(settings,&Settings::changed,this,[this]{select();schedule();});
     m_timer.setInterval(60000);connect(&m_timer,&QTimer::timeout,this,&Updates::schedule);m_timer.start();
@@ -62,18 +78,22 @@ void Updates::schedule(){
     }
 }
 QJsonObject Updates::selectRelease(const QJsonArray &releases,const QString &current,bool prerelease){
-    QJsonObject best;QString highest=current;if(!validVersion(current))return {};
-    static const QRegularExpression assetName("^UTerminal-(.+)-win-x64-setup\\.exe$");
+    QJsonObject best;QString highest; qint64 highestBuild=0;if(!validVersion(current))return {};
+    static const QRegularExpression assetName("^UTerminal-([0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?)-win-x64-setup\\.exe$");
+    static const QRegularExpression developmentTag("^uterminal-dev-([1-9][0-9]{0,18})$");
     static const QRegularExpression digest("^sha256:[0-9a-fA-F]{64}$");
     for(const auto &entry:releases){
         const auto release=entry.toObject();if(release["draft"].toBool()||(!prerelease&&release["prerelease"].toBool()))continue;
-        auto tag=release["tag_name"].toString();if(tag.startsWith("uterminal-v"))tag.remove(0,11);else if(tag.startsWith('v'))tag.remove(0,1);
-        if(!validVersion(tag)||(!prerelease&&tag.contains('-'))||compareVersion(tag,highest)<=0)continue;
+        auto tag=release["tag_name"].toString();const auto devMatch=developmentTag.match(tag);qint64 buildId=0;
+        if(devMatch.hasMatch()){if(!prerelease||!release["prerelease"].toBool())continue;bool ok=false;buildId=devMatch.captured(1).toLongLong(&ok);if(!ok)continue;}
+        else{if(tag.startsWith("uterminal-v"))tag.remove(0,11);else if(tag.startsWith('v'))tag.remove(0,1);if(!validVersion(tag)||(!prerelease&&tag.contains('-')))continue;}
         for(const auto &assetEntry:release["assets"].toArray()){
             const auto asset=assetEntry.toObject();const auto match=assetName.match(asset["name"].toString());const QUrl url(asset["browser_download_url"].toString());
-            if(!match.hasMatch()||match.captured(1)!=tag||!digest.match(asset["digest"].toString()).hasMatch()||url.scheme()!="https"||url.host()!="github.com"||!url.path().startsWith("/popkter/PopToolProject/releases/download/"))continue;
+            if(!match.hasMatch()||(!buildId&&match.captured(1)!=tag)||!digest.match(asset["digest"].toString()).hasMatch()||url.scheme()!="https"||url.host()!="github.com"||!url.path().startsWith("/popkter/PopToolProject/releases/download/"))continue;
+            const auto version=buildId?match.captured(1)+"-dev."+QString::number(buildId):tag;
+            if(!validVersion(version)||!isNewer(version,current,buildId)||(!highest.isEmpty()&&compareCandidates(version,buildId,highest,highestBuild)<=0))continue;
             const qint64 size=asset["size"].toInteger();if(size<=0||size>512ll*1024*1024)continue;
-            highest=tag;best={{"version",tag},{"url",url.toString()},{"sha256",asset["digest"].toString().mid(7).toLower()},{"size",size},{"notes",release["body"].toString().left(20000)},{"prerelease",release["prerelease"].toBool()||tag.contains('-')}};
+            highest=version;highestBuild=buildId;best={{"version",version},{"buildId",buildId},{"url",url.toString()},{"sha256",asset["digest"].toString().mid(7).toLower()},{"size",size},{"notes",release["body"].toString().left(20000)},{"prerelease",release["prerelease"].toBool()||version.contains('-')}};
         }
     }
     return best;
@@ -174,7 +194,7 @@ int Updates::cleanupHelperCache(const QString &updatesDirectory){
 void Updates::launchInstallerAfterExit(){
     if(!m_installOnExit)return;
     const auto receiptPath=m_directory+"/updates/install-result.json";
-    QJsonObject receipt{{"version",m_ready["version"]},{"state","requested"},{"updatedAt",QDateTime::currentSecsSinceEpoch()}};
+    QJsonObject receipt{{"version",m_ready["version"]},{"buildId",m_ready["buildId"]},{"state","requested"},{"updatedAt",QDateTime::currentSecsSinceEpoch()}};
     if(!verifyReady()){receipt["state"]="failed";receipt["message"]=QStringLiteral("退出时发现安装包已损坏或缺失，请重新下载");writeJson(receiptPath,receipt);return;}
     if(!writeJson(receiptPath,receipt)){qWarning("Unable to save UTerminal update receipt; installation not started");return;}
     const auto helper=stageHelper(QCoreApplication::applicationDirPath(),m_directory+"/updates/helper-"+QUuid::createUuid().toString(QUuid::Id128));
@@ -186,7 +206,7 @@ void Updates::launchInstallerAfterExit(){
 void Updates::readInstallationReceipt(){
     const auto receipt=readJson(m_directory+"/updates/install-result.json");if(receipt.isEmpty())return;
     const auto version=receipt["version"].toString();const auto state=receipt["state"].toString();
-    if(validVersion(version)&&compareVersion(currentVersion(),version)>=0)m_installationStatus=QStringLiteral("更新已完成，当前版本：")+currentVersion();
+    if(validVersion(version)&&!isNewer(version,currentVersion(),receipt["buildId"].toInteger()))m_installationStatus=QStringLiteral("更新已完成，当前版本：")+currentVersion();
     else if(state=="failed")m_installationStatus=QStringLiteral("上次更新未能安装：")+receipt["message"].toString().left(500);
     else if(state=="installed")m_installationStatus=QStringLiteral("安装器已成功结束，但当前仍为 %1。请确认启动的是安装目录中的版本；目标版本：%2").arg(currentVersion(),version);
     else if(state=="launched")m_installationStatus=QStringLiteral("上次安装程序已启动，但当前仍为 %1。若安装未完成，请查看更新目录中的 installer.log。目标版本：%2").arg(currentVersion(),version);

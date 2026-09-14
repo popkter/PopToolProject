@@ -21,6 +21,7 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       title: ${{ steps.release.outputs.title }}
       prerelease: ${{ steps.release.outputs.prerelease }}
+      build_id: ${{ steps.release.outputs.build_id }}
     steps:
       - uses: actions/checkout@v6.0.2
       - name: Resolve release identity
@@ -35,13 +36,15 @@ jobs:
             $tag = $env:GITHUB_REF_NAME
             $title = "UTerminal $version"
             $prerelease = 'false'
+            $buildId = '0'
           } else {
             if ($env:GITHUB_REF_NAME -ne 'u_terminal') { throw 'Development releases must run on u_terminal.' }
             $tag = "uterminal-dev-$env:GITHUB_RUN_ID"
             $title = "UTerminal $version · Development $env:GITHUB_RUN_NUMBER"
             $prerelease = 'true'
+            $buildId = $env:GITHUB_RUN_ID
           }
-          "tag=$tag", "title=$title", "prerelease=$prerelease" | Add-Content $env:GITHUB_OUTPUT -Encoding utf8
+          "tag=$tag", "title=$title", "prerelease=$prerelease", "build_id=$buildId" | Add-Content $env:GITHUB_OUTPUT -Encoding utf8
       - name: Install Qt SDK
         uses: jurplel/install-qt-action@v4
         with:
@@ -54,7 +57,7 @@ jobs:
         shell: pwsh
         run: |
           $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
-          ./scripts/package-uterminal.ps1 -QtRoot $env:QT_ROOT_DIR -InnoCompiler $compiler
+          ./scripts/package-uterminal.ps1 -QtRoot $env:QT_ROOT_DIR -InnoCompiler $compiler -BuildId '${{ steps.release.outputs.build_id }}'
       - name: Record installer checksum
         shell: pwsh
         run: |

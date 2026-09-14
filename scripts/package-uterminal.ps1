@@ -1,12 +1,15 @@
-param([string]$QtRoot=$env:QT_ROOT,[string]$InnoCompiler,[switch]$SkipBuild,[string]$SigningCertificateThumbprint,[string]$Publisher='CN=UTerminal',[string]$BuildDirectory)
+param([string]$QtRoot=$env:QT_ROOT,[string]$InnoCompiler,[switch]$SkipBuild,[string]$SigningCertificateThumbprint,[string]$Publisher='CN=UTerminal',[string]$BuildDirectory,[ValidatePattern('^(0|[1-9][0-9]{0,18})$')][string]$BuildId='0')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
 if(!$QtRoot){$QtRoot=Join-Path $projectRoot 'build/qt-sdk/6.10.3/msvc2022_64'}
 if(!$InnoCompiler){$InnoCompiler=Join-Path $env:LOCALAPPDATA 'Programs/Inno Setup 6/ISCC.exe'}
 if(!(Test-Path -LiteralPath $InnoCompiler)){throw 'Inno Setup 6 compiler not found. Pass -InnoCompiler.'}
 $build=if($BuildDirectory){[IO.Path]::GetFullPath($BuildDirectory)}else{Join-Path $projectRoot 'build/uterminal-vs'}
-if(!$SkipBuild){& "$PSScriptRoot/build-uterminal.ps1" -Configuration Release -QtRoot $QtRoot -BuildDirectory $build -Test}
-$version=(Get-Content -LiteralPath "$build/version.json" -Raw | ConvertFrom-Json).version
+if(!$SkipBuild){& "$PSScriptRoot/build-uterminal.ps1" -Configuration Release -QtRoot $QtRoot -BuildDirectory $build -BuildId $BuildId -Test}
+$buildIdentity=Get-Content -LiteralPath "$build/version.json" -Raw | ConvertFrom-Json
+$actualBuildId=[string]$buildIdentity.buildId
+if($actualBuildId -ne $BuildId){throw "Build identity mismatch: expected $BuildId, found $actualBuildId"}
+$version=$buildIdentity.version
 if($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'){throw 'Invalid CMake application version.'}
 foreach($component in $version.Split('.')){if([int64]$component -gt 65535){throw 'Application version exceeds Windows version component limit.'}}
 foreach($binary in 'UTerminal.exe','UTerminalUpdateRunner.exe','UTerminalShell.dll'){
