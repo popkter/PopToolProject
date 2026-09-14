@@ -5,10 +5,11 @@
 #include <QPointer>
 #include <QJsonObject>
 #include <QColor>
+#include <QAbstractNativeEventFilter>
 class QQuickWindow;
 namespace ut {
 class Scripts;class Plugins;class Sessions;class Executions;class PythonEnvironment;class Updates;class Pane;
-class App : public QObject {
+class App : public QObject, public QAbstractNativeEventFilter {
     Q_OBJECT
     Q_PROPERTY(int page READ page WRITE setPage NOTIFY pageChanged)
     Q_PROPERTY(QString resources READ resources CONSTANT)
@@ -16,6 +17,7 @@ class App : public QObject {
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
 public:
     App(QString resources,Scripts *scripts,Plugins *plugins,Sessions *sessions,Executions *runs,PythonEnvironment *python,Updates *updates,QObject *parent=nullptr);
+    ~App() override;
     int page()const{return m_page;}
     void setPage(int page);
     QString resources()const;
@@ -41,6 +43,7 @@ public:
     Q_INVOKABLE void noteEditorInput();
     Q_INVOKABLE void requestQuit();
     Q_INVOKABLE void quitNow();
+    bool nativeEventFilter(const QByteArray &eventType,void *message,qintptr *result) override;
 signals:
     void pageChanged();
     void noticeChanged();
@@ -53,12 +56,13 @@ private:
     void finishExternalActivation();
     void activateWindow();
     QPointer<QQuickWindow> m_window;
+    quintptr m_windowHandle=0;
     QPointer<Pane> m_externalPane;
     QHash<QObject*,QMetaObject::Connection> m_modals;
     QString m_deferredPlugin;
     bool m_externalTerminal=false,m_quitting=false;
     QString m_resources,m_notice,m_import;
-    int m_page=0;
+    int m_page=1;
     Scripts *m_scripts;Plugins *m_plugins;Sessions *m_sessions;Executions *m_runs;
     PythonEnvironment *m_python;
     Updates *m_updates;

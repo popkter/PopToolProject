@@ -4,10 +4,12 @@ import QtQuick.Layouts
 import UTerminal
 Item {
     id: page
-        Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 42; color: Settings.dark ? Theme.surface : "#f7f8fa"
+        Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 42; color: Settings.dark ? "#202020" : "#f3f3f3"
                 readonly property real captionInset: Math.max(138,SafeArea.margins.right)
-                readonly property real tabViewportLimit: Math.max(0,width-captionInset-52)
-                ListView { id: tabs; objectName: "terminalTabs"; x: 0; y: 5; width: Math.min(contentWidth,tabBar.tabViewportLimit); height: 32; orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 7
+                readonly property real tabViewportLimit: Math.max(0,width-captionInset-82)
+                readonly property color idleHover: Settings.dark ? "#353535" : "#e5e5e5"
+                readonly property color idlePressed: Settings.dark ? "#404040" : "#d8d8d8"
+                ListView { id: tabs; objectName: "terminalTabs"; x: 0; y: 4; width: Math.min(contentWidth,tabBar.tabViewportLimit); height: 38; orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 2
                     currentIndex: Sessions.currentIndex
                     highlightMoveDuration: 0
                     function revealCurrentTab() {
@@ -20,32 +22,51 @@ Item {
                     onCountChanged: Qt.callLater(revealCurrentTab)
                     onWidthChanged: Qt.callLater(revealCurrentTab)
                     onContentWidthChanged: Qt.callLater(revealCurrentTab)
-                    delegate: Rectangle { required property int index; required property string tabTitle; required property bool active; width: 180; height: tabs.height; radius: 8; color: active ? Settings.terminalBackground : Settings.dark ? Theme.border : "#e9e9e9"
-                        Text { anchors.fill: parent; anchors.leftMargin: 32; anchors.rightMargin: 32; text: tabTitle; color: active ? Settings.terminalForeground : Settings.dark ? Theme.text : "#0a0a0a"; font.pixelSize: 12; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                    delegate: Rectangle {
+                        id: terminalTab
+                        required property int index; required property string tabTitle; required property bool active
+                        width: 188; height: tabs.height; radius: 8
+                        color: active ? Settings.terminalBackground : tabTap.pressed ? tabBar.idlePressed : tabHover.hovered ? tabBar.idleHover : "transparent"
+                        Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 8; visible: terminalTab.active; color: terminalTab.color }
+                        Rectangle {
+                            anchors.left: parent.left; anchors.leftMargin: 11; anchors.verticalCenter: parent.verticalCenter
+                            width: 18; height: 18; radius: 3; color: "#0c6fce"
+                            Icon { anchors.centerIn: parent; name: "terminal"; font.pixelSize: 12; color: "white" }
+                        }
+                        Text { anchors.fill: parent; anchors.leftMargin: 38; anchors.rightMargin: 34; text: tabTitle; color: active ? Settings.terminalForeground : Settings.dark ? "#f5f5f5" : "#1a1a1a"; font.pixelSize: 12; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
                         ToolButton {
                             id: closeTabButton
                             objectName: "closeTab_" + index
                             anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
                             width: 28; height: 28; text: "×"
-                            contentItem: Text { text: closeTabButton.text; color: active ? Settings.terminalForeground : Settings.dark ? Theme.text : "#0a0a0a"; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                            background: Rectangle { radius: 7; color: closeTabButton.hovered ? (active ? "#25ffffff" : Settings.dark ? Theme.field : "#d7d7d7") : "transparent"; border.width: closeTabButton.activeFocus ? 1 : 0; border.color: Theme.accent }
+                            contentItem: Text { text: closeTabButton.text; color: active ? Settings.terminalForeground : Settings.dark ? "#f5f5f5" : "#1a1a1a"; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            background: Rectangle { radius: 4; color: closeTabButton.down ? "#30ffffff" : closeTabButton.hovered ? "#20ffffff" : "transparent"; border.width: closeTabButton.activeFocus ? 1 : 0; border.color: Theme.accent }
                             onClicked: Sessions.closeTab(index)
                         }
-                        TapHandler { acceptedButtons: Qt.LeftButton; onTapped: Sessions.currentIndex=index }
+                        HoverHandler { id: tabHover }
+                        TapHandler { id: tabTap; acceptedButtons: Qt.LeftButton; onTapped: Sessions.currentIndex=index }
                         TapHandler { acceptedButtons: Qt.RightButton; onTapped: { tabMenu.tabIndex=index;tabMenu.popup() } }
                     }
                 }
             ToolButton {
                 id: newTabButton; objectName: "newTerminalTab"
-                x: tabs.x+tabs.width+(tabs.count > 0 ? 5 : 0); y: 5; width: 32; height: 32
-                background: Rectangle { radius: 8; color: newTabButton.down ? "#1262cb" : newTabButton.hovered ? "#3489f7" : "#1877f2" }
-                contentItem: Icon { name: "add"; font.pixelSize: 18; color: "white" }
+                x: tabs.x+tabs.width+4; y: 5; width: 36; height: 32
+                background: Rectangle { radius: 4; color: newTabButton.down ? tabBar.idlePressed : newTabButton.hovered ? tabBar.idleHover : "transparent" }
+                contentItem: Icon { name: "add"; font.pixelSize: 18; color: Settings.dark ? "#f5f5f5" : "#1a1a1a" }
                 onClicked: Sessions.newTab()
                 ToolTip.visible: hovered; ToolTip.text: "新标签 Ctrl+T"; Accessible.name: "新标签"
             }
+            ToolButton {
+                id: terminalMenuButton; objectName: "terminalMenuButton"
+                x: newTabButton.x+newTabButton.width; y: 5; width: 32; height: 32
+                background: Rectangle { radius: 4; color: terminalMenuButton.down ? tabBar.idlePressed : terminalMenuButton.hovered ? tabBar.idleHover : "transparent" }
+                contentItem: Icon { name: "expand_more"; font.pixelSize: 18; color: Settings.dark ? "#f5f5f5" : "#1a1a1a" }
+                onClicked: terminalActionsMenu.popup()
+                ToolTip.visible: hovered; ToolTip.text: "新建和拆分"; Accessible.name: "终端菜单"
+            }
             Item {
                 id: titleBarDragRegion; objectName: "titleBarDragRegion"
-                anchors.left: newTabButton.right; anchors.leftMargin: 8
+                anchors.left: terminalMenuButton.right; anchors.leftMargin: 6
                 anchors.right: parent.right; anchors.rightMargin: tabBar.captionInset
                 anchors.top: parent.top; anchors.bottom: parent.bottom
                 DragHandler { target: null; acceptedButtons: Qt.LeftButton; onActiveChanged: if(active) App.startSystemMove(ApplicationWindow.window) }
@@ -90,9 +111,9 @@ Item {
                 }
             }
             ColumnLayout { anchors.centerIn: parent; spacing: 20; visible: Sessions.panes.length === 0
-                Icon { name: "terminal"; font.pixelSize: 48; color: "#9aaac0"; Layout.alignment: Qt.AlignHCenter }
-                Label { text: Plugins.powerShellReady ? "打开新的 PowerShell 终端" : "终端需要 PowerShell 7 插件"; color: "#eef1f6"; font.pixelSize: 22; Layout.alignment: Qt.AlignHCenter }
-                Label { text: Plugins.powerShellReady ? "每个标签和窗格都有独立会话" : "安装由你主动开始，Python 并非终端的必需插件。"; color: "#9aaac0"; Layout.alignment: Qt.AlignHCenter }
+                Icon { name: "terminal"; font.pixelSize: 48; color: Settings.dark ? "#9d9d9d" : "#666666"; Layout.alignment: Qt.AlignHCenter }
+                Label { text: Plugins.powerShellReady ? "打开新的 PowerShell 终端" : "终端需要 PowerShell 7 插件"; color: Settings.terminalForeground; font.pixelSize: 22; Layout.alignment: Qt.AlignHCenter }
+                Label { text: Plugins.powerShellReady ? "每个标签和窗格都有独立会话" : "安装由你主动开始，Python 并非终端的必需插件。"; color: Settings.dark ? "#b0b0b0" : "#606060"; Layout.alignment: Qt.AlignHCenter }
                 ActionButton { text: Plugins.powerShellReady ? "打开终端" : "安装 PowerShell 7"; primary: true; Layout.alignment: Qt.AlignHCenter; onClicked: Plugins.powerShellReady ? Sessions.newTab() : App.showPlugin("powershell") }
             }
         }
@@ -110,6 +131,12 @@ Item {
         AppMenuItem { text: "关闭窗格"; enabled: !!Sessions.menuPane; onTriggered: Sessions.closePane(Sessions.menuPane) }
         AppMenuSeparator {}
         AppMenuItem { text: "添加为自定义脚本"; enabled: Sessions.menuText.trim().length > 0; onTriggered: Sessions.draftFromSelection() }
+    }
+    AppMenu { id: terminalActionsMenu; objectName: "terminalActionsMenu"
+        AppMenuItem { text: "新建 PowerShell 标签"; shortcutHint: "Ctrl+T"; onTriggered: Sessions.newTab() }
+        AppMenuSeparator {}
+        AppMenuItem { text: "左右拆分窗格"; enabled: Sessions.panes.length > 0; onTriggered: Sessions.split(false) }
+        AppMenuItem { text: "上下拆分窗格"; enabled: Sessions.panes.length > 0; onTriggered: Sessions.split(true) }
     }
     AppMenu { id: tabMenu; objectName: "terminalTabMenu"; property int tabIndex: -1
         AppMenuItem { text: "重命名"; onTriggered: renameDialog.open() }

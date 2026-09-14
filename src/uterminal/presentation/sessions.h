@@ -65,6 +65,7 @@ private:
 class Sessions : public QAbstractListModel {
     Q_OBJECT
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY changed)
+    Q_PROPERTY(int count READ rowCount NOTIFY changed)
     Q_PROPERTY(QVariantList panes READ panes NOTIFY changed)
     Q_PROPERTY(bool vertical READ vertical NOTIFY changed)
     Q_PROPERTY(bool anyRunning READ anyRunning NOTIFY changed)
@@ -88,6 +89,7 @@ public:
     Pane *menuPane() const { return m_menuPane; }
     bool historyPrediction() const;
     Q_INVOKABLE void newTab();
+    Q_INVOKABLE void ensureTab();
     Q_INVOKABLE void openDirectory(const QString &path);
     Pane *openDirectoryTab(const QString &path,bool activate,bool notifyMissing=true);
     void activatePaneTab(Pane *pane);

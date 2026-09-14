@@ -93,6 +93,11 @@ void Sessions::newTab(){
         for(const auto &directory:directories)openDirectory(directory);
     }else openDirectory({});
 }
+void Sessions::ensureTab(){
+    if(!m_tabs.isEmpty())return;
+    if(!m_pendingDirectories.isEmpty()){newTab();return;}
+    openDirectory({});
+}
 QString Sessions::resolveDirectory(const QString &path){
     if(path.isEmpty())return QDir::homePath();const QFileInfo info(path);
     if(info.isDir())return info.absoluteFilePath();if(info.isFile())return info.absolutePath();return QDir::homePath();

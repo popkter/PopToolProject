@@ -24,11 +24,13 @@ App::App(QString resources,Scripts *scripts,Plugins *plugins,Sessions *sessions,
     connect(runs,&Executions::pluginRequired,this,&App::showPlugin);connect(sessions,&Sessions::pluginRequired,this,&App::showPlugin);
     connect(sessions,&Sessions::draftRequested,this,[this]{setPage(0);emit editorRequested();});
     connect(runs,&Executions::interactiveStarted,this,[this]{setPage(1);});
+    if(auto *application=QCoreApplication::instance())application->installNativeEventFilter(this);
 }
+App::~App(){if(auto *application=QCoreApplication::instance())application->removeNativeEventFilter(this);}
 QString App::resources()const{return QUrl::fromLocalFile(m_resources+'/').toString();}
 void App::setPage(int p){if(p<0||p>2)return;bool entering=p!=m_page;m_page=p;emit pageChanged();if(entering&&p==1&&!m_plugins->powerShellReady()&&m_sessions->rowCount()==0)showPlugin("powershell");}
 bool App::elevated()const{return processElevated();}
-void App::attachWindow(QQuickWindow *window){m_window=window;}
+void App::attachWindow(QQuickWindow *window){m_window=window;m_windowHandle=window?window->winId():0;}
 void App::updateTitleBar(QQuickWindow *window,bool dark,const QColor &background,const QColor &text){
     if(!window)return;
     const auto handle=reinterpret_cast<HWND>(window->winId());const BOOL enabled=dark;
@@ -41,6 +43,18 @@ void App::updateTitleBar(QQuickWindow *window,bool dark,const QColor &background
     RedrawWindow(handle,nullptr,nullptr,RDW_FRAME|RDW_INVALIDATE);
 }
 bool App::startSystemMove(QQuickWindow *window){return window&&window->startSystemMove();}
+bool App::nativeEventFilter(const QByteArray &,void *nativeMessage,qintptr *result){
+    const auto *message=static_cast<MSG*>(nativeMessage);
+    if(!message||!m_window||message->hwnd!=reinterpret_cast<HWND>(m_windowHandle))return false;
+    if(message->message==WM_SYSCOMMAND&&(message->wParam&0xfff0)==SC_MINIMIZE){
+        // Frameless extended-client windows are not minimized reliably by every
+        // taskbar path. Honor the native system command explicitly.
+        ShowWindow(message->hwnd,SW_MINIMIZE);
+        if(result)*result=0;
+        return true;
+    }
+    return false;
+}
 void App::activateWindow(){
     if(!m_window)return;
     m_window->setWindowStates(m_window->windowStates()&~Qt::WindowMinimized);m_window->show();m_window->requestActivate();

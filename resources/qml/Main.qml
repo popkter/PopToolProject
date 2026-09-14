@@ -12,14 +12,15 @@ ApplicationWindow {
     visible: true
     title: App.elevated ? "UTerminal · 管理员" : "UTerminal"
     color: Theme.background
-    readonly property color chromeBackground: Settings.dark ? Theme.surface : "#f7f8fa"
-    readonly property color chromeIdle: Settings.dark ? Theme.field : "#e9e9e9"
-    readonly property color chromeSelected: Settings.dark ? Theme.selected : "#e5edff"
-    readonly property color chromeText: Settings.dark ? Theme.text : "#0a0a0a"
-    readonly property color chromeMuted: Settings.dark ? Theme.muted : "#69717e"
+    readonly property color chromeBackground: Settings.dark ? "#202020" : "#f3f3f3"
+    readonly property color chromeIdle: Settings.dark ? "#353535" : "#e5e5e5"
+    readonly property color chromeSelected: Settings.dark ? "#3b3b3b" : "#dfdfdf"
+    readonly property color chromeText: Settings.dark ? "#f5f5f5" : "#1a1a1a"
+    readonly property color chromeMuted: Settings.dark ? "#b8b8b8" : "#616161"
     readonly property color chromeAccent: Settings.dark ? Theme.accent : "#4978ed"
     function syncTitleBar() { App.updateTitleBar(window,Settings.dark,window.chromeBackground,window.chromeText) }
-    Component.onCompleted: { syncTitleBar(); if(Updates.readyToInstall) Qt.callLater(Updates.requestInstallation) }
+    function openTerminal() { App.page = 1; Sessions.ensureTab() }
+    Component.onCompleted: { syncTitleBar(); Qt.callLater(Sessions.ensureTab); if(Updates.readyToInstall) Qt.callLater(Updates.requestInstallation) }
     Connections { target: Settings; function onChanged() { Qt.callLater(window.syncTitleBar) } }
     palette.window: Theme.background; palette.base: Theme.surface; palette.text: Theme.text; palette.windowText: Theme.text
     palette.button: Theme.surface; palette.buttonText: Theme.text; palette.highlight: Theme.accent; palette.highlightedText: "white"
@@ -58,7 +59,7 @@ ApplicationWindow {
                     Accessible.name: modelData.title
                     background: Rectangle { radius: 5; color: App.page === modelData.page ? window.chromeSelected : parent.hovered ? window.chromeIdle : "transparent" }
                     contentItem: Icon { name: modelData.name; font.pixelSize: 17; color: App.page === modelData.page ? window.chromeAccent : window.chromeMuted }
-                    onClicked: App.page = modelData.page
+                    onClicked: modelData.page === 1 ? window.openTerminal() : App.page = modelData.page
                 }
             }
             Item {
@@ -149,6 +150,7 @@ ApplicationWindow {
     }
     Connections { target: Runs; function onConfirmationRequested(message) { runDialog.message=message;runDialog.open() } }
     Connections { target: Sessions; function onPasteConfirmationRequested(text) { pasteDialog.value=text;pasteDialog.open() } }
+    Connections { target: Plugins; function onChanged() { if(App.page === 1 && Plugins.powerShellReady && Sessions.count === 0) Qt.callLater(Sessions.ensureTab) } }
     Connections { target: Updates; function onInstallationRequested() { updateDialog.open() } }
     Shortcut { sequence: "Ctrl+T"; enabled: App.page === 1; onActivated: Sessions.newTab() }
     Shortcut { sequence: "Ctrl+Tab"; enabled: App.page === 1; onActivated: Sessions.nextTab() }

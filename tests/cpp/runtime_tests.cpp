@@ -109,7 +109,7 @@ private slots:
         QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
         ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
         QQuickWindow window;ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);
-        if(QGuiApplication::platformName()!="windows")QSKIP("Requires native Windows window");
+        if(!QGuiApplication::platformName().startsWith("windows"))QSKIP("Requires native Windows window");
         for(bool dark:{true,false}){
             const QColor background(dark?"#222833":"#ffffff"),text(dark?"#eef1f6":"#111827");
             app.updateTitleBar(&window,dark,background,text);BOOL enabled=FALSE;
@@ -119,6 +119,27 @@ private slots:
             QCOMPARE(DwmGetWindowAttribute(handle,DWMWA_WINDOW_CORNER_PREFERENCE,&corners,sizeof(corners)),S_OK);
             QCOMPARE(corners,DWMWCP_ROUND);
         }
+    }
+    void nativeMinimizeSystemCommand(){
+        if(!QGuiApplication::platformName().startsWith("windows"))QSKIP("Requires native Windows window");
+        QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
+        ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
+        ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);QQuickWindow window;
+        window.resize(900,600);const auto handle=reinterpret_cast<HWND>(window.winId());app.attachWindow(&window);
+        ShowWindow(handle,SW_SHOW);QCoreApplication::processEvents();const auto style=GetWindowLongPtrW(handle,GWL_STYLE);
+        QVERIFY(style&WS_SYSMENU);QVERIFY(style&WS_MINIMIZEBOX);
+        SendMessageW(handle,WM_SYSCOMMAND,SC_MINIMIZE,0);
+        QTRY_VERIFY(IsIconic(handle));
+    }
+    void terminalIsDefaultPage(){
+        QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
+        ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
+        ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);QCOMPARE(app.page(),1);
+    }
+    void ensureTabCoalescesEmptyTerminalRequests(){
+        QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());ut::Sessions sessions(&plugins,&settings,&scripts);
+        QSignalSpy prompts(&sessions,&ut::Sessions::pluginRequired);sessions.ensureTab();sessions.ensureTab();
+        QCOMPARE(sessions.rowCount(),0);QCOMPARE(sessions.pendingDirectoryCount(),1);QCOMPARE(prompts.count(),2);
     }
     void externalLaunchPreservesModalFocus(){
         QTemporaryDir temporary;const auto runtime=temporary.path()+"/plugins/powershell/7.0.0-x64";
@@ -130,6 +151,7 @@ private slots:
         ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
         ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
         ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);
+        app.setPage(0);
         QQuickWindow window;window.resize(1000,700);app.attachWindow(&window);
         QQmlEngine engine;engine.rootContext()->setContextProperty("App",&app);engine.rootContext()->setContextProperty("Settings",&settings);
         QQmlComponent component(&engine);component.setData(R"(
