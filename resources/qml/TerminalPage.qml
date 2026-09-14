@@ -87,6 +87,7 @@ Item {
         AppMenuItem { text: "复制"; shortcutHint: "Ctrl+C"; enabled: Sessions.menuText.length > 0; onTriggered: Sessions.copyMenuSelection() }
         AppMenuItem { text: "粘贴"; shortcutHint: "Ctrl+V"; enabled: Sessions.menuPane && Sessions.menuPane.running; onTriggered: Sessions.menuPane.terminal.pasteClipboard() }
         AppMenuItem { text: "清空"; enabled: !!Sessions.menuPane; onTriggered: Sessions.menuPane.terminal.clearDisplay() }
+        AppMenuItem { objectName: "historyPredictionMenuItem"; text: Sessions.historyPrediction ? "关闭历史" : "显示历史"; enabled: !!Sessions.menuPane; onTriggered: Sessions.toggleHistoryPrediction() }
         AppMenuSeparator {}
         AppMenuItem { text: "停止当前命令"; enabled: Sessions.menuPane && Sessions.menuPane.running; onTriggered: Sessions.interrupt(Sessions.menuPane) }
         AppMenuItem { text: "结束会话"; enabled: Sessions.menuPane && Sessions.menuPane.running; onTriggered: Sessions.endPane(Sessions.menuPane) }

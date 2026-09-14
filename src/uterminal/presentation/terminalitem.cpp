@@ -86,6 +86,7 @@ struct TerminalSession
         vterm_screen_set_damage_merge(screen, VTERM_DAMAGE_ROW);
         vterm_output_set_callback(vt, outputCallback, this);
         vterm_screen_set_callbacks(screen, &callbacks, this);
+        vterm_screen_set_unrecognised_fallbacks(screen, &fallbacks, this);
         VTermColor foreground;
         VTermColor background;
         vterm_color_rgb(&foreground, owner->m_foreground.red(), owner->m_foreground.green(),
@@ -249,6 +250,16 @@ struct TerminalSession
         return 1;
     }
 
+    static int oscCallback(int command,VTermStringFragment fragment,void *user)
+    {
+        if(command!=6973)return 0;
+        auto *session=static_cast<TerminalSession*>(user);
+        if(fragment.initial)session->pendingControl.clear();
+        session->pendingControl.append(QString::fromUtf8(fragment.str,static_cast<qsizetype>(fragment.len)));
+        if(fragment.final)emit session->owner->shellControlReceived(session->id,session->pendingControl);
+        return 1;
+    }
+
     inline static const VTermScreenCallbacks callbacks = {
         damageCallback,
         moveRectCallback,
@@ -262,6 +273,7 @@ struct TerminalSession
         pushLineInfoCallback,
         popLineInfoCallback,
     };
+    inline static const VTermStateFallbacks fallbacks = {nullptr,nullptr,oscCallback,nullptr,nullptr,nullptr,nullptr};
 
     TerminalItem *owner;
     QString id;
@@ -279,6 +291,7 @@ struct TerminalSession
     QPoint selectionAnchor;
     QPoint selectionExtent;
     QString pendingTitle;
+    QString pendingControl;
 };
 
 TerminalItem::TerminalItem(QQuickItem *parent)
@@ -532,6 +545,7 @@ void TerminalItem::pasteText(const QString &value)
         return;
     text.replace(QStringLiteral("\r\n"), QStringLiteral("\r"));
     text.replace(QLatin1Char('\n'), QLatin1Char('\r'));
+    if(text.contains(QLatin1Char('\r')))emit shellCommandSubmitted(session->id);
     vterm_keyboard_start_paste(session->vt);
     emit inputGenerated(session->id, text);
     vterm_keyboard_end_paste(session->vt);
@@ -804,6 +818,7 @@ void TerminalItem::keyPressEvent(QKeyEvent *event)
         if (event->key() == Qt::Key_F) { openSearch(); event->accept(); return; }
         if (event->key() == Qt::Key_C && hasSelection()) { copySelection(); event->accept(); return; }
         if (event->key() == Qt::Key_V) { pasteClipboard(); event->accept(); return; }
+        if (event->key() == Qt::Key_L && !modifiers.testFlag(Qt::AltModifier)) { clearDisplay(); event->accept(); return; }
     }
     if (event->key() == Qt::Key_Insert && modifiers.testFlag(Qt::ShiftModifier)) {
         pasteClipboard(); event->accept(); return;
@@ -834,11 +849,20 @@ void TerminalItem::keyPressEvent(QKeyEvent *event)
         break;
     }
     if (terminalKey != VTERM_KEY_NONE) {
+        if(terminalKey==VTERM_KEY_ENTER){if(auto *session=activeSession())emit shellCommandSubmitted(session->id);}
         sendKey(terminalKey, modifiers);
         event->accept();
         return;
     }
     auto *session = activeSession();
+    // Qt may supply an already translated control character (e.g. U+0003).
+    // libvterm expects the original letter together with the Ctrl modifier.
+    if (session && modifiers.testFlag(Qt::ControlModifier) && event->key() >= Qt::Key_A && event->key() <= Qt::Key_Z) {
+        vterm_keyboard_unichar(session->vt, 'a' + event->key() - Qt::Key_A,
+                               static_cast<VTermModifier>(vtermModifiers(modifiers)));
+        event->accept();
+        return;
+    }
     if (session && !event->text().isEmpty()) {
         const auto codepoints = event->text().toUcs4();
         for (const uint codepoint : codepoints)

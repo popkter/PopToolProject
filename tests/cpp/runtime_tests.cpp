@@ -24,6 +24,8 @@
 #include "presentation/scriptediting.h"
 #include <QTextBlock>
 #include <QTextLayout>
+#include <windows.h>
+#include <dwmapi.h>
 #include <QJsonDocument>
 #include <QCryptographicHash>
 #include "infrastructure/storage.h"
@@ -57,6 +59,64 @@ protected:
 class RuntimeTests:public QObject {
     Q_OBJECT
 private slots:
+    void terminalPrivateShellControl(){
+        TerminalItem item;item.setSessionId("control");item.setSize({500,200});QSignalSpy controls(&item,&TerminalItem::shellControlReceived);
+        item.feedBytes("visible-before\r\n\x1b]6973;prompt:");item.feedBytes("ready\x07visible-after\r\n");
+        QCOMPARE(controls.count(),1);QCOMPARE(controls[0][0].toString(),QString("control"));QCOMPARE(controls[0][1].toString(),QString("prompt:ready"));
+        item.selectAll();const auto text=item.selectionText();QVERIFY(text.contains("visible-before"));QVERIFY(text.contains("visible-after"));QVERIFY(!text.contains("6973"));QVERIFY(!text.contains("prompt:ready"));
+    }
+    void historyPredictionSettingPersists(){
+        QTemporaryDir temporary;ut::Settings settings(temporary.path());QVERIFY(!settings.historyPrediction());
+        settings.setHistoryPrediction(true);QVERIFY(settings.historyPrediction());
+        ut::Settings restored(temporary.path());QVERIFY(restored.historyPrediction());restored.setHistoryPrediction(false);
+        ut::Settings disabled(temporary.path());QVERIFY(!disabled.historyPrediction());
+    }
+    void historyPredictionMenuLabel(){
+        QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());ut::Sessions sessions(&plugins,&settings,&scripts);
+        qmlRegisterUncreatableType<TerminalItem>("UTerminal",1,0,"TerminalItem","Owned by Sessions");qmlRegisterUncreatableType<ut::Pane>("UTerminal",1,0,"Pane","Owned by Sessions");qmlRegisterType<ut::PaneHost>("UTerminal",1,0,"PaneHost");
+        QQmlEngine engine;engine.rootContext()->setContextProperty("Settings",&settings);engine.rootContext()->setContextProperty("Sessions",&sessions);engine.rootContext()->setContextProperty("Plugins",&plugins);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(QStringLiteral(UTERMINAL_TEST_SOURCE_DIR "/resources/qml/TerminalPage.qml")));
+        QScopedPointer<QObject> object(component.create());QVERIFY2(object,qPrintable(component.errorString()));auto *action=object->findChild<QObject*>("historyPredictionMenuItem");QVERIFY(action);
+        QCOMPARE(action->property("text").toString(),QStringLiteral("显示历史"));sessions.toggleHistoryPrediction();QTRY_COMPARE(action->property("text").toString(),QStringLiteral("关闭历史"));
+    }
+    void terminalControlShortcuts(){
+        struct KeyTerminal:TerminalItem {using TerminalItem::keyPressEvent;};
+        KeyTerminal item;item.setSessionId("keys");item.setSize({500,200});
+        QSignalSpy input(&item,&TerminalItem::inputGenerated);
+        for(const auto &text:QStringList{QString(QChar(3)),"c",QString()}){
+            QKeyEvent key(QEvent::KeyPress,Qt::Key_C,Qt::ControlModifier,text);item.keyPressEvent(&key);
+            QCOMPARE(input.takeLast()[1].toString(),QString(QChar(3)));
+        }
+        item.feedBytes("copy this");item.selectAll();const auto selected=item.selectionText();
+        QKeyEvent copy(QEvent::KeyPress,Qt::Key_C,Qt::ControlModifier,QString(QChar(3)));item.keyPressEvent(&copy);
+        QCOMPARE(input.count(),0);QCOMPARE(QGuiApplication::clipboard()->text(),selected);
+        QKeyEvent clear(QEvent::KeyPress,Qt::Key_L,Qt::ControlModifier,QString(QChar(12)));item.keyPressEvent(&clear);
+        QCOMPARE(input.count(),0);QVERIFY(!item.hasSelection());item.selectAll();QVERIFY(!item.selectionText().contains("copy this"));
+        QCOMPARE(item.sessionId(),QString("keys"));item.feedBytes("still alive");item.selectAll();QVERIFY(item.selectionText().contains("still alive"));
+    }
+    void terminalCtrlCInterruptsProcess(){
+        struct KeyTerminal:TerminalItem {using TerminalItem::keyPressEvent;};
+        KeyTerminal item;item.setSessionId("interrupt");ut::ConPty process;QByteArray output;
+        connect(&item,&TerminalItem::inputGenerated,&process,[&](const QString &,const QString &text){process.write(text.toUtf8());});
+        connect(&process,&ut::ConPty::output,this,[&](const QByteArray &bytes){output+=bytes;});
+        QSignalSpy finished(&process,&ut::ConPty::finished);
+        QVERIFY(process.start(qEnvironmentVariable("SystemRoot")+"/System32/WindowsPowerShell/v1.0/powershell.exe",{"-NoLogo","-NoProfile","-Command","Write-Output 'interrupt-ready'; Start-Sleep -Seconds 60; Write-Output 'unexpected-completion'"},QDir::tempPath(),QProcessEnvironment::systemEnvironment()));
+        QTRY_VERIFY_WITH_TIMEOUT(output.contains("interrupt-ready"),10000);
+        QKeyEvent key(QEvent::KeyPress,Qt::Key_C,Qt::ControlModifier,QString(QChar(3)));item.keyPressEvent(&key);
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(),1,7000);QVERIFY(!output.contains("unexpected-completion"));process.close();
+    }
+    void nativeTitleBarTheme(){
+        QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
+        ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
+        QQuickWindow window;ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);
+        if(QGuiApplication::platformName()!="windows")QSKIP("Requires native Windows window");
+        for(bool dark:{true,false}){
+            const QColor background(dark?"#222833":"#ffffff"),text(dark?"#eef1f6":"#111827");
+            app.updateTitleBar(&window,dark,background,text);BOOL enabled=FALSE;
+            const auto handle=reinterpret_cast<HWND>(window.winId());
+            QCOMPARE(DwmGetWindowAttribute(handle,DWMWA_USE_IMMERSIVE_DARK_MODE,&enabled,sizeof(enabled)),S_OK);QCOMPARE(bool(enabled),dark);
+        }
+    }
     void externalLaunchPreservesModalFocus(){
         QTemporaryDir temporary;const auto runtime=temporary.path()+"/plugins/powershell/7.0.0-x64";
         QVERIFY(QDir().mkpath(runtime+"/runtime"));
@@ -433,7 +493,7 @@ private slots:
         if(runs){
             QTRY_VERIFY_WITH_TIMEOUT(!runs->selectedRunning(),7000);
             QCOMPARE(runs->outcome(),QString("failed"));
-            if(mode=="exit"){QVERIFY2(runs->status().contains("退出码 7"),qPrintable(runs->status()));QVERIFY(runs->output().contains("lifecycle-result"));}
+            if(mode=="exit"){QVERIFY2(runs->status().contains("退出码 7"),qPrintable(runs->status()));QVERIFY(runs->output().isEmpty());QVERIFY(runs->selectedInteractive());}
             if(mode=="timeout")QVERIFY(runs->status().contains("运行超时"));
         }
         QVERIFY(!sessions.anyRunning());QCOMPARE(QDir(data+"/runs").entryList(QDir::Dirs|QDir::NoDotAndDotDot).size(),0);

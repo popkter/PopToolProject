@@ -48,6 +48,7 @@ QString Executions::output()const{
 QString Executions::status()const{auto*r=selected();return r?r->status:QStringLiteral("尚未运行");}
 QString Executions::outcome()const{auto*r=selected();return !r?QStringLiteral("idle"):r->running?QStringLiteral("running"):r->succeeded?QStringLiteral("succeeded"):QStringLiteral("failed");}
 bool Executions::selectedRunning()const{auto*r=selected();return r&&r->running;}
+bool Executions::selectedInteractive()const{auto*r=selected();return r&&r->interactive;}
 void Executions::runSelected(const QVariantMap &parameters,bool interactive){
     if(m_plugins->pythonReady()&&m_plugins->pythonReserved()){emit error(QStringLiteral("Python 环境正在等待或进行依赖修改，请完成或取消后再启动任务"));return;}
     auto script=m_scripts->get(m_scripts->selected()["id"].toString());if(script.isEmpty())return;
@@ -136,7 +137,6 @@ void Executions::launch(QJsonObject script,QVariantMap parameters,bool interacti
         if(!r->pane){finish(r,-1,QStringLiteral("无法创建交互会话"));return;}
         connect(r->pane,&Pane::ended,this,[this,r](int code,const QString &reason){finish(r,code,r->stopReason.isEmpty()?reason:r->stopReason);});
         connect(r->pane,&QObject::destroyed,this,[this,r]{if(r->running)finish(r,-1,QStringLiteral("会话已关闭"));});
-        connect(&r->pane->process,&ConPty::output,this,[this,r](const QByteArray &bytes){append(r,bytes);});
         const int seconds=script["timeoutSeconds"].toInt(300);
         if(seconds>0){
             r->timeout=new QTimer(this);r->timeout->setSingleShot(true);

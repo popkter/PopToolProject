@@ -38,8 +38,12 @@ void PaneHost::setPane(Pane *pane){
 void PaneHost::geometryChange(const QRectF &now,const QRectF &before){QQuickItem::geometryChange(now,before);if(m_pane)m_pane->terminal()->setSize(now.size());}
 
 Sessions::Sessions(Plugins *plugins,Settings *settings,Scripts *scripts,QObject *parent)
-    :QAbstractListModel(parent),m_plugins(plugins),m_settings(settings),m_scripts(scripts){
-    connect(settings,&Settings::changed,this,[this]{for(const auto &tab:m_tabs)for(auto *p:tab.panes){p->terminal()->setColors(m_settings->terminalForeground(),m_settings->terminalBackground());p->terminal()->setFontSize(m_settings->fontSize());p->terminal()->setFontFamily(m_settings->fontFamily());}});
+    :QAbstractListModel(parent),m_plugins(plugins),m_settings(settings),m_scripts(scripts),m_historyPrediction(settings->historyPrediction()){
+    connect(settings,&Settings::changed,this,[this]{
+        for(const auto &tab:m_tabs)for(auto *p:tab.panes){p->terminal()->setColors(m_settings->terminalForeground(),m_settings->terminalBackground());p->terminal()->setFontSize(m_settings->fontSize());p->terminal()->setFontFamily(m_settings->fontFamily());}
+        const bool desired=m_settings->historyPrediction();
+        if(desired!=m_historyPrediction){m_historyPrediction=desired;m_historyErrorReported=false;applyHistoryPredictionToAll();emit menuChanged();}
+    });
 }
 Sessions::~Sessions(){closeAll();}
 int Sessions::rowCount(const QModelIndex &parent)const{return parent.isValid()?0:int(m_tabs.size());}
@@ -53,6 +57,7 @@ QHash<int,QByteArray> Sessions::roleNames()const{return {{Qt::UserRole+1,"tabTit
 QVariantList Sessions::panes()const{QVariantList result;if(m_current>=0&&m_current<m_tabs.size())for(auto *p:m_tabs[m_current].panes)result.append(QVariant::fromValue(p));return result;}
 bool Sessions::vertical()const{return m_current>=0&&m_current<m_tabs.size()&&m_tabs[m_current].vertical;}
 bool Sessions::anyRunning()const{for(const auto &t:m_tabs)for(auto *p:t.panes)if(p->running())return true;return false;}
+bool Sessions::historyPrediction()const{return m_historyPrediction;}
 void Sessions::setCurrentIndex(int i){if(i<0||i>=m_tabs.size())return;m_current=i;emit dataChanged(index(0),index(rowCount()-1));emit changed();if(!m_tabs[i].panes.isEmpty())focusPane(m_tabs[i].panes.first());}
 void Sessions::nextTab(){if(!m_tabs.isEmpty())setCurrentIndex((m_current+1)%int(m_tabs.size()));}
 Pane *Sessions::makePane(){
@@ -64,6 +69,8 @@ Pane *Sessions::makePane(){
     connect(pane->terminal(),&QQuickItem::activeFocusChanged,this,[this,pane]{if(pane->terminal()->hasActiveFocus()){m_focused=pane;emit focusChanged();}});
     connect(pane->terminal(),&TerminalItem::contextMenuRequested,this,[this,pane](qreal x,qreal y){m_menuPane=pane;m_menuText=pane->terminal()->selectionText();auto pos=pane->terminal()->mapToScene({x,y});emit menuChanged();emit contextMenuRequested(pos.x(),pos.y());});
     connect(pane->terminal(),&TerminalItem::multilinePasteRequested,this,[this,pane](const QString &text){m_pastePane=pane;m_pasteText=text;emit pasteConfirmationRequested(text);});
+    connect(pane->terminal(),&TerminalItem::shellCommandSubmitted,this,[pane](const QString &){pane->m_shellPromptReady=false;});
+    connect(pane->terminal(),&TerminalItem::shellControlReceived,this,[this,pane](const QString &,const QString &message){handleShellControl(pane,message);});
     return pane;
 }
 bool Sessions::startShell(Pane *pane,const QString &directory){
@@ -107,6 +114,32 @@ void Sessions::split(bool vertical){if(m_current<0){newTab();return;}auto *pane=
 void Sessions::focusPane(Pane *pane){m_focused=pane;if(pane)pane->terminal()->forceActiveFocus();emit focusChanged();}
 void Sessions::endPane(Pane *pane){if(!pane)return;const bool wasRunning=pane->running();pane->process.close();release(pane);if(wasRunning)emit pane->ended(-1,QStringLiteral("会话已关闭"));emit pane->changed();emit changed();}
 void Sessions::interrupt(Pane *pane){if(pane)pane->process.interrupt();}
+void Sessions::toggleHistoryPrediction(){m_settings->setHistoryPrediction(!m_historyPrediction);}
+void Sessions::applyHistoryPredictionToAll(){for(const auto &tab:m_tabs)for(auto *pane:tab.panes)applyHistoryPrediction(pane);}
+void Sessions::applyHistoryPrediction(Pane *pane){
+    if(!pane||pane->language!="powershell"||!pane->running()||!pane->m_shellPromptReady||!pane->m_historySupported||pane->m_historyInFlight)return;
+    if(pane->m_historyApplied&&*pane->m_historyApplied==m_historyPrediction)return;
+    pane->m_historyInFlight=true;
+    pane->process.write(m_historyPrediction?QByteArray("\x18\x19",2):QByteArray("\x18\x0e",2));
+}
+void Sessions::handleShellControl(Pane *pane,const QString &message){
+    if(!pane||pane->language!="powershell")return;
+    if(message=="prompt:ready"){
+        pane->m_shellPromptReady=true;pane->m_historySupported=true;applyHistoryPrediction(pane);return;
+    }
+    if(message=="prompt:unsupported"){
+        pane->m_shellPromptReady=true;pane->m_historySupported=false;
+        if(m_historyPrediction&&!m_historyErrorReported){m_historyErrorReported=true;emit error(QStringLiteral("当前 PowerShell 的 PSReadLine 不支持历史预测列表。"));}
+        return;
+    }
+    if(message=="history:on"||message=="history:off"){
+        pane->m_historyInFlight=false;pane->m_shellPromptReady=true;pane->m_historyApplied=message=="history:on";applyHistoryPrediction(pane);return;
+    }
+    if(message.startsWith("history:error")){
+        pane->m_historyInFlight=false;pane->m_shellPromptReady=false;
+        if(!m_historyErrorReported){m_historyErrorReported=true;emit error(QStringLiteral("无法应用 PowerShell 历史预测设置，将在下次提示符出现时重试。"));}
+    }
+}
 void Sessions::closePane(Pane *pane){for(int i=0;i<m_tabs.size();++i){auto &t=m_tabs[i];if(!t.panes.contains(pane))continue;if(t.panes.size()==1){closeTab(i);return;}const bool wasFocused=m_focused==pane;t.panes.removeOne(pane);endPane(pane);delete pane;emit changed();if(i==m_current&&wasFocused)focusPane(t.panes.first());return;}}
 void Sessions::closeTab(int i){if(i<0||i>=m_tabs.size())return;beginRemoveRows({},i,i);auto tab=m_tabs.takeAt(i);if(m_current>=i)--m_current;m_current=m_tabs.isEmpty()?-1:qBound(0,m_current,int(m_tabs.size())-1);endRemoveRows();for(auto*p:tab.panes){endPane(p);delete p;}emit changed();if(m_current>=0)setCurrentIndex(m_current);else focusPane(nullptr);}
 void Sessions::closeOthers(int i){for(int n=int(m_tabs.size())-1;n>=0;--n)if(n!=i)closeTab(n);}

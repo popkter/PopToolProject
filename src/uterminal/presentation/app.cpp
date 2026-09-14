@@ -14,6 +14,8 @@
 #include <QTimer>
 #include <utility>
 #include "infrastructure/instance.h"
+#include <windows.h>
+#include <dwmapi.h>
 namespace ut {
 App::App(QString resources,Scripts *scripts,Plugins *plugins,Sessions *sessions,Executions *runs,PythonEnvironment *python,Updates *updates,QObject *parent)
     :QObject(parent),m_resources(std::move(resources)),m_scripts(scripts),m_plugins(plugins),m_sessions(sessions),m_runs(runs),m_python(python),m_updates(updates){
@@ -27,6 +29,15 @@ QString App::resources()const{return QUrl::fromLocalFile(m_resources+'/').toStri
 void App::setPage(int p){if(p<0||p>2)return;bool entering=p!=m_page;m_page=p;emit pageChanged();if(entering&&p==1&&!m_plugins->powerShellReady()&&m_sessions->rowCount()==0)showPlugin("powershell");}
 bool App::elevated()const{return processElevated();}
 void App::attachWindow(QQuickWindow *window){m_window=window;}
+void App::updateTitleBar(QQuickWindow *window,bool dark,const QColor &background,const QColor &text){
+    if(!window)return;
+    const auto handle=reinterpret_cast<HWND>(window->winId());const BOOL enabled=dark;
+    const COLORREF caption=RGB(background.red(),background.green(),background.blue()),foreground=RGB(text.red(),text.green(),text.blue());
+    DwmSetWindowAttribute(handle,DWMWA_USE_IMMERSIVE_DARK_MODE,&enabled,sizeof(enabled));
+    DwmSetWindowAttribute(handle,DWMWA_CAPTION_COLOR,&caption,sizeof(caption));
+    DwmSetWindowAttribute(handle,DWMWA_TEXT_COLOR,&foreground,sizeof(foreground));
+    RedrawWindow(handle,nullptr,nullptr,RDW_FRAME|RDW_INVALIDATE);
+}
 void App::activateWindow(){
     if(!m_window)return;
     m_window->setWindowStates(m_window->windowStates()&~Qt::WindowMinimized);m_window->show();m_window->requestActivate();

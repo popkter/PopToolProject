@@ -4,6 +4,7 @@
 #include <QVariantList>
 #include "infrastructure/conpty.h"
 #include "terminalitem.h"
+#include <optional>
 
 namespace ut {
 class Plugins;
@@ -39,7 +40,10 @@ private:
     QString m_runtimeLabel;
     bool m_finished=false;
     int m_exitCode=0;
+    bool m_shellPromptReady=false,m_historySupported=false,m_historyInFlight=false;
+    std::optional<bool> m_historyApplied;
     TerminalItem *m_terminal;
+    friend class Sessions;
 };
 
 class PaneHost : public QQuickItem {
@@ -67,6 +71,7 @@ class Sessions : public QAbstractListModel {
     Q_PROPERTY(ut::Pane *focusedPane READ focusedPane NOTIFY focusChanged)
     Q_PROPERTY(QString menuText READ menuText NOTIFY menuChanged)
     Q_PROPERTY(ut::Pane *menuPane READ menuPane NOTIFY menuChanged)
+    Q_PROPERTY(bool historyPrediction READ historyPrediction NOTIFY menuChanged)
 public:
     Sessions(Plugins *plugins,Settings *settings,Scripts *scripts,QObject *parent=nullptr);
     ~Sessions() override;
@@ -81,6 +86,7 @@ public:
     Pane *focusedPane() const { return m_focused; }
     QString menuText() const { return m_menuText; }
     Pane *menuPane() const { return m_menuPane; }
+    bool historyPrediction() const;
     Q_INVOKABLE void newTab();
     Q_INVOKABLE void openDirectory(const QString &path);
     Pane *openDirectoryTab(const QString &path,bool activate,bool notifyMissing=true);
@@ -97,6 +103,7 @@ public:
     Q_INVOKABLE void focusPane(ut::Pane *pane);
     Q_INVOKABLE void endPane(ut::Pane *pane);
     Q_INVOKABLE void interrupt(ut::Pane *pane);
+    Q_INVOKABLE void toggleHistoryPrediction();
     Q_INVOKABLE void copyMenuSelection();
     Q_INVOKABLE void draftFromSelection();
     Q_INVOKABLE void acceptPaste();
@@ -119,6 +126,9 @@ private:
     bool startShell(Pane *pane,const QString &directory=QString());
     void release(Pane *pane);
     void appendTab(Pane *pane,const QString &title,bool fixedTitle=false,bool activate=true);
+    void handleShellControl(Pane *pane,const QString &message);
+    void applyHistoryPrediction(Pane *pane);
+    void applyHistoryPredictionToAll();
     QList<Tab> m_tabs;
     int m_current=-1;
     Plugins *m_plugins;
@@ -127,5 +137,6 @@ private:
     QPointer<Pane> m_focused,m_menuPane,m_pastePane;
     QString m_menuText,m_pasteText;
     QStringList m_pendingDirectories;
+    bool m_historyPrediction=false,m_historyErrorReported=false;
 };
 }

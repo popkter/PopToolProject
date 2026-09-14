@@ -4,6 +4,7 @@
 #include <QSet>
 #include <QPointer>
 #include <QJsonObject>
+#include <QColor>
 class QQuickWindow;
 namespace ut {
 class Scripts;class Plugins;class Sessions;class Executions;class PythonEnvironment;class Updates;class Pane;
@@ -21,6 +22,7 @@ public:
     QString notice()const{return m_notice;}
     bool elevated()const;
     void attachWindow(QQuickWindow *window);
+    Q_INVOKABLE void updateTitleBar(QQuickWindow *window,bool dark,const QColor &background,const QColor &text);
     void handleLaunch(const QJsonObject &request);
     Q_INVOKABLE void setModalOpen(QObject *dialog,bool open);
     Q_INVOKABLE void showNotice(const QString &text);

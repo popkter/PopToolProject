@@ -8,27 +8,38 @@ ApplicationWindow {
     visible: true
     title: App.elevated ? "UTerminal · 管理员" : "UTerminal"
     color: Theme.background
+    function syncTitleBar() { App.updateTitleBar(window,Settings.dark,Theme.surface,Theme.text) }
+    Component.onCompleted: syncTitleBar()
+    Connections { target: Settings; function onChanged() { Qt.callLater(window.syncTitleBar) } }
     palette.window: Theme.background; palette.base: Theme.surface; palette.text: Theme.text; palette.windowText: Theme.text
     palette.button: Theme.surface; palette.buttonText: Theme.text; palette.highlight: Theme.accent; palette.highlightedText: "white"
     onClosing: close => { close.accepted = false; App.requestQuit() }
     RowLayout {
         anchors.fill: parent; spacing: 0
         Rectangle {
-            Layout.preferredWidth: 70; Layout.fillHeight: true; color: Theme.surface
+            Layout.preferredWidth: 52; Layout.fillHeight: true; color: Theme.surface
             Rectangle { width: 1; height: parent.height; anchors.right: parent.right; color: Theme.border }
             ColumnLayout {
-                anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter; anchors.topMargin: 24; spacing: 18
-                Image { source: App.resources + "icons/app-icon-ui.png"; Layout.preferredWidth: 38; Layout.preferredHeight: 38; Layout.alignment: Qt.AlignHCenter; fillMode: Image.PreserveAspectFit }
+                anchors.fill: parent; anchors.topMargin: 14; anchors.bottomMargin: 12; spacing: 8
+                Image { source: App.resources + "icons/app-icon-ui.png"; Layout.preferredWidth: 28; Layout.preferredHeight: 28; Layout.alignment: Qt.AlignHCenter; fillMode: Image.PreserveAspectFit }
                 Repeater {
-                    model: [{name:"code",title:"自定义",page:0},{name:"terminal",title:"终端",page:1},{name:"settings",title:"设置",page:2}]
+                    model: [{name:"terminal",title:"终端",page:1},{name:"code",title:"自定义",page:0}]
                     delegate: ToolButton {
                         required property var modelData
-                        Layout.preferredWidth: 44; Layout.preferredHeight: 44
+                        Layout.preferredWidth: 36; Layout.preferredHeight: 36; Layout.alignment: Qt.AlignHCenter
                         ToolTip.visible: hovered; ToolTip.text: modelData.title
-                        background: Rectangle { radius: 7; color: App.page === modelData.page ? Theme.selected : parent.hovered ? Theme.field : "transparent" }
-                        contentItem: Icon { name: modelData.name; color: App.page === modelData.page ? Theme.accent : Theme.muted }
+                        background: Rectangle { radius: 6; color: App.page === modelData.page ? Theme.selected : parent.hovered ? Theme.field : "transparent" }
+                        contentItem: Icon { name: modelData.name; font.pixelSize: 18; color: App.page === modelData.page ? Theme.accent : Theme.muted }
                         onClicked: App.page = modelData.page
                     }
+                }
+                Item { Layout.fillHeight: true }
+                ToolButton {
+                    Layout.preferredWidth: 36; Layout.preferredHeight: 36; Layout.alignment: Qt.AlignHCenter
+                    ToolTip.visible: hovered; ToolTip.text: "设置"
+                    background: Rectangle { radius: 6; color: App.page === 2 ? Theme.selected : parent.hovered ? Theme.field : "transparent" }
+                    contentItem: Icon { name: "settings"; font.pixelSize: 18; color: App.page === 2 ? Theme.accent : Theme.muted }
+                    onClicked: App.page = 2
                 }
             }
         }

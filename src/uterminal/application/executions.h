@@ -16,6 +16,7 @@ class Executions : public QObject {
     Q_PROPERTY(QString status READ status NOTIFY changed)
     Q_PROPERTY(QString outcome READ outcome NOTIFY changed)
     Q_PROPERTY(bool selectedRunning READ selectedRunning NOTIFY changed)
+    Q_PROPERTY(bool selectedInteractive READ selectedInteractive NOTIFY changed)
 public:
     Executions(QString directory,Plugins *plugins,Settings *settings,Scripts *scripts,Sessions *sessions,QObject *parent=nullptr);
     ~Executions() override;
@@ -24,6 +25,7 @@ public:
     QString status() const;
     QString outcome() const;
     bool selectedRunning() const;
+    bool selectedInteractive() const;
     Q_INVOKABLE void runSelected(const QVariantMap &parameters,bool interactive=false);
     Q_INVOKABLE void confirmRun();
     Q_INVOKABLE void cancelRun();

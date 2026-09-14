@@ -4,6 +4,7 @@
 #define NOMINMAX
 #endif
 #include <Windows.h>
+#include <algorithm>
 #include "application/plugins.h"
 #include "application/pythonenvironment.h"
 #include "infrastructure/processrunner.h"
@@ -259,6 +260,30 @@ private slots:
         pane.process.write("Write-Output ('uterminal-'+'interactive-ok')\r");
         QTRY_VERIFY_WITH_TIMEOUT(bytes.contains("uterminal-interactive-ok"),10000);
         pane.process.close();
+    }
+    void historyPredictionIsSilentAndDeferred(){
+        QVERIFY(plugins->powerShellReady());QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Sessions sessions(plugins.get(),&settings,&scripts);
+        QSignalSpy errors(&sessions,&ut::Sessions::error);sessions.newTab();auto *pane=sessions.focusedPane();QVERIFY(pane);QSignalSpy controls(pane->terminal(),&TerminalItem::shellControlReceived);
+        const auto messages=[&]{QStringList result;for(const auto &row:controls)result.append(row[1].toString());return result.join(',');};
+        QTRY_VERIFY_WITH_TIMEOUT(std::any_of(controls.begin(),controls.end(),[](const auto &row){return row[1].toString()=="prompt:ready";}),20000);
+        QTRY_VERIFY2_WITH_TIMEOUT(std::any_of(controls.begin(),controls.end(),[](const auto &row){return row[1].toString()=="history:off";}),qPrintable(messages()),10000);
+        sessions.split(false);auto *second=sessions.focusedPane();QVERIFY(second&&second!=pane);QSignalSpy secondControls(second->terminal(),&TerminalItem::shellControlReceived);
+        QTRY_VERIFY_WITH_TIMEOUT(std::any_of(secondControls.begin(),secondControls.end(),[](const auto &row){return row[1].toString()=="history:off";}),20000);
+        pane->process.write("Write-Outp");settings.setHistoryPrediction(true);
+        QTRY_VERIFY2_WITH_TIMEOUT(std::any_of(controls.begin(),controls.end(),[](const auto &row){return row[1].toString()=="history:on";}),qPrintable(messages()),10000);
+        QTRY_VERIFY_WITH_TIMEOUT(std::any_of(secondControls.begin(),secondControls.end(),[](const auto &row){return row[1].toString()=="history:on";}),10000);
+        pane->terminal()->selectAll();auto visible=pane->terminal()->selectionText();pane->terminal()->clearSelection();
+        QVERIFY(!visible.contains("Set-PSReadLineOption"));QVERIFY(!visible.contains("6973"));QVERIFY(!visible.contains("history:on"));
+        QByteArray output;connect(&pane->process,&ut::ConPty::output,this,[&](const QByteArray &bytes){output+=bytes;});
+        pane->process.write("ut 'buffer-preserved'\r");QTRY_VERIFY_WITH_TIMEOUT(output.contains("buffer-preserved"),10000);output.clear();
+        const auto offCount=[&]{return std::count_if(controls.cbegin(),controls.cend(),[](const auto &row){return row[1].toString()=="history:off";});};
+        const auto secondOffCount=[&]{return std::count_if(secondControls.cbegin(),secondControls.cend(),[](const auto &row){return row[1].toString()=="history:off";});};
+        const int beforeOff=offCount(),beforeSecondOff=secondOffCount();
+        pane->terminal()->pasteText("Start-Sleep -Milliseconds 600; Write-Output 'long-command-done'\r");settings.setHistoryPrediction(false);
+        QTRY_VERIFY_WITH_TIMEOUT(secondOffCount()>beforeSecondOff,3000);QCOMPARE(offCount(),beforeOff);
+        QTRY_VERIFY_WITH_TIMEOUT(output.contains("long-command-done"),10000);
+        QTRY_VERIFY_WITH_TIMEOUT(offCount()>beforeOff,10000);
+        QCOMPARE(errors.count(),0);sessions.closeAll();
     }
     void pythonImportedAttachments(){
         QVERIFY(plugins->pythonReady());QTemporaryDir temporary;const auto collection=temporary.path()+"/collection";

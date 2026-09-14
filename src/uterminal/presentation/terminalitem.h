@@ -88,6 +88,8 @@ signals:
     void multilinePasteRequested(const QString &text);
     void searchChanged();
     void searchRequested();
+    void shellControlReceived(const QString &sessionId,const QString &message);
+    void shellCommandSubmitted(const QString &sessionId);
 
 protected:
     void dragEnterEvent(QDragEnterEvent *event) override;

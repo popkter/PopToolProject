@@ -39,7 +39,10 @@ ScrollView {
                 Card { title: "运行设置"; subtitle: "普通脚本并发与终端显示"; icon: "tune"; Layout.fillWidth: true
                     RowLayout { Label { text: "最大并发"; Layout.fillWidth: true } SpinBox { from: 1; to: 5; value: Settings.concurrency; onValueModified: Settings.concurrency=value } }
                     RowLayout { Label { text: "终端字号"; Layout.fillWidth: true } SpinBox { from: 8; to: 40; value: Settings.fontSize; onValueModified: Settings.fontSize=value } }
-                    Field { text: Settings.fontFamily; placeholderText: "终端字体"; Layout.fillWidth: true; onEditingFinished: Settings.fontFamily=text }
+                    RowLayout { Layout.fillWidth: true
+                        Label { text: "终端字体"; Layout.fillWidth: true }
+                        SelectField { Layout.preferredWidth: 200; model: Settings.terminalFonts; currentIndex: Settings.terminalFonts.indexOf(Settings.fontFamily); onActivated: Settings.fontFamily=currentText }
+                    }
                     RowLayout { Label { text: "终端配色"; Layout.fillWidth: true }
                         SelectField { Layout.preferredWidth: 130; model: ["深灰","浅色","纯黑"]; currentIndex: ["slate","light","black"].indexOf(Settings.terminalScheme); onActivated: Settings.terminalScheme=["slate","light","black"][currentIndex] }
                     }
@@ -49,7 +52,7 @@ ScrollView {
                 }
                 Card { title: "应用更新"; subtitle: "当前版本："+Updates.currentVersion; icon: "system_update"; Layout.fillWidth: true
                     SelectField { Layout.fillWidth: true; model: ["手动检查","启动时检查","每日检查","每周检查"]; currentIndex: ["manual","startup","daily","weekly"].indexOf(Settings.updatePolicy); onActivated: Settings.updatePolicy=["manual","startup","daily","weekly"][currentIndex] }
-                    CheckBox { text: "接收预发布版本"; checked: Settings.prerelease; onToggled: Settings.prerelease=checked }
+                    AppCheckBox { text: "接收预发布版本"; checked: Settings.prerelease; onToggled: Settings.prerelease=checked }
                     Label { text: Updates.status; color: Theme.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
                     Label { text: Updates.installationStatus; visible: text.length>0; color: Theme.text; wrapMode: Text.Wrap; Layout.fillWidth: true }
                     ActionButton { text: "打开安装日志目录"; visible: Updates.installationStatus.length>0; onClicked: App.openDirectory(Settings.directory+"/updates") }
@@ -60,7 +63,7 @@ ScrollView {
                         ActionButton { text: "取消下载"; visible: Updates.downloading; onClicked: Updates.cancelDownload() }
                     }
                     Label { text: "已下载："+(Updates.downloaded.version || ""); visible: !!Updates.downloaded.version; color: Theme.muted }
-                    CheckBox { text: "退出应用后安装更新"; visible: !!Updates.downloaded.version; checked: Updates.installOnExit; onToggled: Updates.installOnExit=checked }
+                    AppCheckBox { text: "退出应用后安装更新"; visible: !!Updates.downloaded.version; checked: Updates.installOnExit; onToggled: Updates.installOnExit=checked }
                     Label { text: Updates.available.notes || ""; visible: !!Updates.available.version; color: Theme.muted; wrapMode: Text.Wrap; Layout.fillWidth: true; textFormat: Text.PlainText }
                 }
             }
@@ -84,7 +87,7 @@ ScrollView {
                 }
                 Card { title: "关于 UTerminal"; subtitle: "Windows 终端与自定义脚本"; icon: "info"; Layout.fillWidth: true
                     Label { text: "UTerminal "+Updates.currentVersion+"\nQt 6 · C++ · QML"; color: Theme.muted }
-                    Label { text: "Ctrl+T 新标签 · Ctrl+Tab 切换标签\nCtrl+C 复制选区 / 中断 · Ctrl+V 粘贴"; color: Theme.muted; font.pixelSize: 12 }
+                    Label { text: "Ctrl+T 新标签 · Ctrl+Tab 切换标签\nCtrl+C 复制选区 / 中断 · Ctrl+V 粘贴\nCtrl+L 清屏"; color: Theme.muted; font.pixelSize: 12 }
                 }
             }
         }

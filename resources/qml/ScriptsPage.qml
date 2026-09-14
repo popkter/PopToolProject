@@ -188,12 +188,12 @@ Item {
                                 RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8
                                     Text { text: "控制台输出"; color: "#e5e7eb"; font.pixelSize: 12 }
                                     Text { text: Runs.outcome === "running" ? "● 运行中" : Runs.outcome === "succeeded" ? "● 已完成" : Runs.outcome === "failed" ? "● 未成功" : "尚未运行"; color: Runs.outcome === "failed" ? "#f2a0a0" : Runs.outcome === "idle" ? "#a6b4c5" : "#86d5a5"; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight }
-                                    ToolButton { id: copyOutput; text: "复制"; implicitHeight: 28; implicitWidth: 44
+                                    ToolButton { id: copyOutput; text: "复制"; implicitHeight: 28; implicitWidth: 44; enabled: Runs.output.length > 0
                                         contentItem: Text { text: copyOutput.text; color: "#b9c4d2"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                                         background: Rectangle { radius: 4; color: copyOutput.down ? "#405064" : copyOutput.hovered ? "#313d4c" : "transparent" }
                                         onClicked: App.copyText(Runs.output)
                                     }
-                                    ToolButton { id: clearOutput; text: "清空"; implicitHeight: 28; implicitWidth: 44
+                                    ToolButton { id: clearOutput; text: "清空"; implicitHeight: 28; implicitWidth: 44; enabled: Runs.output.length > 0
                                         contentItem: Text { text: clearOutput.text; color: "#b9c4d2"; font.pixelSize: 11; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                                         background: Rectangle { radius: 4; color: clearOutput.down ? "#405064" : clearOutput.hovered ? "#313d4c" : "transparent" }
                                         onClicked: Runs.clearOutput()
@@ -201,7 +201,7 @@ Item {
                                 }
                             }
                             ScrollView { Layout.fillWidth: true; Layout.fillHeight: true
-                                TextArea { text: Runs.output; textFormat: TextEdit.PlainText; placeholderText: "运行脚本后，输出会显示在这里"; placeholderTextColor: "#738092"; padding: 14; readOnly: true; selectByMouse: true; color: "#e5e7eb"; font.family: Settings.fontFamily; font.pixelSize: 13; wrapMode: TextEdit.Wrap; background: null }
+                                TextArea { text: Runs.selectedInteractive ? "交互运行的输出请在终端页面查看。" : Runs.output; textFormat: TextEdit.PlainText; placeholderText: "运行脚本后，输出会显示在这里"; placeholderTextColor: "#738092"; padding: 14; readOnly: true; selectByMouse: true; color: Runs.selectedInteractive ? "#738092" : "#e5e7eb"; font.family: Settings.fontFamily; font.pixelSize: 13; wrapMode: TextEdit.Wrap; background: null }
                             }
                             Rectangle { Layout.fillWidth: true; height: 1; color: "#222a34" }
                             Label { Layout.fillWidth: true; Layout.leftMargin: 12; Layout.rightMargin: 12; Layout.topMargin: 8; Layout.bottomMargin: 8
