@@ -58,13 +58,17 @@ Updates::Updates(QString directory,Settings *settings,Plugins *plugins,QObject *
     cleanupHelperCache(m_directory+"/updates");
     readInstallationReceipt();
     m_ready=readJson(m_directory+"/updates/pending.json");
-    if(!m_ready.isEmpty()&&(!verifyReady()||!validVersion(m_ready["version"].toString())||!isNewer(m_ready["version"].toString(),currentVersion(),m_ready["buildId"].toInteger())))m_ready={};
-    if(!m_ready.isEmpty())m_status=QStringLiteral("更新包已下载，可稍后或退出后安装");
+    if(!m_ready.isEmpty()&&(!verifyReady()||!validVersion(m_ready["version"].toString())||!isNewer(m_ready["version"].toString(),currentVersion(),m_ready["buildId"].toInteger())))clearReady(QStringLiteral("已清除损坏或过期的更新包，请重新下载"));
+    if(!m_ready.isEmpty())m_status=QStringLiteral("更新包已下载，可以立即更新");
     connect(settings,&Settings::changed,this,[this]{select();schedule();});
     m_timer.setInterval(60000);connect(&m_timer,&QTimer::timeout,this,&Updates::schedule);m_timer.start();
     QTimer::singleShot(0,this,&Updates::schedule);
 }
 QString Updates::currentVersion()const{return QCoreApplication::applicationVersion().isEmpty()?QStringLiteral(UTERMINAL_VERSION):QCoreApplication::applicationVersion();}
+bool Updates::canDownload()const{
+    if(m_available.isEmpty())return false;
+    return m_ready.isEmpty()||isNewer(m_available["version"].toString(),m_ready["version"].toString(),m_available["buildId"].toInteger());
+}
 bool Updates::due(const QString &policy,qint64 last,qint64 now,bool startupUsed){
     if(policy=="manual")return false;if(policy=="startup")return !startupUsed;
     if(policy!="daily"&&policy!="weekly")return false;
@@ -121,6 +125,22 @@ QString Updates::readyPath()const{
     return m_directory+"/updates/"+file;
 }
 bool Updates::verifyReady()const{return verifyUpdatePackage(readyPath(),m_ready["size"].toInteger(),m_ready["sha256"].toString());}
+void Updates::clearReady(const QString &status){
+    const auto path=readyPath();if(!path.isEmpty())QFile::remove(path);
+    QFile::remove(m_directory+"/updates/pending.json");m_ready={};m_installOnExit=false;m_preparedHelper.clear();
+    if(!status.isEmpty())m_status=status;
+}
+void Updates::requestInstallation(){
+    if(m_ready.isEmpty())return;
+    if(!verifyReady()){clearReady(QStringLiteral("更新包已损坏或缺失，请重新下载"));emit changed();return;}
+    emit installationRequested();
+}
+bool Updates::prepareInstallation(){
+    if(m_ready.isEmpty()||!verifyReady()){clearReady(QStringLiteral("更新包已损坏或缺失，请重新下载"));emit changed();return false;}
+    m_preparedHelper=stageHelper(QCoreApplication::applicationDirPath(),m_directory+"/updates/helper-"+QUuid::createUuid().toString(QUuid::Id128));
+    if(m_preparedHelper.isEmpty()){m_status=QStringLiteral("无法准备独立更新助手，应用将继续运行");emit changed();return false;}
+    m_installOnExit=true;emit changed();return true;
+}
 void Updates::setInstallOnExit(bool enabled){
     if(enabled&&!verifyReady()){m_installOnExit=false;m_status=QStringLiteral("更新包已损坏或缺失，请重新下载");emit changed();return;}
     m_installOnExit=enabled;emit changed();
@@ -197,9 +217,9 @@ void Updates::launchInstallerAfterExit(){
     QJsonObject receipt{{"version",m_ready["version"]},{"buildId",m_ready["buildId"]},{"state","requested"},{"updatedAt",QDateTime::currentSecsSinceEpoch()}};
     if(!verifyReady()){receipt["state"]="failed";receipt["message"]=QStringLiteral("退出时发现安装包已损坏或缺失，请重新下载");writeJson(receiptPath,receipt);return;}
     if(!writeJson(receiptPath,receipt)){qWarning("Unable to save UTerminal update receipt; installation not started");return;}
-    const auto helper=stageHelper(QCoreApplication::applicationDirPath(),m_directory+"/updates/helper-"+QUuid::createUuid().toString(QUuid::Id128));
+    const auto helper=m_preparedHelper.isEmpty()?stageHelper(QCoreApplication::applicationDirPath(),m_directory+"/updates/helper-"+QUuid::createUuid().toString(QUuid::Id128)):m_preparedHelper;
     if(helper.isEmpty()){receipt["state"]="failed";receipt["message"]=QStringLiteral("无法准备独立更新助手，未启动安装");writeJson(receiptPath,receipt);return;}
-    if(!QProcess::startDetached(helper,{QString::number(QCoreApplication::applicationPid()),readyPath(),QString::number(m_ready["size"].toInteger()),m_ready["sha256"].toString(),receiptPath})){
+    if(!QProcess::startDetached(helper,{QString::number(QCoreApplication::applicationPid()),readyPath(),QString::number(m_ready["size"].toInteger()),m_ready["sha256"].toString(),receiptPath,QCoreApplication::applicationFilePath()})){
         receipt["state"]="failed";receipt["message"]=QStringLiteral("无法启动更新助手，请重新安装应用或手动运行已下载的安装包");writeJson(receiptPath,receipt);
     }
 }
@@ -209,13 +229,14 @@ void Updates::readInstallationReceipt(){
     if(validVersion(version)&&!isNewer(version,currentVersion(),receipt["buildId"].toInteger()))m_installationStatus=QStringLiteral("更新已完成，当前版本：")+currentVersion();
     else if(state=="failed")m_installationStatus=QStringLiteral("上次更新未能安装：")+receipt["message"].toString().left(500);
     else if(state=="installed")m_installationStatus=QStringLiteral("安装器已成功结束，但当前仍为 %1。请确认启动的是安装目录中的版本；目标版本：%2").arg(currentVersion(),version);
+    else if(state=="restart_failed")m_installationStatus=QStringLiteral("更新已安装，但未能自动重新启动 UTerminal。当前版本：")+currentVersion();
     else if(state=="launched")m_installationStatus=QStringLiteral("上次安装程序已启动，但当前仍为 %1。若安装未完成，请查看更新目录中的 installer.log。目标版本：%2").arg(currentVersion(),version);
     else m_installationStatus=QStringLiteral("上次更新尚未确认启动安装程序，可能仍在等待旧进程退出。请稍后重试或检查更新助手。");
 }
 void Updates::cancelDownload(){if(m_download){m_downloadCancelled=true;m_download->abort();}}
 void Updates::download(){
-    if(busy()||m_available.isEmpty())return;
-    m_downloadPackage=m_available;m_downloadCancelled=false;m_downloadError.clear();m_received=0;m_progress=0;m_installOnExit=false;
+    if(busy()||!canDownload())return;
+    m_downloadPackage=m_available;m_downloadCancelled=false;m_downloadError.clear();m_received=0;m_progress=0;m_installOnExit=false;m_preparedHelper.clear();
     const auto directory=m_directory+"/updates";if(!QDir().mkpath(directory)){m_status=QStringLiteral("无法创建更新目录");emit changed();return;}
     m_downloadPath=directory+"/"+QUuid::createUuid().toString(QUuid::WithoutBraces)+".exe";
     m_file=std::make_unique<QSaveFile>(m_downloadPath);if(!m_file->open(QIODevice::WriteOnly)){m_status=m_file->errorString();m_file.reset();emit changed();return;}
@@ -240,13 +261,14 @@ void Updates::download(){
         else if(problem.isEmpty()&&reply->error()!=QNetworkReply::NoError)problem=reply->errorString();
         if(problem.isEmpty()&&(m_received!=m_downloadPackage["size"].toInteger()||QString::fromLatin1(m_hash->result().toHex())!=m_downloadPackage["sha256"].toString()))problem=QStringLiteral("更新包大小或 SHA-256 校验失败");
         if(problem.isEmpty()&&!m_file->commit())problem=m_file->errorString();
-        if(problem.isEmpty()){
+        bool downloadedReady=false;if(problem.isEmpty()){
             auto ready=m_downloadPackage;ready["file"]=QFileInfo(m_downloadPath).fileName();
-            if(writeJson(m_directory+"/updates/pending.json",ready,&problem)){m_ready=ready;m_status=QStringLiteral("更新已下载并校验，可稍后安装或选择退出后安装");}
+            const auto previous=readyPath();
+            if(writeJson(m_directory+"/updates/pending.json",ready,&problem)){m_ready=ready;if(!previous.isEmpty()&&previous!=m_downloadPath)QFile::remove(previous);m_status=QStringLiteral("更新已下载并校验，可以立即更新");downloadedReady=true;}
             else QFile::remove(m_downloadPath);
         }
         if(!problem.isEmpty())m_status=problem;
-        m_file.reset();m_hash.reset();emit changed();
+        m_file.reset();m_hash.reset();emit changed();if(downloadedReady)emit installationRequested();
     });
 }
 }

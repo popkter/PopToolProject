@@ -36,8 +36,11 @@ void App::updateTitleBar(QQuickWindow *window,bool dark,const QColor &background
     DwmSetWindowAttribute(handle,DWMWA_USE_IMMERSIVE_DARK_MODE,&enabled,sizeof(enabled));
     DwmSetWindowAttribute(handle,DWMWA_CAPTION_COLOR,&caption,sizeof(caption));
     DwmSetWindowAttribute(handle,DWMWA_TEXT_COLOR,&foreground,sizeof(foreground));
+    const DWM_WINDOW_CORNER_PREFERENCE corners=DWMWCP_ROUND;
+    DwmSetWindowAttribute(handle,DWMWA_WINDOW_CORNER_PREFERENCE,&corners,sizeof(corners));
     RedrawWindow(handle,nullptr,nullptr,RDW_FRAME|RDW_INVALIDATE);
 }
+bool App::startSystemMove(QQuickWindow *window){return window&&window->startSystemMove();}
 void App::activateWindow(){
     if(!m_window)return;
     m_window->setWindowStates(m_window->windowStates()&~Qt::WindowMinimized);m_window->show();m_window->requestActivate();

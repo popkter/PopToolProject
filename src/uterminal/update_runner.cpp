@@ -11,9 +11,10 @@
 #include "infrastructure/updatepackage.h"
 int main(int argc,char **argv){
     SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX|SEM_NOOPENFILEERRORBOX);
-    QCoreApplication app(argc,argv);const auto args=app.arguments();if(args.size()!=5&&args.size()!=6)return 2;
+    QCoreApplication app(argc,argv);const auto args=app.arguments();if(args.size()!=5&&args.size()!=6&&args.size()!=7)return 2;
     QLockFile cacheLease(QCoreApplication::applicationDirPath()+"/helper.lock");cacheLease.setStaleLockTime(0);
-    const QString receiptPath=args.size()==6?args[5]:QString();QJsonObject receipt;
+    const QString receiptPath=args.size()>=6?args[5]:QString();QJsonObject receipt;
+    const QString restartPath=args.size()==7?args[6]:QString();
     if(!receiptPath.isEmpty()){QFile previous(receiptPath);if(previous.open(QIODevice::ReadOnly))receipt=QJsonDocument::fromJson(previous.readAll()).object();}
     receipt.remove("installerExitCode");
     auto report=[&](const QString &state,const QString &message){
@@ -38,5 +39,6 @@ int main(int argc,char **argv){
     if(!installer.waitForFinished(-1))return fail(7,QStringLiteral("无法取得安装程序的退出结果，请查看 installer.log"));
     receipt["installerExitCode"]=installer.exitCode();
     if(installer.exitStatus()!=QProcess::NormalExit||installer.exitCode()!=0)return fail(7,QStringLiteral("安装程序失败或被取消，退出码 %1。请查看 installer.log").arg(installer.exitCode()));
-    return report("installed",QStringLiteral("安装程序成功结束，目标版本将在下次启动时核对"))?0:6;
+    if(!restartPath.isEmpty()&&!QProcess::startDetached(restartPath,{}))return report("restart_failed",QStringLiteral("更新已安装，但无法自动重新启动 UTerminal"))?9:6;
+    return report("installed",restartPath.isEmpty()?QStringLiteral("安装程序成功结束，目标版本将在下次启动时核对"):QStringLiteral("安装程序成功结束，UTerminal 已重新启动"))?0:6;
 }

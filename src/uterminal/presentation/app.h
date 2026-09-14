@@ -23,6 +23,7 @@ public:
     bool elevated()const;
     void attachWindow(QQuickWindow *window);
     Q_INVOKABLE void updateTitleBar(QQuickWindow *window,bool dark,const QColor &background,const QColor &text);
+    Q_INVOKABLE bool startSystemMove(QQuickWindow *window);
     void handleLaunch(const QJsonObject &request);
     Q_INVOKABLE void setModalOpen(QObject *dialog,bool open);
     Q_INVOKABLE void showNotice(const QString &text);

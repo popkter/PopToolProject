@@ -118,7 +118,18 @@ Item {
                                 Text { id: languageLabel; anchors.centerIn: parent; text: Scripts.selected.language === "powershell" ? "PowerShell 7" : Scripts.selected.language === "python" ? "Python" : "CMD"; color: Theme.muted; font.pixelSize: 11 }
                             }
                         }
-                        ToolButton { Layout.alignment: Qt.AlignTop; text: Scripts.selected.favorite ? "★" : "☆"; onClicked: Scripts.toggleFavorite(Scripts.selected.id) }
+                        ToolButton {
+                            id: favoriteButton; objectName: "scriptFavoriteButton"
+                            Layout.alignment: Qt.AlignTop; implicitWidth: 32; implicitHeight: 32
+                            text: Scripts.selected.favorite ? "★" : "☆"; Accessible.name: Scripts.selected.favorite ? "取消收藏" : "收藏"
+                            contentItem: Text { text: favoriteButton.text; color: Scripts.selected.favorite || favoriteButton.activeFocus ? Theme.accent : Theme.muted; font.pixelSize: 18; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            background: Rectangle {
+                                radius: 7
+                                color: favoriteButton.down || Scripts.selected.favorite ? Theme.selected : favoriteButton.hovered ? Theme.field : "transparent"
+                                border.width: favoriteButton.activeFocus ? 1 : 0; border.color: Theme.accent
+                            }
+                            onClicked: Scripts.toggleFavorite(Scripts.selected.id)
+                        }
                         ActionButton { Layout.alignment: Qt.AlignTop; text: "分享"; onClicked: App.shareScript() }
                     }
                     Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }

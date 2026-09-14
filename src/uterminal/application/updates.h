@@ -18,6 +18,8 @@ class Updates : public QObject {
     Q_PROPERTY(QString currentVersion READ currentVersion CONSTANT)
     Q_PROPERTY(QVariantMap available READ available NOTIFY changed)
     Q_PROPERTY(QVariantMap downloaded READ downloaded NOTIFY changed)
+    Q_PROPERTY(bool readyToInstall READ readyToInstall NOTIFY changed)
+    Q_PROPERTY(bool canDownload READ canDownload NOTIFY changed)
     Q_PROPERTY(int progress READ progress NOTIFY changed)
     Q_PROPERTY(bool installOnExit READ installOnExit WRITE setInstallOnExit NOTIFY changed)
     Q_PROPERTY(QString installationStatus READ installationStatus NOTIFY changed)
@@ -30,6 +32,8 @@ public:
     QString currentVersion()const;
     QVariantMap available()const{return m_available.toVariantMap();}
     QVariantMap downloaded()const{return m_ready.toVariantMap();}
+    bool readyToInstall()const{return !m_ready.isEmpty();}
+    bool canDownload()const;
     int progress()const{return m_progress;}
     bool installOnExit()const{return m_installOnExit;}
     void setInstallOnExit(bool enabled);
@@ -39,15 +43,19 @@ public:
     Q_INVOKABLE void check();
     Q_INVOKABLE void download();
     Q_INVOKABLE void cancelDownload();
+    Q_INVOKABLE void requestInstallation();
+    Q_INVOKABLE bool prepareInstallation();
     static QJsonObject selectRelease(const QJsonArray &releases,const QString &current,bool prerelease);
     static bool due(const QString &policy,qint64 last,qint64 now,bool startupUsed);
 signals:
     void changed();
+    void installationRequested();
 private:
     void schedule();
     void select();
     QString readyPath()const;
     bool verifyReady()const;
+    void clearReady(const QString &status=QString());
     void readInstallationReceipt();
     QString m_installationStatus;
     QString m_directory,m_status=QStringLiteral("尚未检查更新");
@@ -59,7 +67,7 @@ private:
     std::unique_ptr<QSaveFile> m_file;
     std::unique_ptr<QCryptographicHash> m_hash;
     QJsonObject m_downloadPackage,m_ready;
-    QString m_downloadPath,m_downloadError;
+    QString m_downloadPath,m_downloadError,m_preparedHelper;
     qint64 m_received=0;
     int m_progress=0;
     bool m_installOnExit=false,m_downloadCancelled=false;

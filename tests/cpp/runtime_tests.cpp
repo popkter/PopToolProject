@@ -115,6 +115,9 @@ private slots:
             app.updateTitleBar(&window,dark,background,text);BOOL enabled=FALSE;
             const auto handle=reinterpret_cast<HWND>(window.winId());
             QCOMPARE(DwmGetWindowAttribute(handle,DWMWA_USE_IMMERSIVE_DARK_MODE,&enabled,sizeof(enabled)),S_OK);QCOMPARE(bool(enabled),dark);
+            DWM_WINDOW_CORNER_PREFERENCE corners=DWMWCP_DEFAULT;
+            QCOMPARE(DwmGetWindowAttribute(handle,DWMWA_WINDOW_CORNER_PREFERENCE,&corners,sizeof(corners)),S_OK);
+            QCOMPARE(corners,DWMWCP_ROUND);
         }
     }
     void externalLaunchPreservesModalFocus(){
@@ -215,6 +218,19 @@ private slots:
         QCOMPARE(selections.count(),3);
         scripts.select(scripts.selected()["id"].toString());scripts.select("missing-script");
         QCOMPARE(selections.count(),3);QCOMPARE(resets.count(),0);
+    }
+    void scriptFavoriteButtonUsesRoundedStyle(){
+        QTemporaryDir temporary;QVERIFY(temporary.isValid());
+        ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());
+        ut::Plugins plugins(temporary.path(),temporary.path());ut::Sessions sessions(&plugins,&settings,&scripts);
+        ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
+        QQmlEngine engine;engine.rootContext()->setContextProperty("Scripts",&scripts);
+        engine.rootContext()->setContextProperty("Settings",&settings);engine.rootContext()->setContextProperty("Runs",&runs);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(QStringLiteral(UTERMINAL_TEST_SOURCE_DIR "/resources/qml/ScriptsPage.qml")));
+        QScopedPointer<QObject> object(component.create());QVERIFY2(object,qPrintable(component.errorString()));
+        auto *button=object->findChild<QObject*>("scriptFavoriteButton");QVERIFY(button);
+        QCOMPARE(button->property("implicitWidth").toReal(),32.0);QCOMPARE(button->property("implicitHeight").toReal(),32.0);
+        auto *background=qvariant_cast<QObject*>(button->property("background"));QVERIFY(background);QCOMPARE(background->property("radius").toReal(),7.0);
     }
     void powerShellUpgradeWaitsForSelection(){
         QTemporaryDir tmp;CatalogTestNetwork network;const auto data=tmp.path()+"/data";
@@ -455,19 +471,24 @@ private slots:
     }
     void updateHelperWaitsAndVerifies(){
         QTemporaryDir tmp;const auto marker=tmp.path()+"/installer-called.json";
+        const auto restartMarker=tmp.path()+"/relaunch-called.json";
         const auto fixture=QCoreApplication::applicationDirPath()+"/uterminal_update_fixture.exe";
+        const auto relaunch=tmp.path()+"/relaunch.exe";QVERIFY(QFile::copy(fixture,relaunch));
         QFile file(fixture);QVERIFY(file.open(QIODevice::ReadOnly));const auto bytes=file.readAll();file.close();
         QProcess parentProcess;parentProcess.start(fixture,{"--wait"});QVERIFY(parentProcess.waitForStarted());
-        auto env=QProcessEnvironment::systemEnvironment();env.insert("UTERMINAL_TEST_INSTALLER_OUTPUT",marker);
+        auto env=QProcessEnvironment::systemEnvironment();env.insert("UTERMINAL_TEST_INSTALLER_OUTPUT",marker);env.insert("UTERMINAL_TEST_RELAUNCH_OUTPUT",restartMarker);
         QProcess helper;helper.setProcessEnvironment(env);
         const auto program=QCoreApplication::applicationDirPath()+"/UTerminalUpdateRunner.exe";
         QStringList args{QString::number(parentProcess.processId()),fixture,QString::number(bytes.size()),QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex())};
-        const auto receiptPath=tmp.path()+"/install-result.json";QVERIFY(ut::writeJson(receiptPath,{{"version","9.0.0"}}));args.append(receiptPath);
+        const auto receiptPath=tmp.path()+"/install-result.json";QVERIFY(ut::writeJson(receiptPath,{{"version","9.0.0"}}));args.append(receiptPath);args.append(relaunch);
         helper.start(program,args);QVERIFY(helper.waitForStarted());QTest::qWait(150);QVERIFY(!QFileInfo::exists(marker));QCOMPARE(helper.state(),QProcess::Running);
         parentProcess.kill();QVERIFY(parentProcess.waitForFinished());QVERIFY(helper.waitForFinished(10000));QCOMPARE(helper.exitCode(),0);
         QCOMPARE(ut::readJson(receiptPath)["state"].toString(),QString("installed"));QCOMPARE(ut::readJson(receiptPath)["version"].toString(),QString("9.0.0"));QCOMPARE(ut::readJson(receiptPath)["installerExitCode"].toInt(),0);
         QTRY_VERIFY(QFileInfo::exists(marker));QFile result(marker);QVERIFY(result.open(QIODevice::ReadOnly));const auto arguments=QJsonDocument::fromJson(result.readAll()).array();result.close();
         QVERIFY(arguments.contains("/NOCLOSEAPPLICATIONS"));QVERIFY(arguments.contains("/SILENT"));QVERIFY(QFile::remove(marker));
+        QTRY_VERIFY(QFileInfo::exists(restartMarker));QFile restartResult(restartMarker);QVERIFY(restartResult.open(QIODevice::ReadOnly));const auto restartArguments=QJsonDocument::fromJson(restartResult.readAll()).array();QCOMPARE(restartArguments.size(),1);
+        QStringList legacyArgs{"4294967294",fixture,QString::number(bytes.size()),QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex()),receiptPath};
+        helper.start(program,legacyArgs);QVERIFY(helper.waitForFinished(10000));QCOMPARE(helper.exitCode(),0);QCOMPARE(ut::readJson(receiptPath)["state"].toString(),QString("installed"));QVERIFY(QFile::remove(marker));
         args[0]="4294967294";args[3]=QString(64,'0');helper.start(program,args);QVERIFY(helper.waitForFinished(10000));QCOMPARE(helper.exitCode(),4);QVERIFY(!QFileInfo::exists(marker));
         QCOMPARE(ut::readJson(receiptPath)["state"].toString(),QString("failed"));QVERIFY(ut::readJson(receiptPath)["message"].toString().contains("SHA-256"));
         const auto brokenPath=tmp.path()+"/broken.exe";QFile broken(brokenPath);QVERIFY(broken.open(QIODevice::WriteOnly));broken.write("invalid");broken.close();

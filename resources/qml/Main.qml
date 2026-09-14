@@ -5,46 +5,83 @@ import UTerminal
 ApplicationWindow {
     id: window
     width: 1362; height: 1024; minimumWidth: 1000; minimumHeight: 700
+    flags: Qt.Window | Qt.CustomizeWindowHint | Qt.WindowSystemMenuHint
+           | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
+           | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
+    topPadding: 0; leftPadding: 0; rightPadding: 0; bottomPadding: 0
     visible: true
     title: App.elevated ? "UTerminal · 管理员" : "UTerminal"
     color: Theme.background
-    function syncTitleBar() { App.updateTitleBar(window,Settings.dark,Theme.surface,Theme.text) }
-    Component.onCompleted: syncTitleBar()
+    readonly property color chromeBackground: Settings.dark ? Theme.surface : "#f7f8fa"
+    readonly property color chromeIdle: Settings.dark ? Theme.field : "#e9e9e9"
+    readonly property color chromeSelected: Settings.dark ? Theme.selected : "#e5edff"
+    readonly property color chromeText: Settings.dark ? Theme.text : "#0a0a0a"
+    readonly property color chromeMuted: Settings.dark ? Theme.muted : "#69717e"
+    readonly property color chromeAccent: Settings.dark ? Theme.accent : "#4978ed"
+    function syncTitleBar() { App.updateTitleBar(window,Settings.dark,window.chromeBackground,window.chromeText) }
+    Component.onCompleted: { syncTitleBar(); if(Updates.readyToInstall) Qt.callLater(Updates.requestInstallation) }
     Connections { target: Settings; function onChanged() { Qt.callLater(window.syncTitleBar) } }
     palette.window: Theme.background; palette.base: Theme.surface; palette.text: Theme.text; palette.windowText: Theme.text
     palette.button: Theme.surface; palette.buttonText: Theme.text; palette.highlight: Theme.accent; palette.highlightedText: "white"
     onClosing: close => { close.accepted = false; App.requestQuit() }
-    RowLayout {
-        anchors.fill: parent; spacing: 0
+    Item {
+        anchors.fill: parent
         Rectangle {
-            Layout.preferredWidth: 52; Layout.fillHeight: true; color: Theme.surface
-            Rectangle { width: 1; height: parent.height; anchors.right: parent.right; color: Theme.border }
-            ColumnLayout {
-                anchors.fill: parent; anchors.topMargin: 14; anchors.bottomMargin: 12; spacing: 8
-                Image { source: App.resources + "icons/app-icon-ui.png"; Layout.preferredWidth: 28; Layout.preferredHeight: 28; Layout.alignment: Qt.AlignHCenter; fillMode: Image.PreserveAspectFit }
-                Repeater {
-                    model: [{name:"terminal",title:"终端",page:1},{name:"code",title:"自定义",page:0}]
-                    delegate: ToolButton {
-                        required property var modelData
-                        Layout.preferredWidth: 36; Layout.preferredHeight: 36; Layout.alignment: Qt.AlignHCenter
-                        ToolTip.visible: hovered; ToolTip.text: modelData.title
-                        background: Rectangle { radius: 6; color: App.page === modelData.page ? Theme.selected : parent.hovered ? Theme.field : "transparent" }
-                        contentItem: Icon { name: modelData.name; font.pixelSize: 18; color: App.page === modelData.page ? Theme.accent : Theme.muted }
-                        onClicked: App.page = modelData.page
-                    }
+            id: topBar
+            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+            height: 42; color: window.chromeBackground
+            Item {
+                anchors.left: parent.left; anchors.leftMargin: 42; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
+                anchors.rightMargin: Math.max(138,SafeArea.margins.right)
+                DragHandler {
+                    target: null
+                    acceptedButtons: Qt.LeftButton
+                    onActiveChanged: if(active) App.startSystemMove(window)
                 }
-                Item { Layout.fillHeight: true }
-                ToolButton {
-                    Layout.preferredWidth: 36; Layout.preferredHeight: 36; Layout.alignment: Qt.AlignHCenter
-                    ToolTip.visible: hovered; ToolTip.text: "设置"
-                    background: Rectangle { radius: 6; color: App.page === 2 ? Theme.selected : parent.hovered ? Theme.field : "transparent" }
-                    contentItem: Icon { name: "settings"; font.pixelSize: 18; color: App.page === 2 ? Theme.accent : Theme.muted }
-                    onClicked: App.page = 2
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    onDoubleTapped: window.visibility === Window.Maximized ? window.showNormal() : window.showMaximized()
                 }
             }
         }
+        Rectangle {
+            id: navigation
+            anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+            width: 42; color: window.chromeBackground; z: 20
+            Image { x: 5; y: 5; width: 32; height: 32; source: App.resources + "icons/app-icon-ui.png"; fillMode: Image.PreserveAspectFit }
+            Repeater {
+                model: [{name:"terminal",title:"终端",page:1},{name:"code",title:"自定义",page:0}]
+                delegate: ToolButton {
+                    required property var modelData
+                    required property int index
+                    x: 5; y: 42 + index * 37; width: 32; height: 32
+                    Accessible.name: modelData.title
+                    background: Rectangle { radius: 5; color: App.page === modelData.page ? window.chromeSelected : parent.hovered ? window.chromeIdle : "transparent" }
+                    contentItem: Icon { name: modelData.name; font.pixelSize: 17; color: App.page === modelData.page ? window.chromeAccent : window.chromeMuted }
+                    onClicked: App.page = modelData.page
+                }
+            }
+            Item {
+                anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: settingsButton.top; anchors.bottomMargin: 8
+                width: 32; height: App.elevated ? 132 : 92
+                Text {
+                    anchors.centerIn: parent
+                    text: App.elevated ? "UTerminal · 管理员" : "UTerminal"
+                    rotation: -90; color: window.chromeMuted; font.pixelSize: 12
+                }
+            }
+            ToolButton {
+                id: settingsButton
+                x: 5; anchors.bottom: parent.bottom; anchors.bottomMargin: 6; width: 32; height: 32
+                Accessible.name: "设置"
+                background: Rectangle { radius: 5; color: App.page === 2 ? window.chromeSelected : parent.hovered ? window.chromeIdle : "transparent" }
+                contentItem: Icon { name: "settings"; font.pixelSize: 17; color: App.page === 2 ? window.chromeAccent : window.chromeMuted }
+                onClicked: App.page = 2
+            }
+        }
         StackLayout {
-            Layout.fillWidth: true; Layout.fillHeight: true; currentIndex: App.page
+            anchors.left: navigation.right; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
+            anchors.topMargin: App.page === 1 ? 0 : 42; currentIndex: App.page
             ScriptsPage {}
             TerminalPage {}
             SettingsPage {}
@@ -86,6 +123,18 @@ ApplicationWindow {
         }
         onAccepted: Sessions.acceptPaste(); onRejected: Sessions.cancelPaste()
     }
+    AppDialog { id: updateDialog; objectName: "updateConfirmationDialog"; title: "立即更新"; anchors.centerIn: parent; modal: true; width: Math.min(560,window.width-48); standardButtons: Dialog.NoButton; closePolicy: Popup.NoAutoClose
+        ColumnLayout { anchors.fill: parent; spacing: 8
+            Label { text: "更新包已经下载完毕，是否立即重启更新？"; color: Theme.muted; font.pixelSize: 15; wrapMode: Text.Wrap; Layout.fillWidth: true }
+            Label { text: "立即更新会关闭正在运行的终端和脚本。"; color: Theme.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        }
+        footer: Item { implicitHeight: 70
+            RowLayout { anchors.fill: parent; anchors.leftMargin: 20; anchors.rightMargin: 20; anchors.bottomMargin: 20; spacing: 12
+                ActionButton { text: "立即更新"; Layout.fillWidth: true; onClicked: { if(Updates.prepareInstallation()){ updateDialog.close();App.quitNow() } } }
+                ActionButton { text: "稍后更新"; primary: true; Layout.fillWidth: true; onClicked: updateDialog.close() }
+            }
+        }
+    }
     Popup { id: notification; x: (window.width-width)/2; y: window.height-height-30; width: Math.min(700,window.width-80); padding: 16
         background: PopupSurface {}
         contentItem: Text { text: App.notice; color: Theme.text; wrapMode: Text.Wrap; font.pixelSize: 13 }
@@ -100,7 +149,9 @@ ApplicationWindow {
     }
     Connections { target: Runs; function onConfirmationRequested(message) { runDialog.message=message;runDialog.open() } }
     Connections { target: Sessions; function onPasteConfirmationRequested(text) { pasteDialog.value=text;pasteDialog.open() } }
+    Connections { target: Updates; function onInstallationRequested() { updateDialog.open() } }
     Shortcut { sequence: "Ctrl+T"; enabled: App.page === 1; onActivated: Sessions.newTab() }
     Shortcut { sequence: "Ctrl+Tab"; enabled: App.page === 1; onActivated: Sessions.nextTab() }
     Shortcut { sequence: "Ctrl+F"; enabled: App.page === 1 && !!Sessions.focusedPane; onActivated: Sessions.focusedPane.terminal.openSearch() }
+    Shortcut { objectName: "showScriptsShortcut"; sequence: "Ctrl+Q"; enabled: App.page === 1; onActivated: App.page = 0 }
 }

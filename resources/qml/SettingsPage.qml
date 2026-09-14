@@ -59,11 +59,11 @@ ScrollView {
                     ActionButton { text: Updates.busy ? "正在检查…" : "检查应用更新"; enabled: !Updates.busy; onClicked: Updates.check() }
                     ProgressBar { Layout.fillWidth: true; visible: Updates.busy && Updates.progress>0; value: Updates.progress/100 }
                     RowLayout { Layout.fillWidth: true
-                        ActionButton { text: "下载更新"; visible: !!Updates.available.version; enabled: !Updates.busy; onClicked: Updates.download() }
+                        ActionButton { objectName: "downloadUpdateButton"; text: "下载更新"; visible: !!Updates.available.version || Updates.readyToInstall; enabled: !Updates.busy && Updates.canDownload; onClicked: Updates.download() }
                         ActionButton { text: "取消下载"; visible: Updates.downloading; onClicked: Updates.cancelDownload() }
+                        ActionButton { objectName: "installUpdateButton"; text: "立即更新"; primary: true; visible: Updates.readyToInstall; enabled: !Updates.busy; onClicked: Updates.requestInstallation() }
                     }
                     Label { text: "已下载："+(Updates.downloaded.version || ""); visible: !!Updates.downloaded.version; color: Theme.muted }
-                    AppCheckBox { text: "退出应用后安装更新"; visible: !!Updates.downloaded.version; checked: Updates.installOnExit; onToggled: Updates.installOnExit=checked }
                     Label { text: Updates.available.notes || ""; visible: !!Updates.available.version; color: Theme.muted; wrapMode: Text.Wrap; Layout.fillWidth: true; textFormat: Text.PlainText }
                 }
             }

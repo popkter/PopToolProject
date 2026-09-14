@@ -48,14 +48,14 @@ private slots:
         const QByteArray package="fixture package bytes";const auto hash=QString::fromLatin1(QCryptographicHash::hash(package,QCryptographicHash::Sha256).toHex());
         const QJsonObject asset{{"name","UTerminal-0.2.0-win-x64-setup.exe"},{"browser_download_url","https://github.com/popkter/PopToolProject/releases/download/v0.2.0/setup.exe"},{"digest","sha256:"+hash},{"size",package.size()}};
         network.responses.append(QJsonDocument(QJsonArray{QJsonObject{{"tag_name","v0.2.0"},{"assets",QJsonArray{asset}}}}).toJson());
-        ut::Updates updates(tmp.path(),&settings,&plugins,nullptr,&network);updates.check();QTRY_VERIFY(!updates.busy());QVERIFY(!updates.available().isEmpty());
+        ut::Updates updates(tmp.path(),&settings,&plugins,nullptr,&network);QSignalSpy installationRequests(&updates,&ut::Updates::installationRequested);updates.check();QTRY_VERIFY(!updates.busy());QVERIFY(!updates.available().isEmpty());
         network.responses.append(package);updates.download();updates.cancelDownload();QVERIFY(!updates.busy());QVERIFY(updates.downloaded().isEmpty());
-        network.responses.append(package);updates.download();QTRY_VERIFY(!updates.busy());QCOMPARE(updates.downloaded()["version"].toString(),QString("0.2.0"));QVERIFY(!updates.installOnExit());
+        network.responses.append(package);updates.download();QTRY_VERIFY(!updates.busy());QCOMPARE(updates.downloaded()["version"].toString(),QString("0.2.0"));QVERIFY(updates.readyToInstall());QVERIFY(!updates.canDownload());QCOMPARE(installationRequests.size(),1);QVERIFY(!updates.installOnExit());
         const auto path=tmp.path()+"/updates/"+updates.downloaded()["file"].toString();QVERIFY(ut::verifyUpdatePackage(path,package.size(),hash));
-        updates.setInstallOnExit(true);QVERIFY(updates.installOnExit());updates.setInstallOnExit(false);
-        {ut::Updates restored(tmp.path(),&settings,&plugins);QCOMPARE(restored.downloaded()["version"].toString(),QString("0.2.0"));QVERIFY(!restored.installOnExit());}
+        QVERIFY(updates.prepareInstallation());QVERIFY(updates.installOnExit());updates.setInstallOnExit(false);
+        {ut::Updates restored(tmp.path(),&settings,&plugins);QSignalSpy restoredRequests(&restored,&ut::Updates::installationRequested);QCOMPARE(restored.downloaded()["version"].toString(),QString("0.2.0"));QVERIFY(restored.readyToInstall());QVERIFY(!restored.installOnExit());restored.requestInstallation();QCOMPARE(restoredRequests.size(),1);}
         QFile altered(path);QVERIFY(altered.open(QIODevice::WriteOnly|QIODevice::Truncate));altered.write("bad");altered.close();
-        updates.setInstallOnExit(true);QVERIFY(!updates.installOnExit());ut::Updates rejected(tmp.path(),&settings,&plugins);QVERIFY(rejected.downloaded().isEmpty());
+        updates.requestInstallation();QVERIFY(!updates.readyToInstall());QVERIFY(!QFileInfo::exists(tmp.path()+"/updates/pending.json"));QVERIFY(!updates.installOnExit());ut::Updates rejected(tmp.path(),&settings,&plugins);QVERIFY(rejected.downloaded().isEmpty());
     }
     void updateSelectionAndPolicy(){
         auto release=[](const QString &version,bool preview=false,const QString &name=QString()){
