@@ -10,6 +10,7 @@ $buildIdentity=Get-Content -LiteralPath "$build/version.json" -Raw | ConvertFrom
 $actualBuildId=[string]$buildIdentity.buildId
 if($actualBuildId -ne $BuildId){throw "Build identity mismatch: expected $BuildId, found $actualBuildId"}
 $version=$buildIdentity.version
+$applicationVersion=$buildIdentity.applicationVersion
 if($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'){throw 'Invalid CMake application version.'}
 foreach($component in $version.Split('.')){if([int64]$component -gt 65535){throw 'Application version exceeds Windows version component limit.'}}
 foreach($binary in 'UTerminal.exe','UTerminalUpdateRunner.exe','UTerminalShell.dll'){
@@ -48,5 +49,11 @@ if(!(Test-Path -LiteralPath "$stage/vcruntime140.dll")){throw 'MSVC runtime miss
 & $InnoCompiler /Qp "/DSourceDir=$stage" "/DOutputDir=$projectRoot/build/installer" "/DAppVersion=$version" "$projectRoot/installer/UTerminal.iss"
 if($LASTEXITCODE){throw "Installer compilation failed: $LASTEXITCODE"}
 $installer=Join-Path $projectRoot "build/installer/UTerminal-$version-win-x64-setup.exe"
+if($applicationVersion -ne $version){
+    $versionedInstaller=Join-Path $projectRoot "build/installer/UTerminal-$applicationVersion-win-x64-setup.exe"
+    if(Test-Path -LiteralPath $versionedInstaller){Remove-Item -LiteralPath $versionedInstaller -Force}
+    Move-Item -LiteralPath $installer -Destination $versionedInstaller
+    $installer=$versionedInstaller
+}
 $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
 "$hash  $([IO.Path]::GetFileName($installer))" | Set-Content -LiteralPath (Join-Path $projectRoot 'build/installer/SHA256SUMS.txt') -Encoding ascii

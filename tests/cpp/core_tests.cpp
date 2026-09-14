@@ -74,6 +74,8 @@ private slots:
         QCOMPARE(ut::Updates::selectRelease(QJsonArray{development},"0.3.0",true)["version"].toString(),QString("0.3.0-dev.200"));
         QVERIFY(ut::Updates::selectRelease(QJsonArray{development},"0.3.0-dev.200",true).isEmpty());
         QCOMPARE(ut::Updates::selectRelease(QJsonArray{development},"0.3.0-dev.199",true)["buildId"].toInteger(),qint64(200));
+        const auto semanticDevelopment=release("0.4.0-dev.201",true);
+        QCOMPARE(ut::Updates::selectRelease(QJsonArray{semanticDevelopment},"0.3.0",true)["version"].toString(),QString("0.4.0-dev.201"));
         QVERIFY(!ut::Updates::due("manual",0,100000,false));QVERIFY(ut::Updates::due("startup",100000,100000,false));QVERIFY(!ut::Updates::due("startup",0,100000,true));
         QVERIFY(!ut::Updates::due("daily",100000,100001,true));QVERIFY(ut::Updates::due("daily",100000,186400,true));QVERIFY(!ut::Updates::due("weekly",100000,186400,true));
     }

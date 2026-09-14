@@ -39,7 +39,7 @@ jobs:
             $buildId = '0'
           } else {
             if ($env:GITHUB_REF_NAME -ne 'u_terminal') { throw 'Development releases must run on u_terminal.' }
-            $tag = "uterminal-dev-$env:GITHUB_RUN_ID"
+            $tag = "uterminal-v$version-dev.$env:GITHUB_RUN_ID"
             $title = "UTerminal $version · Development $env:GITHUB_RUN_NUMBER"
             $prerelease = 'true'
             $buildId = $env:GITHUB_RUN_ID
