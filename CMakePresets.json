@@ -8,6 +8,7 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/uterminal-debug",
       "architecture": {"value": "x64", "strategy": "external"},
+      "environment": {"VSLANG": "1033"},
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_PREFIX_PATH": "$env{QT_ROOT}",

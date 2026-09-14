@@ -42,7 +42,7 @@ ApplicationWindow {
     ScriptEditor { id: editor }
     PluginDialog { id: pluginDialog; objectName: "globalPluginDialog" }
     PythonEnvironmentDialog { id: environmentDialog; objectName: "globalPythonEnvironment" }
-    Dialog { id: migrationDialog; title: "切换 Python 版本"; anchors.centerIn: parent; width: 620; height: 460; modal: true; closePolicy: Popup.NoAutoClose
+    AppDialog { id: migrationDialog; title: "切换 Python 版本"; anchors.centerIn: parent; width: 620; height: 460; modal: true; closePolicy: Popup.NoAutoClose
         ColumnLayout { anchors.fill: parent; spacing: 14
             Label { text: "目标版本："+Python.migrationTarget+"。旧会话继续使用原环境。"; Layout.fillWidth: true; wrapMode: Text.Wrap }
             Label { text: "是否在目标版本重新安装以下依赖？失败时保留当前活动版本。"; Layout.fillWidth: true; wrapMode: Text.Wrap }
@@ -56,19 +56,19 @@ ApplicationWindow {
         }
     }
     Connections { target: Python; function onSwitchConfirmationRequested() { migrationDialog.open() } }
-    Dialog { id: replaceDialog; title: "替换已有脚本"; anchors.centerIn: parent; modal: true; standardButtons: Dialog.Yes | Dialog.No
-        Label { text: "已有相同 ID 的脚本。备份后替换其内容？" }
+    AppDialog { id: replaceDialog; title: "替换已有脚本"; anchors.centerIn: parent; modal: true; standardButtons: Dialog.Yes | Dialog.No
+        Label { text: "已有相同 ID 的脚本。备份后替换其内容？"; width: parent.width; wrapMode: Text.Wrap; color: Theme.muted }
         onAccepted: App.importClipboard(true)
     }
-    Dialog { id: quitDialog; title: "结束任务并退出？"; anchors.centerIn: parent; modal: true; standardButtons: Dialog.Yes | Dialog.No
-        Label { text: "仍有运行任务、终端会话或插件安装。退出会结束它们。" }
+    AppDialog { id: quitDialog; title: "退出应用"; destructive: true; acceptText: "退出"; anchors.centerIn: parent; modal: true; standardButtons: Dialog.Yes | Dialog.No
+        Label { text: "仍有运行任务、终端会话或插件安装。退出会结束它们。"; width: parent.width; wrapMode: Text.Wrap; color: Theme.muted }
         onAccepted: App.quitNow()
     }
-    Dialog { id: runDialog; property string message; title: "运行确认"; anchors.centerIn: parent; modal: true; standardButtons: Dialog.Yes | Dialog.No
-        Label { text: runDialog.message; width: 430; wrapMode: Text.Wrap }
+    AppDialog { id: runDialog; property string message; title: "运行确认"; anchors.centerIn: parent; modal: true; standardButtons: Dialog.Yes | Dialog.No
+        Label { text: runDialog.message; width: parent.width; wrapMode: Text.Wrap; color: Theme.muted }
         onAccepted: Runs.confirmRun(); onRejected: Runs.cancelRun()
     }
-    Dialog { id: pasteDialog; property string value; title: "粘贴多行文本？"; anchors.centerIn: parent; modal: true; width: 600; standardButtons: Dialog.Yes | Dialog.No
+    AppDialog { id: pasteDialog; property string value; title: "粘贴多行文本？"; anchors.centerIn: parent; modal: true; width: 600; standardButtons: Dialog.Yes | Dialog.No
         ColumnLayout { anchors.fill: parent
             Label { text: "多行文本可能执行多条命令。请确认内容后粘贴。" }
             ScrollView { Layout.fillWidth: true; Layout.preferredHeight: 200; TextArea { text: pasteDialog.value; readOnly: true; font.family: Settings.fontFamily; wrapMode: TextEdit.Wrap } }
@@ -76,7 +76,7 @@ ApplicationWindow {
         onAccepted: Sessions.acceptPaste(); onRejected: Sessions.cancelPaste()
     }
     Popup { id: notification; x: (window.width-width)/2; y: window.height-height-30; width: Math.min(700,window.width-80); padding: 16
-        background: Rectangle { color: Theme.surface; border.color: Theme.border; radius: 9 }
+        background: PopupSurface {}
         contentItem: Text { text: App.notice; color: Theme.text; wrapMode: Text.Wrap; font.pixelSize: 13 }
         Timer { id: notificationTimer; interval: 6000; onTriggered: notification.close() }
     }

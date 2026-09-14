@@ -212,23 +212,16 @@ Item {
             }
         }
     }
-    Dialog { id: descriptionDialog; objectName: "scriptDescriptionDialog"; title: "脚本说明"; anchors.centerIn: parent; width: Math.min(640,page.width-48); height: Math.min(480,page.height-48); modal: true; padding: 20
-        background: Rectangle { radius: 10; color: Theme.surface; border.color: Theme.border }
-        header: Label { text: descriptionDialog.title; color: Theme.text; font.pixelSize: 20; font.bold: true; padding: 20; bottomPadding: 12 }
+    AppDialog { id: descriptionDialog; objectName: "scriptDescriptionDialog"; title: "脚本说明"; anchors.centerIn: parent; width: Math.min(640,page.width-48); height: Math.min(480,page.height-48); modal: true; padding: 20
+        standardButtons: Dialog.Close
         contentItem: ScrollView { id: descriptionScroll; objectName: "scriptDescriptionScroll"; clip: true; contentWidth: availableWidth
             TextArea { objectName: "scriptDescriptionText"; width: descriptionScroll.availableWidth; text: Scripts.selected.description || ""; textFormat: TextEdit.PlainText; readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap; padding: 0; color: Theme.text; font.pixelSize: 13; background: null }
         }
-        footer: DialogButtonBox {
-            padding: 12
-            background: Item {}
-            ActionButton { text: "关闭"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
-            onRejected: descriptionDialog.close()
-        }
         onOpened: contentItem.contentItem.contentY=0
     }
-    Dialog { id: deleteDialog; title: "删除脚本"; anchors.centerIn: parent; width: Math.min(480,page.width-48); implicitHeight: 220; modal: true; standardButtons: Dialog.Yes | Dialog.No
+    AppDialog { id: deleteDialog; title: "删除脚本"; destructive: true; acceptText: "删除"; anchors.centerIn: parent; width: Math.min(480,page.width-48); implicitHeight: 220; modal: true; standardButtons: Dialog.Yes | Dialog.No
         contentItem: ScrollView { id: deleteContent; clip: true
-            Label { width: deleteContent.availableWidth; wrapMode: Text.Wrap; text: "删除“"+(Scripts.selected.title || "")+"”？原文件将保留在备份目录。" }
+            Label { width: deleteContent.availableWidth; wrapMode: Text.Wrap; color: Theme.muted; text: "删除“"+(Scripts.selected.title || "")+"”？原文件将保留在备份目录。" }
         }
         onAccepted: Scripts.deleteSelected()
     }

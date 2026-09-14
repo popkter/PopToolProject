@@ -35,6 +35,8 @@ Qt 默认从 `build/qt-sdk/6.10.3/msvc2022_64` 查找，也可通过 `QT_ROOT` �
 
 也可在 Visual Studio 中直接“打开文件夹”选择本项目，使用 `CMakePresets.json` 的 `windows-msvc` 或 `windows-release` 配置。此方式需要在启动 Visual Studio 前设置 `QT_ROOT`；其 Ninja 构建目录与脚本生成的 VS 解决方案目录不同。
 
+Ninja/MSVC 配置会探测编译器原始 `/showIncludes` 前缀，避免中文输出编码导致头文件依赖丢失。若沿用此修复前的 Ninja 构建目录，请在 Visual Studio 中重新配置并“全部重新生成”一次，以清除可能混用新旧类布局的目标文件；只重新链接不足以修复旧产物。
+
 真实 Python/PowerShell 插件集成测试需要显式指定测试数据及资源目录，部分测试会下载运行时或依赖，不包含在普通 core/runtime 回归中。不要将测试数据目录指向个人正式数据。
 
 `.github/workflows/uterminal-ci.yml` 配置 Windows Debug/Release 构建及归档、core、runtime 测试，并保存测试日志。工作流已写入本地，尚未提交推送或获得 GitHub 运行结果；它不发布安装包。

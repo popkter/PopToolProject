@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-Dialog {
+AppDialog {
     id: dialog
     property string kind: "powershell"
     property string selectedVersion: ""
@@ -14,8 +14,6 @@ Dialog {
     title: pluginName+" 插件"
     anchors.centerIn: parent; modal: true
     width: Math.min(560,parent.width-40); height: Math.min(510,parent.height-40); padding: 20
-    background: Rectangle { radius: 10; color: Theme.surface; border.color: Theme.border }
-    header: Label { text: dialog.title; color: Theme.text; font.pixelSize: 21; font.bold: true; padding: 20; bottomPadding: 12 }
     ColumnLayout {
         anchors.fill: parent; spacing: 14
         RowLayout { Layout.fillWidth: true; spacing: 12

@@ -7,6 +7,34 @@ ComboBox {
     rightPadding: 34
     font.pixelSize: 13
     opacity: enabled ? 1 : 0.45
+    delegate: ItemDelegate {
+        width: control.popup.availableWidth
+        implicitHeight: 32
+        leftPadding: 12; rightPadding: 12
+        highlighted: control.highlightedIndex === index
+        contentItem: Text {
+            text: control.textAt(index); textFormat: Text.PlainText; font: control.font
+            color: parent.highlighted ? "white" : Theme.text
+            verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+        }
+        background: Rectangle { radius: 4; color: parent.highlighted ? Theme.accent : "transparent" }
+    }
+    popup: Popup {
+        y: control.height + 4
+        width: control.width
+        padding: 4
+        implicitHeight: Math.min(contentItem.implicitHeight + 8, 280)
+        margins: 8
+        popupType: Popup.Item
+        contentItem: ListView {
+            clip: true; implicitHeight: contentHeight
+            model: control.popup.visible ? control.delegateModel : null
+            currentIndex: control.highlightedIndex
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollIndicator.vertical: ScrollIndicator {}
+        }
+        background: PopupSurface {}
+    }
     contentItem: Text {
         text: control.displayText; font: control.font; color: Theme.text
         verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight

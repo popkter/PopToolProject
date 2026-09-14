@@ -1,6 +1,10 @@
 pragma Singleton
 import QtQuick
 QtObject {
+    readonly property int dialogRadius: 10
+    readonly property int popupRadius: 6
+    readonly property color danger: Settings.dark ? "#ff9b9b" : "#bd3434"
+    readonly property color dangerSurface: Settings.dark ? "#542d35" : "#ffcccc"
     readonly property color background: Settings.dark ? "#171b23" : "#f7f8fa"
     readonly property color surface: Settings.dark ? "#222833" : "#ffffff"
     readonly property color field: Settings.dark ? "#2b313d" : "#f5f7fa"

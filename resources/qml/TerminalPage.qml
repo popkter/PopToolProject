@@ -4,21 +4,39 @@ import QtQuick.Layouts
 import UTerminal
 Item {
     id: page
-        Rectangle { id: tabBar; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 48; color: Theme.background
-            RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 4
-                ListView { id: tabs; Layout.fillWidth: true; Layout.fillHeight: true; orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 4
-                    delegate: Rectangle { required property int index; required property string tabTitle; required property bool active; width: 220; height: 40; y: 8; radius: 8; color: active ? "#2b313d" : Theme.field
-                        RowLayout { anchors.fill: parent; anchors.leftMargin: 12
-                            Text { text: tabTitle; color: active ? "#eef1f6" : Theme.muted; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
-                            ToolButton { text: "×"; palette.buttonText: active ? "white" : Theme.muted; onClicked: Sessions.closeTab(index) }
+        Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 48; color: Theme.surface
+            RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; anchors.topMargin: 8; anchors.bottomMargin: 8; spacing: 4
+                ListView { id: tabs; objectName: "terminalTabs"; Layout.fillWidth: true; Layout.preferredHeight: 32; Layout.minimumHeight: 32; Layout.maximumHeight: 32; orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 4
+                    currentIndex: Sessions.currentIndex
+                    highlightMoveDuration: 0
+                    function revealCurrentTab() {
+                        if (currentIndex < 0 || currentIndex >= count || width <= 0) return
+                        forceLayout()
+                        positionViewAtIndex(currentIndex, ListView.Contain)
+                    }
+                    // Coalesce model and geometry changes, after delegate widths settle.
+                    onCurrentIndexChanged: Qt.callLater(revealCurrentTab)
+                    onCountChanged: Qt.callLater(revealCurrentTab)
+                    onWidthChanged: Qt.callLater(revealCurrentTab)
+                    onContentWidthChanged: Qt.callLater(revealCurrentTab)
+                    delegate: Rectangle { required property int index; required property string tabTitle; required property bool active; width: Math.max(160,Math.min(440,(tabs.width-4*Math.max(0,tabs.count-1))/Math.max(1,tabs.count))); height: tabs.height; radius: height/2; color: active ? "#2b313d" : Theme.field
+                        Text { anchors.fill: parent; anchors.leftMargin: 32; anchors.rightMargin: 32; text: tabTitle; color: active ? "#eef1f6" : Theme.muted; font.pixelSize: 12; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                        ToolButton {
+                            id: closeTabButton
+                            objectName: "closeTab_" + index
+                            anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
+                            width: 28; height: 28; text: "×"
+                            contentItem: Text { text: closeTabButton.text; color: active ? "white" : Theme.muted; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                            background: Rectangle { radius: 14; color: closeTabButton.hovered ? (active ? "#25ffffff" : Theme.border) : "transparent"; border.width: closeTabButton.activeFocus ? 1 : 0; border.color: Theme.accent }
+                            onClicked: Sessions.closeTab(index)
                         }
                         TapHandler { acceptedButtons: Qt.LeftButton; onTapped: Sessions.currentIndex=index }
                         TapHandler { acceptedButtons: Qt.RightButton; onTapped: { tabMenu.tabIndex=index;tabMenu.popup() } }
                     }
                 }
-                ToolButton { text: "+"; onClicked: Sessions.newTab(); ToolTip.visible: hovered; ToolTip.text: "新标签 Ctrl+T" }
-                ToolButton { contentItem: Icon { name: "view_column" } onClicked: Sessions.split(false); ToolTip.visible: hovered; ToolTip.text: "左右分屏" }
-                ToolButton { contentItem: Icon { name: "table_rows" } onClicked: Sessions.split(true); ToolTip.visible: hovered; ToolTip.text: "上下分屏" }
+                IconActionButton { objectName: "newTerminalTab"; iconName: "add"; onClicked: Sessions.newTab(); ToolTip.visible: hovered; ToolTip.text: "新标签 Ctrl+T"; Accessible.name: "新标签" }
+                IconActionButton { objectName: "splitTerminalHorizontal"; iconName: "view_column"; onClicked: Sessions.split(false); ToolTip.visible: hovered; ToolTip.text: "左右分屏"; Accessible.name: "左右分屏" }
+                IconActionButton { objectName: "splitTerminalVertical"; iconName: "table_rows"; onClicked: Sessions.split(true); ToolTip.visible: hovered; ToolTip.text: "上下分屏"; Accessible.name: "上下分屏" }
             }
         }
         Rectangle { anchors.top: tabBar.bottom; anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; color: "#2b313d"
@@ -65,25 +83,25 @@ Item {
                 ActionButton { text: Plugins.powerShellReady ? "打开终端" : "安装 PowerShell 7"; primary: true; Layout.alignment: Qt.AlignHCenter; onClicked: Plugins.powerShellReady ? Sessions.newTab() : App.showPlugin("powershell") }
             }
         }
-    Menu { id: contextMenu
-        MenuItem { text: "复制"; enabled: Sessions.menuText.length > 0; onTriggered: Sessions.copyMenuSelection() }
-        MenuItem { text: "粘贴"; enabled: Sessions.menuPane && Sessions.menuPane.running; onTriggered: Sessions.menuPane.terminal.pasteClipboard() }
-        MenuItem { text: "清空"; enabled: !!Sessions.menuPane; onTriggered: Sessions.menuPane.terminal.clearDisplay() }
-        MenuSeparator {}
-        MenuItem { text: "停止当前命令"; enabled: Sessions.menuPane && Sessions.menuPane.running; onTriggered: Sessions.interrupt(Sessions.menuPane) }
-        MenuItem { text: "结束会话"; enabled: Sessions.menuPane && Sessions.menuPane.running; onTriggered: Sessions.endPane(Sessions.menuPane) }
-        MenuItem { text: "关闭窗格"; enabled: !!Sessions.menuPane; onTriggered: Sessions.closePane(Sessions.menuPane) }
-        MenuSeparator {}
-        MenuItem { text: "添加为自定义脚本"; enabled: Sessions.menuText.trim().length > 0; onTriggered: Sessions.draftFromSelection() }
+    AppMenu { id: contextMenu; objectName: "terminalContextMenu"
+        AppMenuItem { text: "复制"; shortcutHint: "Ctrl+C"; enabled: Sessions.menuText.length > 0; onTriggered: Sessions.copyMenuSelection() }
+        AppMenuItem { text: "粘贴"; shortcutHint: "Ctrl+V"; enabled: Sessions.menuPane && Sessions.menuPane.running; onTriggered: Sessions.menuPane.terminal.pasteClipboard() }
+        AppMenuItem { text: "清空"; enabled: !!Sessions.menuPane; onTriggered: Sessions.menuPane.terminal.clearDisplay() }
+        AppMenuSeparator {}
+        AppMenuItem { text: "停止当前命令"; enabled: Sessions.menuPane && Sessions.menuPane.running; onTriggered: Sessions.interrupt(Sessions.menuPane) }
+        AppMenuItem { text: "结束会话"; enabled: Sessions.menuPane && Sessions.menuPane.running; onTriggered: Sessions.endPane(Sessions.menuPane) }
+        AppMenuItem { text: "关闭窗格"; enabled: !!Sessions.menuPane; onTriggered: Sessions.closePane(Sessions.menuPane) }
+        AppMenuSeparator {}
+        AppMenuItem { text: "添加为自定义脚本"; enabled: Sessions.menuText.trim().length > 0; onTriggered: Sessions.draftFromSelection() }
     }
-    Menu { id: tabMenu; property int tabIndex: -1
-        MenuItem { text: "重命名"; onTriggered: renameDialog.open() }
-        MenuItem { text: "关闭"; onTriggered: Sessions.closeTab(tabMenu.tabIndex) }
-        MenuItem { text: "关闭其他标签"; onTriggered: Sessions.closeOthers(tabMenu.tabIndex) }
-        MenuItem { text: "关闭右侧标签"; onTriggered: Sessions.closeRight(tabMenu.tabIndex) }
+    AppMenu { id: tabMenu; objectName: "terminalTabMenu"; property int tabIndex: -1
+        AppMenuItem { text: "重命名"; onTriggered: renameDialog.open() }
+        AppMenuItem { text: "关闭"; onTriggered: Sessions.closeTab(tabMenu.tabIndex) }
+        AppMenuItem { text: "关闭其他标签"; onTriggered: Sessions.closeOthers(tabMenu.tabIndex) }
+        AppMenuItem { text: "关闭右侧标签"; onTriggered: Sessions.closeRight(tabMenu.tabIndex) }
     }
-    Dialog { id: renameDialog; title: "重命名标签"; anchors.centerIn: parent; modal: true; standardButtons: Dialog.Ok | Dialog.Cancel
-        Field { id: tabName; placeholderText: "标签名称" }
+    AppDialog { id: renameDialog; title: "重命名标签"; anchors.centerIn: parent; modal: true; standardButtons: Dialog.Ok | Dialog.Cancel
+        Field { id: tabName; width: parent.width; placeholderText: "标签名称" }
         onAccepted: Sessions.renameTab(tabMenu.tabIndex,tabName.text)
     }
     Connections { target: Sessions; function onContextMenuRequested(x,y) { const point=page.mapFromItem(null,x,y);contextMenu.popup(point.x,point.y) } }

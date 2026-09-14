@@ -111,11 +111,11 @@ signals:
     void pluginRequired(const QString &kind);
     void error(const QString &message);
 private:
-    struct Tab { QString title; bool renamed=false,vertical=false; QList<Pane*> panes; };
+    struct Tab { QString title; bool fixedTitle=false,vertical=false; QList<Pane*> panes; };
     Pane *makePane();
     bool startShell(Pane *pane,const QString &directory=QString());
     void release(Pane *pane);
-    void appendTab(Pane *pane,const QString &title);
+    void appendTab(Pane *pane,const QString &title,bool fixedTitle=false);
     QList<Tab> m_tabs;
     int m_current=-1;
     Plugins *m_plugins;

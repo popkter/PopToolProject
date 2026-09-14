@@ -2,16 +2,14 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import UTerminal 1.0
-Dialog {
+AppDialog {
     id: editor
     property bool advancedExpanded: false
     readonly property string languageName: Scripts.draft.language === "python" ? "Python" : Scripts.draft.language === "cmd" ? "CMD / BAT" : "PowerShell 7"
     anchors.centerIn: parent; width: Math.min(900,parent.width-80); height: Math.min(830,parent.height-60); modal: true
     padding: 20
     title: (Scripts.draft.id ? "编辑脚本" : "新建脚本") + " · " + languageName
-    background: Rectangle { radius: 10; color: Theme.surface; border.color: Theme.border }
-    header: Label { text: editor.title; color: Theme.text; font.pixelSize: 21; font.bold: true; padding: 20; bottomPadding: 12; elide: Text.ElideRight }
-    Dialog {
+    AppDialog {
         id: iconDialog; objectName: "scriptIconDialog"
         title: "选择脚本图标"; modal: true; anchors.centerIn: parent
         width: Math.min(520,editor.width-32); height: Math.min(520,editor.height-32)
@@ -125,7 +123,7 @@ Dialog {
             ActionButton { text: "检查 Python 依赖"; visible: Scripts.draft.language === "python"; enabled: Plugins.pythonReady && !Python.busy; onClicked: { Python.probe(Scripts.draft.code,Scripts.draft.workingDirectory || "");diagnostics.open() } }
         }
     }
-    Dialog {
+    AppDialog {
         id: argumentsDialog; objectName: "scriptArgumentsDialog"; title: "Python 命令行参数"; anchors.centerIn: parent; modal: true
         width: Math.min(650,editor.width-30); height: Math.min(480,editor.height-40); standardButtons: Dialog.Close
         ColumnLayout { anchors.fill: parent
@@ -141,7 +139,7 @@ Dialog {
             ActionButton { text: "添加参数"; onClicked: Scripts.setDraftArgument((Scripts.draft.arguments || []).length,"") }
         }
     }
-    Dialog { id: environmentDialog; anchors.centerIn: parent; width: Math.min(650,editor.width-30); height: Math.min(500,editor.height-40); title: "脚本环境变量"; modal: true; standardButtons: Dialog.Close
+    AppDialog { id: environmentDialog; anchors.centerIn: parent; width: Math.min(650,editor.width-30); height: Math.min(500,editor.height-40); title: "脚本环境变量"; modal: true; standardButtons: Dialog.Close
         ColumnLayout { anchors.fill: parent; spacing: 10
             Label { text: "仅影响此脚本进程。选择一项后可修改其值；Python 环境和输出目录由应用管理。"; wrapMode: Text.Wrap; Layout.fillWidth: true; color: Theme.muted }
             ListView { Layout.fillWidth: true; Layout.fillHeight: true; clip: true; model: Scripts.draftEnvironment; spacing: 6
@@ -158,7 +156,7 @@ Dialog {
             ActionButton { text: "添加或更新"; primary: true; enabled: envName.text.length>0; onClicked: { if(Scripts.setDraftEnvironment(envName.text,envValue.text)){ envName.clear(); envValue.clear() } } }
         }
     }
-    Dialog { id: diagnostics; anchors.centerIn: parent; title: "Python 依赖检查"; width: 530; modal: true; standardButtons: Dialog.Close
+    AppDialog { id: diagnostics; anchors.centerIn: parent; title: "Python 依赖检查"; width: 530; modal: true; standardButtons: Dialog.Close
         ColumnLayout { width: parent.width; spacing: 12
             Label { text: Python.status; wrapMode: Text.Wrap; Layout.fillWidth: true }
             Label { text: Python.diagnostics.syntaxError || ""; visible: text !== ""; color: "#e05252"; wrapMode: Text.Wrap; Layout.fillWidth: true }

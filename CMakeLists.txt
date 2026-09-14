@@ -1,5 +1,31 @@
 cmake_minimum_required(VERSION 3.25)
+# Keep MSVC's dependency output stable across Visual Studio and shell builds.
+# A localized /showIncludes prefix decoded under another code page can make
+# Ninja record zero headers and link objects with incompatible class layouts.
+if(WIN32)
+  set(ENV{VSLANG} 1033)
+endif()
 project(UTerminal VERSION 0.1.1 LANGUAGES C CXX)
+if(MSVC AND CMAKE_GENERATOR MATCHES "Ninja")
+  # English resources are optional in localized VS installations. Probe the
+  # actual bytes instead of assuming VSLANG can force English, or decoding the
+  # compiler's OEM output as UTF-8 before Ninja compares it byte-for-byte.
+  set(ut_include_probe "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/uterminal-includes")
+  file(MAKE_DIRECTORY "${ut_include_probe}")
+  file(WRITE "${ut_include_probe}/probe.h" "\n")
+  file(WRITE "${ut_include_probe}/probe.cpp" "#include \"${ut_include_probe}/probe.h\"\n")
+  execute_process(COMMAND "${CMAKE_CXX_COMPILER}" /nologo /showIncludes /EP "${ut_include_probe}/probe.cpp"
+    OUTPUT_VARIABLE ut_include_output ERROR_VARIABLE ut_include_error
+    RESULT_VARIABLE ut_include_result ENCODING NONE)
+  string(APPEND ut_include_output "\n${ut_include_error}")
+  if(NOT ut_include_result EQUAL 0 OR NOT ut_include_output MATCHES "(^|\n)([^:\r\n]+:[^:\r\n]+:[ \t]+)[A-Za-z]:")
+    message(FATAL_ERROR "Cannot identify MSVC header dependencies. Run CMake from the Visual Studio developer environment.")
+  endif()
+  set(CMAKE_C_CL_SHOWINCLUDES_PREFIX "${CMAKE_MATCH_2}")
+  set(CMAKE_CXX_CL_SHOWINCLUDES_PREFIX "${CMAKE_MATCH_2}")
+  set(CMAKE_C_COMPILER_LAUNCHER "${CMAKE_COMMAND}" -E env VSLANG=1033)
+  set(CMAKE_CXX_COMPILER_LAUNCHER "${CMAKE_COMMAND}" -E env VSLANG=1033)
+endif()
 configure_file(src/uterminal/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/uterminal-version.rc @ONLY)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/version.json "{\"version\":\"${PROJECT_VERSION}\"}\n")
 set(CMAKE_CXX_STANDARD 20)
@@ -91,6 +117,7 @@ if(BUILD_TESTING)
   qt6_generate_moc(tests/cpp/runtime_tests.cpp ${CMAKE_CURRENT_BINARY_DIR}/runtime_tests.moc)
   add_executable(uterminal_runtime_tests tests/cpp/runtime_tests.cpp ${CMAKE_CURRENT_BINARY_DIR}/runtime_tests.moc)
   target_include_directories(uterminal_runtime_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+  target_compile_definitions(uterminal_runtime_tests PRIVATE UTERMINAL_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
   target_link_libraries(uterminal_runtime_tests PRIVATE uterminal_terminal Qt6::Test)
   add_dependencies(uterminal_runtime_tests UTerminalUpdateRunner uterminal_update_fixture)
   add_test(NAME runtime COMMAND uterminal_runtime_tests -o ${CMAKE_CURRENT_BINARY_DIR}/runtime-results.txt,txt)

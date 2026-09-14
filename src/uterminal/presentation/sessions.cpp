@@ -59,7 +59,7 @@ Pane *Sessions::makePane(){
     pane->terminal()->setColors(m_settings->terminalForeground(),m_settings->terminalBackground());pane->terminal()->setFontSize(m_settings->fontSize());pane->terminal()->setFontFamily(m_settings->fontFamily());
     connect(&pane->process,&ConPty::error,this,&Sessions::error);
     connect(&pane->process,&ConPty::finished,this,[this,pane]{release(pane);emit changed();});
-    connect(pane,&Pane::changed,this,[this,pane]{for(int i=0;i<m_tabs.size();++i)if(m_tabs[i].panes.contains(pane)&&!m_tabs[i].renamed){m_tabs[i].title=pane->title();emit dataChanged(index(i),index(i));}});
+    connect(pane,&Pane::changed,this,[this,pane]{for(int i=0;i<m_tabs.size();++i)if(m_tabs[i].panes.contains(pane)&&!m_tabs[i].fixedTitle){m_tabs[i].title=pane->title();emit dataChanged(index(i),index(i));}});
     connect(pane->terminal(),&QQuickItem::activeFocusChanged,this,[this,pane]{if(pane->terminal()->hasActiveFocus()){m_focused=pane;emit focusChanged();}});
     connect(pane->terminal(),&TerminalItem::contextMenuRequested,this,[this,pane](qreal x,qreal y){m_menuPane=pane;m_menuText=pane->terminal()->selectionText();auto pos=pane->terminal()->mapToScene({x,y});emit menuChanged();emit contextMenuRequested(pos.x(),pos.y());});
     connect(pane->terminal(),&TerminalItem::multilinePasteRequested,this,[this,pane](const QString &text){m_pastePane=pane;m_pasteText=text;emit pasteConfirmationRequested(text);});
@@ -76,7 +76,7 @@ bool Sessions::startShell(Pane *pane,const QString &directory){
     if(!ok)release(pane);else pane->captureRuntime();return ok;
 }
 void Sessions::release(Pane *pane){m_plugins->release("powershell",pane->powerShellVersion);m_plugins->release("python",pane->pythonVersion);pane->powerShellVersion.clear();pane->pythonVersion.clear();}
-void Sessions::appendTab(Pane *pane,const QString &title){beginInsertRows({},int(m_tabs.size()),int(m_tabs.size()));m_tabs.append({title,false,false,{pane}});endInsertRows();setCurrentIndex(int(m_tabs.size())-1);}
+void Sessions::appendTab(Pane *pane,const QString &title,bool fixedTitle){beginInsertRows({},int(m_tabs.size()),int(m_tabs.size()));m_tabs.append({title,fixedTitle,false,{pane}});endInsertRows();setCurrentIndex(int(m_tabs.size())-1);}
 void Sessions::newTab(){openDirectory(m_pendingDirectory);}
 QString Sessions::resolveDirectory(const QString &path){
     if(path.isEmpty())return QDir::homePath();const QFileInfo info(path);
@@ -85,7 +85,7 @@ QString Sessions::resolveDirectory(const QString &path){
 void Sessions::openDirectory(const QString &path){
     m_pendingDirectory=resolveDirectory(path);
     if(!m_plugins->powerShellReady()){emit pluginRequired("powershell");return;}
-    auto *pane=makePane();if(!startShell(pane,m_pendingDirectory)){delete pane;return;}m_pendingDirectory.clear();appendTab(pane,"PowerShell");
+    auto *pane=makePane();if(!startShell(pane,m_pendingDirectory)){delete pane;return;}m_pendingDirectory.clear();appendTab(pane,QStringLiteral("Power'Shell"),true);
 }
 void Sessions::split(bool vertical){if(m_current<0){newTab();return;}auto *pane=makePane();if(!startShell(pane)){delete pane;return;}m_tabs[m_current].vertical=vertical;m_tabs[m_current].panes.append(pane);emit changed();focusPane(pane);}
 void Sessions::focusPane(Pane *pane){m_focused=pane;if(pane)pane->terminal()->forceActiveFocus();emit focusChanged();}
@@ -95,7 +95,7 @@ void Sessions::closePane(Pane *pane){for(int i=0;i<m_tabs.size();++i){auto &t=m_
 void Sessions::closeTab(int i){if(i<0||i>=m_tabs.size())return;beginRemoveRows({},i,i);auto tab=m_tabs.takeAt(i);if(m_current>=i)--m_current;m_current=m_tabs.isEmpty()?-1:qBound(0,m_current,int(m_tabs.size())-1);endRemoveRows();for(auto*p:tab.panes){endPane(p);delete p;}emit changed();if(m_current>=0)setCurrentIndex(m_current);else focusPane(nullptr);}
 void Sessions::closeOthers(int i){for(int n=int(m_tabs.size())-1;n>=0;--n)if(n!=i)closeTab(n);}
 void Sessions::closeRight(int i){for(int n=int(m_tabs.size())-1;n>i;--n)closeTab(n);}
-void Sessions::renameTab(int i,const QString &title){if(i<0||i>=m_tabs.size()||title.trimmed().isEmpty())return;m_tabs[i].title=title.trimmed().left(200);m_tabs[i].renamed=true;emit dataChanged(index(i),index(i));}
+void Sessions::renameTab(int i,const QString &title){if(i<0||i>=m_tabs.size()||title.trimmed().isEmpty())return;m_tabs[i].title=title.trimmed().left(200);m_tabs[i].fixedTitle=true;emit dataChanged(index(i),index(i));}
 void Sessions::copyMenuSelection(){if(!m_menuText.isEmpty())QGuiApplication::clipboard()->setText(m_menuText);}
 void Sessions::draftFromSelection(){if(m_menuText.trimmed().isEmpty())return;m_scripts->newDraft(m_menuText,m_menuPane?m_menuPane->language:"powershell");emit draftRequested();}
 void Sessions::acceptPaste(){if(m_pastePane&&m_pastePane->running())m_pastePane->terminal()->pasteText(m_pasteText);cancelPaste();}

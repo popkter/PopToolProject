@@ -7,6 +7,9 @@
 #include <QDropEvent>
 #include <QPainter>
 #include <QQuickWindow>
+#include <QQmlEngine>
+#include <QQmlComponent>
+#include <QQmlContext>
 #include "infrastructure/conpty.h"
 #include "infrastructure/processrunner.h"
 #include "presentation/sessions.h"
@@ -415,6 +418,73 @@ private slots:
         QTemporaryDir temporary;ut::Plugins plugins(temporary.path(),temporary.path());ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Sessions sessions(&plugins,&settings,&scripts);
         auto*pane=sessions.startProgram(qEnvironmentVariable("SystemRoot")+"/System32/cmd.exe",{"/D","/Q"},temporary.path(),QProcessEnvironment::systemEnvironment(),"cmd","test");
         QVERIFY(pane);QCOMPARE(sessions.rowCount(),1);QSignalSpy focus(&sessions,&ut::Sessions::focusChanged);sessions.closePane(pane);QCOMPARE(sessions.rowCount(),0);QCOMPARE(sessions.currentIndex(),-1);QVERIFY(!sessions.anyRunning());QVERIFY(!sessions.focusedPane());QVERIFY(!focus.isEmpty());
+    }
+    void closeTabThroughQmlButton(){
+        QTemporaryDir temporary;QVERIFY(temporary.isValid());
+        ut::Plugins plugins(temporary.path(),temporary.path());ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Sessions sessions(&plugins,&settings,&scripts);
+        qmlRegisterUncreatableType<ut::Pane>("UTerminal",1,0,"Pane","Owned by Sessions");
+        qmlRegisterType<ut::PaneHost>("UTerminal",1,0,"PaneHost");
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("Settings",&settings);
+        engine.rootContext()->setContextProperty("Sessions",&sessions);
+        engine.rootContext()->setContextProperty("Plugins",&plugins);
+        QQuickWindow window;window.resize(1000,700);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(QStringLiteral(UTERMINAL_TEST_SOURCE_DIR "/resources/qml/TerminalPage.qml")));
+        QScopedPointer<QObject> object(component.create());QVERIFY2(object,qPrintable(component.errorString()));
+        auto *page=qobject_cast<QQuickItem*>(object.data());QVERIFY(page);page->setParentItem(window.contentItem());page->setSize(window.size());
+        window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));
+        for(int i=0;i<3;++i)QVERIFY(sessions.startProgram(qEnvironmentVariable("SystemRoot")+"/System32/cmd.exe",{"/D","/Q"},temporary.path(),QProcessEnvironment::systemEnvironment(),"cmd",QString("test %1").arg(i)));
+        auto findItem=[](auto &&self,QQuickItem *parent,const QString &name)->QQuickItem*{
+            if(parent->objectName()==name)return parent;
+            for(auto *child:parent->childItems())if(auto *found=self(self,child,name))return found;
+            return nullptr;
+        };
+        // Close an inactive tab, then the active tab, then the final tab through
+        // actual pointer delivery. A direct Sessions::closeTab call misses this path.
+        for(const int index:{0,1,0}){
+            QTest::qWait(100);
+            auto *button=findItem(findItem,page,QString("closeTab_%1").arg(index));QVERIFY(button);
+            const auto before=sessions.rowCount();
+            QTest::mouseClick(&window,Qt::LeftButton,Qt::NoModifier,button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint());
+            QTRY_COMPARE(sessions.rowCount(),before-1);
+        }
+        QVERIFY(!sessions.anyRunning());QVERIFY(!sessions.focusedPane());QCOMPARE(sessions.currentIndex(),-1);
+    }
+    void selectedTabRemainsVisible(){
+        QTemporaryDir temporary;QVERIFY(temporary.isValid());
+        ut::Plugins plugins(temporary.path(),temporary.path());ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Sessions sessions(&plugins,&settings,&scripts);
+        qmlRegisterUncreatableType<ut::Pane>("UTerminal",1,0,"Pane","Owned by Sessions");
+        qmlRegisterType<ut::PaneHost>("UTerminal",1,0,"PaneHost");
+        QQmlEngine engine;engine.rootContext()->setContextProperty("Settings",&settings);engine.rootContext()->setContextProperty("Sessions",&sessions);engine.rootContext()->setContextProperty("Plugins",&plugins);
+        QQuickWindow window;window.resize(1000,700);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(QStringLiteral(UTERMINAL_TEST_SOURCE_DIR "/resources/qml/TerminalPage.qml")));
+        QScopedPointer<QObject> object(component.create());QVERIFY2(object,qPrintable(component.errorString()));
+        auto *page=qobject_cast<QQuickItem*>(object.data());QVERIFY(page);page->setParentItem(window.contentItem());page->setSize({930,700});
+        auto *tabs=page->findChild<QQuickItem*>("terminalTabs");QVERIFY(tabs);
+        window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));
+        auto fullyVisible=[&]{
+            auto *item=qvariant_cast<QQuickItem*>(tabs->property("currentItem"));
+            if(!item||tabs->property("currentIndex").toInt()!=sessions.currentIndex())return false;
+            const auto left=item->mapToItem(tabs,QPointF()).x();
+            return left>=-0.5&&left+item->width()<=tabs->width()+0.5;
+        };
+        for(int i=0;i<9;++i){
+            QVERIFY(sessions.startProgram(qEnvironmentVariable("SystemRoot")+"/System32/cmd.exe",{"/D","/Q"},temporary.path(),QProcessEnvironment::systemEnvironment(),"cmd",QString("test %1").arg(i)));
+            QTRY_VERIFY(fullyVisible());
+        }
+        QVERIFY(tabs->property("contentX").toDouble()>0);
+        sessions.setCurrentIndex(0);QTRY_VERIFY(fullyVisible());
+        // This is the same navigation entry point used by Ctrl+Tab.
+        for(int i=0;i<9;++i){sessions.nextTab();QTRY_VERIFY(fullyVisible());}
+        sessions.setCurrentIndex(8);QTRY_VERIFY(fullyVisible());
+        sessions.closeTab(8);QTRY_VERIFY(fullyVisible());
+        const auto narrowWidth=tabs->width();
+        window.resize(1362,700);page->setWidth(1292);QTRY_VERIFY(tabs->width()>narrowWidth);QTRY_VERIFY(fullyVisible());
+        window.resize(1000,700);page->setWidth(930);QTRY_COMPARE(tabs->width(),narrowWidth);QTRY_VERIFY(fullyVisible());
+        const auto scroll=tabs->property("contentX").toDouble();
+        sessions.renameTab(sessions.currentIndex(),"renamed");QTest::qWait(60);
+        QCOMPARE(tabs->property("contentX").toDouble(),scroll);
+        sessions.closeAll();QTRY_COMPARE(tabs->property("count").toInt(),0);
     }
     void processOutputAndExit(){
         ut::ProcessRunner runner;QSignalSpy done(&runner,&ut::ProcessRunner::finished);QByteArray bytes;

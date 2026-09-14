@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-Dialog {
+AppDialog {
     id: dialog
     anchors.centerIn: parent; width: Math.min(820,parent.width-80); height: Math.min(780,parent.height-80); modal: true
     title: "Python 依赖环境"
