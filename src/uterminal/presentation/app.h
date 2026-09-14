@@ -6,7 +6,9 @@
 #include <QJsonObject>
 #include <QColor>
 #include <QAbstractNativeEventFilter>
+#include <QRect>
 class QQuickWindow;
+class QQuickItem;
 namespace ut {
 class Scripts;class Plugins;class Sessions;class Executions;class PythonEnvironment;class Updates;class Pane;
 class App : public QObject, public QAbstractNativeEventFilter {
@@ -15,6 +17,7 @@ class App : public QObject, public QAbstractNativeEventFilter {
     Q_PROPERTY(QString resources READ resources CONSTANT)
     Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
+    Q_PROPERTY(qreal captionHeight READ captionHeight NOTIFY captionMetricsChanged)
 public:
     App(QString resources,Scripts *scripts,Plugins *plugins,Sessions *sessions,Executions *runs,PythonEnvironment *python,Updates *updates,QObject *parent=nullptr);
     ~App() override;
@@ -23,9 +26,11 @@ public:
     QString resources()const;
     QString notice()const{return m_notice;}
     bool elevated()const;
+    qreal captionHeight()const{return m_captionHeight;}
     void attachWindow(QQuickWindow *window);
     Q_INVOKABLE void updateTitleBar(QQuickWindow *window,bool dark,const QColor &background,const QColor &text);
     Q_INVOKABLE bool startSystemMove(QQuickWindow *window);
+    Q_INVOKABLE void registerCaptionItem(QQuickItem *item);
     void handleLaunch(const QJsonObject &request);
     Q_INVOKABLE void setModalOpen(QObject *dialog,bool open);
     Q_INVOKABLE void showNotice(const QString &text);
@@ -52,11 +57,16 @@ signals:
     void pluginRequested(const QString &kind);
     void quitConfirmationRequested();
     void quitting();
+    void captionMetricsChanged();
 private:
     void finishExternalActivation();
     void activateWindow();
+    void refreshCaptionMetrics();
+    int captionButtonHitTest(quintptr window,qintptr position) const;
     QPointer<QQuickWindow> m_window;
     quintptr m_windowHandle=0;
+    QList<QPointer<QQuickItem>> m_captionItems;
+    qreal m_captionHeight=32;
     QPointer<Pane> m_externalPane;
     QHash<QObject*,QMetaObject::Connection> m_modals;
     QString m_deferredPlugin;

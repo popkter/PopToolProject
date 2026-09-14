@@ -30,10 +30,14 @@ ApplicationWindow {
         Rectangle {
             id: topBar
             anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
-            height: 42; color: window.chromeBackground
+            height: App.captionHeight; color: window.chromeBackground
             Item {
+                id: mainTitleBarDragRegion
+                objectName: "mainTitleBarDragRegion"
                 anchors.left: parent.left; anchors.leftMargin: 42; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
                 anchors.rightMargin: Math.max(138,SafeArea.margins.right)
+                visible: App.page !== 1
+                Component.onCompleted: App.registerCaptionItem(mainTitleBarDragRegion)
                 DragHandler {
                     target: null
                     acceptedButtons: Qt.LeftButton
@@ -55,7 +59,7 @@ ApplicationWindow {
                 delegate: ToolButton {
                     required property var modelData
                     required property int index
-                    x: 5; y: 42 + index * 37; width: 32; height: 32
+                    x: 5; y: App.captionHeight + index * 37; width: 32; height: 32
                     Accessible.name: modelData.title
                     background: Rectangle { radius: 5; color: App.page === modelData.page ? window.chromeSelected : parent.hovered ? window.chromeIdle : "transparent" }
                     contentItem: Icon { name: modelData.name; font.pixelSize: 17; color: App.page === modelData.page ? window.chromeAccent : window.chromeMuted }
@@ -82,7 +86,7 @@ ApplicationWindow {
         }
         StackLayout {
             anchors.left: navigation.right; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
-            anchors.topMargin: App.page === 1 ? 0 : 42; currentIndex: App.page
+            anchors.topMargin: App.page === 1 ? 0 : App.captionHeight; currentIndex: App.page
             ScriptsPage {}
             TerminalPage {}
             SettingsPage {}

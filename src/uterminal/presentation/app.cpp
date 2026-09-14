@@ -11,10 +11,12 @@
 #include <QFileDialog>
 #include <QUrl>
 #include <QQuickWindow>
+#include <QQuickItem>
 #include <QTimer>
 #include <utility>
 #include "infrastructure/instance.h"
 #include <windows.h>
+#include <windowsx.h>
 #include <dwmapi.h>
 namespace ut {
 App::App(QString resources,Scripts *scripts,Plugins *plugins,Sessions *sessions,Executions *runs,PythonEnvironment *python,Updates *updates,QObject *parent)
@@ -30,22 +32,67 @@ App::~App(){if(auto *application=QCoreApplication::instance())application->remov
 QString App::resources()const{return QUrl::fromLocalFile(m_resources+'/').toString();}
 void App::setPage(int p){if(p<0||p>2)return;bool entering=p!=m_page;m_page=p;emit pageChanged();if(entering&&p==1&&!m_plugins->powerShellReady()&&m_sessions->rowCount()==0)showPlugin("powershell");}
 bool App::elevated()const{return processElevated();}
-void App::attachWindow(QQuickWindow *window){m_window=window;m_windowHandle=window?window->winId():0;}
+void App::attachWindow(QQuickWindow *window){m_window=window;m_windowHandle=window?window->winId():0;refreshCaptionMetrics();}
 void App::updateTitleBar(QQuickWindow *window,bool dark,const QColor &background,const QColor &text){
     if(!window)return;
     const auto handle=reinterpret_cast<HWND>(window->winId());const BOOL enabled=dark;
-    const COLORREF caption=RGB(background.red(),background.green(),background.blue()),foreground=RGB(text.red(),text.green(),text.blue());
+    const COLORREF caption=RGB(background.red(),background.green(),background.blue());
     DwmSetWindowAttribute(handle,DWMWA_USE_IMMERSIVE_DARK_MODE,&enabled,sizeof(enabled));
     DwmSetWindowAttribute(handle,DWMWA_CAPTION_COLOR,&caption,sizeof(caption));
-    DwmSetWindowAttribute(handle,DWMWA_TEXT_COLOR,&foreground,sizeof(foreground));
+    // Leave caption glyph colors under DWM control so their hover and pressed
+    // states always contrast with the system-provided button background.
+    const COLORREF automatic=DWMWA_COLOR_DEFAULT;
+    DwmSetWindowAttribute(handle,DWMWA_TEXT_COLOR,&automatic,sizeof(automatic));
     const DWM_WINDOW_CORNER_PREFERENCE corners=DWMWCP_ROUND;
     DwmSetWindowAttribute(handle,DWMWA_WINDOW_CORNER_PREFERENCE,&corners,sizeof(corners));
     RedrawWindow(handle,nullptr,nullptr,RDW_FRAME|RDW_INVALIDATE);
+    Q_UNUSED(text);
 }
 bool App::startSystemMove(QQuickWindow *window){return window&&window->startSystemMove();}
+void App::registerCaptionItem(QQuickItem *item){if(item&&!m_captionItems.contains(item))m_captionItems.append(item);}
+void App::refreshCaptionMetrics(){
+    if(!m_windowHandle||!m_window)return;
+    RECT bounds{};const auto handle=reinterpret_cast<HWND>(m_windowHandle);
+    if(DwmGetWindowAttribute(handle,DWMWA_CAPTION_BUTTON_BOUNDS,&bounds,sizeof(bounds))!=S_OK||bounds.bottom<=bounds.top)return;
+    const auto height=qBound(28.0,qreal(bounds.bottom-bounds.top)/m_window->devicePixelRatio(),48.0);
+    if(qAbs(height-m_captionHeight)<0.5)return;
+    m_captionHeight=height;emit captionMetricsChanged();
+}
+int App::captionButtonHitTest(quintptr windowHandle,qintptr position)const{
+    const auto window=reinterpret_cast<HWND>(windowHandle);
+    RECT buttons{},frame{};
+    if(DwmGetWindowAttribute(window,DWMWA_CAPTION_BUTTON_BOUNDS,&buttons,sizeof(buttons))!=S_OK||
+       !GetWindowRect(window,&frame)||buttons.right<=buttons.left||buttons.bottom<=buttons.top)return HTNOWHERE;
+    const POINT point{GET_X_LPARAM(position)-frame.left,GET_Y_LPARAM(position)-frame.top};
+    if(point.x<buttons.left||point.x>=buttons.right||point.y<buttons.top||point.y>=buttons.bottom)return HTNOWHERE;
+    const auto width=qMax<LONG>(1,(buttons.right-buttons.left)/3);
+    if(point.x>=buttons.right-width)return HTCLOSE;
+    if(point.x>=buttons.right-2*width)return HTMAXBUTTON;
+    return HTMINBUTTON;
+}
 bool App::nativeEventFilter(const QByteArray &,void *nativeMessage,qintptr *result){
     const auto *message=static_cast<MSG*>(nativeMessage);
     if(!message||!m_window||message->hwnd!=reinterpret_cast<HWND>(m_windowHandle))return false;
+    if(message->message==WM_NCHITTEST){
+        LRESULT dwmResult=HTNOWHERE;
+        if(DwmDefWindowProc(message->hwnd,message->message,message->wParam,message->lParam,&dwmResult)&&
+           (dwmResult==HTMINBUTTON||dwmResult==HTMAXBUTTON||dwmResult==HTCLOSE)){
+            if(result)*result=dwmResult;return true;
+        }
+        const auto button=captionButtonHitTest(reinterpret_cast<quintptr>(message->hwnd),message->lParam);
+        if(button!=HTNOWHERE){if(result)*result=button;return true;}
+        POINT point{GET_X_LPARAM(message->lParam),GET_Y_LPARAM(message->lParam)};
+        if(ScreenToClient(message->hwnd,&point)){
+            const auto scale=m_window->devicePixelRatio();const QPointF scene(point.x/scale,point.y/scale);
+            for(const auto &item:m_captionItems)if(item&&item->isVisible()&&item->contains(item->mapFromScene(scene))){
+                if(result)*result=HTCAPTION;return true;
+            }
+        }
+        return false;
+    }
+    if((message->message==WM_NCRBUTTONDOWN||message->message==WM_NCRBUTTONUP)&&message->wParam==HTCAPTION){
+        if(result)*result=0;return true;
+    }
     if(message->message==WM_SYSCOMMAND&&(message->wParam&0xfff0)==SC_MINIMIZE){
         // Frameless extended-client windows are not minimized reliably by every
         // taskbar path. Honor the native system command explicitly.
@@ -53,6 +100,7 @@ bool App::nativeEventFilter(const QByteArray &,void *nativeMessage,qintptr *resu
         if(result)*result=0;
         return true;
     }
+    if(message->message==WM_DPICHANGED||message->message==WM_WINDOWPOSCHANGED)QTimer::singleShot(0,this,&App::refreshCaptionMetrics);
     return false;
 }
 void App::activateWindow(){

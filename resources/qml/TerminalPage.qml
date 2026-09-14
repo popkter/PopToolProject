@@ -4,12 +4,13 @@ import QtQuick.Layouts
 import UTerminal
 Item {
     id: page
-        Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 42; color: Settings.dark ? "#202020" : "#f3f3f3"
+        readonly property real nativeCaptionHeight: typeof App !== "undefined" ? App.captionHeight : 32
+        Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: page.nativeCaptionHeight; color: Settings.dark ? "#202020" : "#f3f3f3"
                 readonly property real captionInset: Math.max(138,SafeArea.margins.right)
                 readonly property real tabViewportLimit: Math.max(0,width-captionInset-82)
                 readonly property color idleHover: Settings.dark ? "#353535" : "#e5e5e5"
                 readonly property color idlePressed: Settings.dark ? "#404040" : "#d8d8d8"
-                ListView { id: tabs; objectName: "terminalTabs"; x: 0; y: 4; width: Math.min(contentWidth,tabBar.tabViewportLimit); height: 38; orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 2
+                ListView { id: tabs; objectName: "terminalTabs"; x: 0; y: 2; width: Math.min(contentWidth,tabBar.tabViewportLimit); height: Math.max(26,tabBar.height-y); orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 2
                     currentIndex: Sessions.currentIndex
                     highlightMoveDuration: 0
                     function revealCurrentTab() {
@@ -50,7 +51,7 @@ Item {
                 }
             ToolButton {
                 id: newTabButton; objectName: "newTerminalTab"
-                x: tabs.x+tabs.width+4; y: 5; width: 36; height: 32
+                x: tabs.x+tabs.width+4; y: 0; width: 36; height: tabBar.height
                 background: Rectangle { radius: 4; color: newTabButton.down ? tabBar.idlePressed : newTabButton.hovered ? tabBar.idleHover : "transparent" }
                 contentItem: Icon { name: "add"; font.pixelSize: 18; color: Settings.dark ? "#f5f5f5" : "#1a1a1a" }
                 onClicked: Sessions.newTab()
@@ -58,7 +59,7 @@ Item {
             }
             ToolButton {
                 id: terminalMenuButton; objectName: "terminalMenuButton"
-                x: newTabButton.x+newTabButton.width; y: 5; width: 32; height: 32
+                x: newTabButton.x+newTabButton.width; y: 0; width: 32; height: tabBar.height
                 background: Rectangle { radius: 4; color: terminalMenuButton.down ? tabBar.idlePressed : terminalMenuButton.hovered ? tabBar.idleHover : "transparent" }
                 contentItem: Icon { name: "expand_more"; font.pixelSize: 18; color: Settings.dark ? "#f5f5f5" : "#1a1a1a" }
                 onClicked: terminalActionsMenu.popup()
@@ -69,6 +70,7 @@ Item {
                 anchors.left: terminalMenuButton.right; anchors.leftMargin: 6
                 anchors.right: parent.right; anchors.rightMargin: tabBar.captionInset
                 anchors.top: parent.top; anchors.bottom: parent.bottom
+                Component.onCompleted: if(typeof App !== "undefined") App.registerCaptionItem(titleBarDragRegion)
                 DragHandler { target: null; acceptedButtons: Qt.LeftButton; onActiveChanged: if(active) App.startSystemMove(ApplicationWindow.window) }
                 TapHandler { acceptedButtons: Qt.LeftButton; onDoubleTapped: ApplicationWindow.window.visibility === Window.Maximized ? ApplicationWindow.window.showNormal() : ApplicationWindow.window.showMaximized() }
             }

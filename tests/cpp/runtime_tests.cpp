@@ -126,8 +126,19 @@ private slots:
         ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
         ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);QQuickWindow window;
         window.resize(900,600);const auto handle=reinterpret_cast<HWND>(window.winId());app.attachWindow(&window);
-        ShowWindow(handle,SW_SHOW);QCoreApplication::processEvents();const auto style=GetWindowLongPtrW(handle,GWL_STYLE);
+        window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));const auto style=GetWindowLongPtrW(handle,GWL_STYLE);
         QVERIFY(style&WS_SYSMENU);QVERIFY(style&WS_MINIMIZEBOX);
+        QQuickItem caption(window.contentItem());caption.setPosition({0,0});caption.setSize({900,100});app.registerCaptionItem(&caption);
+        POINT dragPoint{180,10};QVERIFY(ClientToScreen(handle,&dragPoint));
+        POINT mapped=dragPoint;QVERIFY(ScreenToClient(handle,&mapped));const auto scale=window.devicePixelRatio();
+        QVERIFY(caption.isVisible());QVERIFY(caption.contains(caption.mapFromScene(QPointF(mapped.x/scale,mapped.y/scale))));
+        const auto dragHit=SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(dragPoint.x,dragPoint.y));QCOMPARE(dragHit,LRESULT(HTCAPTION));
+        MSG rightClick{};rightClick.hwnd=handle;rightClick.message=WM_NCRBUTTONUP;rightClick.wParam=HTCAPTION;qintptr menuResult=-1;
+        QVERIFY(app.nativeEventFilter({},&rightClick,&menuResult));QCOMPARE(menuResult,qintptr(0));
+        RECT buttons{},frame{};QVERIFY(DwmGetWindowAttribute(handle,DWMWA_CAPTION_BUTTON_BOUNDS,&buttons,sizeof(buttons))==S_OK);QVERIFY(GetWindowRect(handle,&frame));
+        const auto buttonWidth=(buttons.right-buttons.left)/3;const POINT maximizePoint{frame.left+buttons.right-buttonWidth-buttonWidth/2,frame.top+(buttons.top+buttons.bottom)/2};
+        const auto maximizeHit=SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(maximizePoint.x,maximizePoint.y));QCOMPARE(maximizeHit,LRESULT(HTMAXBUTTON));
+        QTRY_VERIFY(app.captionHeight()>=28&&app.captionHeight()<=48);
         SendMessageW(handle,WM_SYSCOMMAND,SC_MINIMIZE,0);
         QTRY_VERIFY(IsIconic(handle));
     }
