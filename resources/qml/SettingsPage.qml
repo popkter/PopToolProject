@@ -1,16 +1,22 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-ScrollView {
+Item {
     id: page
-    clip: true
-    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
     ColumnLayout {
-        width: page.availableWidth-56; x: 28; y: 28; spacing: 22
-        ColumnLayout { spacing: 4
+        id: heading
+        x: 28; y: 28; spacing: 4
             Text { text: "设置"; font.pixelSize: 30; font.bold: true; color: Theme.text }
             Text { text: "应用与开发环境配置"; font.pixelSize: 12; color: Theme.muted }
         }
+    ScrollView {
+        id: settingsScroll
+        anchors.top: heading.bottom; anchors.topMargin: 22
+        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+        clip: true
+        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+        ColumnLayout {
+            width: settingsScroll.availableWidth-56; x: 28; spacing: 22
         RowLayout { Layout.fillWidth: true; spacing: 18; Layout.alignment: Qt.AlignTop
             ColumnLayout { Layout.fillWidth: true; Layout.preferredWidth: 1; Layout.alignment: Qt.AlignTop; spacing: 14
                 Card { title: "外观"; subtitle: "选择应用的外观主题"; icon: "palette"; Layout.fillWidth: true
@@ -87,11 +93,12 @@ ScrollView {
                 }
                 Card { title: "关于 UTerminal"; subtitle: "Windows 终端与自定义脚本"; icon: "info"; Layout.fillWidth: true
                     Label { text: "UTerminal "+Updates.currentVersion+"\nQt 6 · C++ · QML"; color: Theme.muted }
-                    Label { text: "Ctrl+T 新标签 · Ctrl+Tab 切换标签\nCtrl+C 复制选区 / 中断 · Ctrl+V 粘贴\nCtrl+L 清屏"; color: Theme.muted; font.pixelSize: 12 }
+                    Label { text: "Ctrl+Q 自定义 · Ctrl+T 打开终端 / 新标签\nCtrl+Tab 切换标签\nCtrl+C 复制选区 / 中断 · Ctrl+V 粘贴\nCtrl+L 清屏"; color: Theme.muted; font.pixelSize: 12 }
                 }
             }
         }
         Item { Layout.preferredHeight: 28 }
+    }
     }
     PythonEnvironmentDialog { id: dependencies }
 }

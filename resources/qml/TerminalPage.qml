@@ -4,7 +4,7 @@ import QtQuick.Layouts
 import UTerminal
 Item {
     id: page
-        readonly property real nativeCaptionHeight: 42
+        readonly property real nativeCaptionHeight: typeof App !== "undefined" ? App.captionHeight : 42
         readonly property real nativeCaptionTop: 4
         Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: page.nativeCaptionHeight; color: "transparent"
                 Rectangle { anchors.fill: parent; anchors.rightMargin: tabBar.captionInset; color: Settings.dark ? "#202020" : "#f3f3f3" }
@@ -12,13 +12,26 @@ Item {
                 readonly property real tabViewportLimit: Math.max(0,width-captionInset-82)
                 readonly property color idleHover: Settings.dark ? "#353535" : "#e5e5e5"
                 readonly property color idlePressed: Settings.dark ? "#404040" : "#d8d8d8"
-                ListView { id: tabs; objectName: "terminalTabs"; x: 0; y: page.nativeCaptionTop; width: Math.min(contentWidth,tabBar.tabViewportLimit); height: tabBar.height-y; orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 2
+                ListView { id: tabs; objectName: "terminalTabs"; x: 0; y: page.nativeCaptionTop; width: Math.min(totalTabWidth,tabBar.tabViewportLimit); height: tabBar.height-y; orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 2
+                    property real tabWidth: Math.max(100, Math.min(188, (tabBar.tabViewportLimit - Math.max(0,count-1)*spacing)/Math.max(1,count)))
+                    Behavior on tabWidth { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    readonly property real totalTabWidth: count*tabWidth + Math.max(0,count-1)*spacing
+                    contentWidth: totalTabWidth
+                    boundsBehavior: Flickable.StopAtBounds
                     currentIndex: Sessions.currentIndex
+                    WheelHandler {
+                        onWheel: event => {
+                            const delta = event.pixelDelta.x || event.pixelDelta.y || (event.angleDelta.x || event.angleDelta.y)/120*60
+                            tabs.contentX = Math.max(tabs.originX, Math.min(tabs.originX + Math.max(0,tabs.contentWidth-tabs.width), tabs.contentX-delta))
+                            event.accepted = true
+                        }
+                    }
                     highlightMoveDuration: 0
                     function revealCurrentTab() {
                         if (currentIndex < 0 || currentIndex >= count || width <= 0) return
                         forceLayout()
                         positionViewAtIndex(currentIndex, ListView.Contain)
+                        if (contentWidth <= width) positionViewAtBeginning()
                     }
                     // Coalesce model and geometry changes, after delegate widths settle.
                     onCurrentIndexChanged: Qt.callLater(revealCurrentTab)
@@ -28,7 +41,8 @@ Item {
                     delegate: Rectangle {
                         id: terminalTab
                         required property int index; required property string tabTitle; required property bool active
-                        width: 188; height: tabs.height; radius: 8
+                        width: tabs.tabWidth; height: tabs.height; radius: 8
+                        onWidthChanged: Qt.callLater(tabs.revealCurrentTab)
                         color: active ? Settings.terminalBackground : tabTap.pressed ? tabBar.idlePressed : tabHover.hovered ? tabBar.idleHover : "transparent"
                         Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 8; visible: terminalTab.active; color: terminalTab.color }
                         Rectangle {
@@ -88,7 +102,7 @@ Item {
                             RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 12
                                 Text { text: modelData.runtimeLabel; color: Theme.muted; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight }
                                 Text { text: modelData.stateLabel; color: modelData.running ? Theme.accent : Theme.muted; font.pixelSize: 10 }
-                                ToolButton { objectName: "closePane_"+index; visible: Sessions.panes.length>1; implicitHeight: 22; implicitWidth: 24; text: "×"; onClicked: Sessions.closePane(modelData); ToolTip.visible: hovered; ToolTip.text: "关闭此窗格" }
+                                ToolButton { id: closePaneButton; objectName: "closePane_"+index; background: Rectangle { radius: 5; color: closePaneButton.down ? tabBar.idlePressed : closePaneButton.hovered ? tabBar.idleHover : "transparent" } visible: Sessions.panes.length>1; implicitHeight: 22; implicitWidth: 24; text: "×"; onClicked: Sessions.closePane(modelData); ToolTip.visible: hovered; ToolTip.text: "关闭此窗格" }
                             }
                         }
                         Rectangle {

@@ -94,9 +94,19 @@ int App::captionButtonHitTest(quintptr windowHandle,qintptr position)const{
 bool App::nativeEventFilter(const QByteArray &,void *nativeMessage,qintptr *result){
     const auto *message=static_cast<MSG*>(nativeMessage);
     if(!message||!m_window||message->hwnd!=reinterpret_cast<HWND>(m_windowHandle))return false;
-    if(message->message==WM_NCMOUSELEAVE){
+    if(message->message==WM_NCMOUSEMOVE||message->message==WM_NCMOUSELEAVE||
+       message->message==WM_NCLBUTTONDOWN||message->message==WM_NCLBUTTONUP||
+       message->message==WM_NCLBUTTONDBLCLK){
         LRESULT nativeResult=0;
-        DwmDefWindowProc(message->hwnd,message->message,message->wParam,message->lParam,&nativeResult);
+        if(DwmDefWindowProc(message->hwnd,message->message,message->wParam,message->lParam,&nativeResult)){
+            if(result)*result=nativeResult;
+            return true;
+        }
+        if(message->wParam==HTMINBUTTON||message->wParam==HTMAXBUTTON||message->wParam==HTCLOSE){
+            nativeResult=DefWindowProcW(message->hwnd,message->message,message->wParam,message->lParam);
+            if(result)*result=nativeResult;
+            return true;
+        }
     }
     if(message->message==WM_NCPAINT||message->message==WM_NCACTIVATE){
         const auto nativeResult=DefWindowProcW(message->hwnd,message->message,message->wParam,message->lParam);

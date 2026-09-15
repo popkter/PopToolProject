@@ -158,6 +158,12 @@ private slots:
             QVERIFY(qAbs(app.captionTop()-expectedTop)<0.01);
             const auto expectedInset=buttons.right>buttons.left?(client.right-frame.left-buttons.left+origin.x)/dpr:138.0;
             QVERIFY(qAbs(app.captionInset()-expectedInset)<0.01);
+            for(int index=0;index<3;++index){
+                const auto width=(buttons.right-buttons.left)/3;
+                const POINT center{frame.left+buttons.left+width*index+width/2,frame.top+(buttons.top+buttons.bottom)/2};
+                const LRESULT expected[]={HTMINBUTTON,HTMAXBUTTON,HTCLOSE};
+                QCOMPARE(SendMessageW(layoutHandle,WM_NCHITTEST,0,MAKELPARAM(center.x,center.y)),expected[index]);
+            }
         }
         SendMessageW(layoutHandle,WM_SYSCOMMAND,SC_MINIMIZE,0);
         QTRY_VERIFY(IsIconic(layoutHandle));
@@ -753,7 +759,16 @@ private slots:
         sessions.closeTab(8);QTRY_VERIFY(fullyVisible());
         const auto narrowWidth=tabs->width();
         window.resize(1362,700);page->setWidth(1292);QTRY_VERIFY(tabs->width()>narrowWidth);QTRY_VERIFY(fullyVisible());
+        QTRY_VERIFY(tabs->property("tabWidth").toDouble()>100);
+        sessions.setCurrentIndex(0);QTRY_VERIFY(fullyVisible());
+        QTRY_VERIFY(qAbs(qvariant_cast<QQuickItem*>(tabs->property("currentItem"))->mapToItem(tabs,QPointF()).x())<0.5);
         window.resize(1000,700);page->setWidth(930);QTRY_COMPARE(tabs->width(),narrowWidth);QTRY_VERIFY(fullyVisible());
+        QTRY_COMPARE(tabs->property("tabWidth").toDouble(),100.0);
+        const auto wheelPosition=tabs->mapToScene(QPointF(tabs->width()/2,tabs->height()/2));
+        const auto beforeWheel=tabs->property("contentX").toDouble();
+        QWheelEvent wheel(wheelPosition,window.mapToGlobal(wheelPosition.toPoint()),QPoint(),QPoint(0,-120),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
+        QCoreApplication::sendEvent(&window,&wheel);
+        QTRY_VERIFY(tabs->property("contentX").toDouble()>beforeWheel);
         const auto scroll=tabs->property("contentX").toDouble();
         sessions.renameTab(sessions.currentIndex(),"renamed");QTest::qWait(60);
         QCOMPARE(tabs->property("contentX").toDouble(),scroll);

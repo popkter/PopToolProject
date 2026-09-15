@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import UTerminal
 ApplicationWindow {
-    id: window
+    id: appWindow
     width: 1362; height: 1024; minimumWidth: 1000; minimumHeight: 700
     flags: Qt.Window | Qt.CustomizeWindowHint | Qt.WindowTitleHint | Qt.WindowSystemMenuHint
            | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
@@ -16,11 +16,11 @@ ApplicationWindow {
     readonly property color chromeSelected: Settings.dark ? "#3b3b3b" : "#dfdfdf"
     readonly property color chromeText: Settings.dark ? "#f5f5f5" : "#1a1a1a"
     readonly property color chromeMuted: Settings.dark ? "#b8b8b8" : "#616161"
-    readonly property color chromeAccent: Settings.dark ? Theme.accent : "#4978ed"
-    function syncTitleBar() { App.updateTitleBar(window,Settings.dark,window.chromeBackground,window.chromeText) }
+    readonly property color chromeAccent: Theme.accent
+    function syncTitleBar() { App.updateTitleBar(appWindow,Settings.dark,appWindow.chromeBackground,appWindow.chromeText) }
     function openTerminal() { App.page = 1; Sessions.ensureTab() }
     Component.onCompleted: { syncTitleBar(); Qt.callLater(Sessions.ensureTab); if(Updates.readyToInstall) Qt.callLater(Updates.requestInstallation) }
-    Connections { target: Settings; function onChanged() { Qt.callLater(window.syncTitleBar) } }
+    Connections { target: Settings; function onChanged() { Qt.callLater(appWindow.syncTitleBar) } }
     palette.window: Theme.background; palette.base: Theme.surface; palette.text: Theme.text; palette.windowText: Theme.text
     palette.button: Theme.surface; palette.buttonText: Theme.text; palette.highlight: Theme.accent; palette.highlightedText: "white"
     onClosing: close => { close.accepted = false; App.requestQuit() }
@@ -30,7 +30,7 @@ ApplicationWindow {
         Rectangle {
             id: topBar
             anchors.left: parent.left; anchors.right: parent.right; anchors.rightMargin: App.captionInset; anchors.top: parent.top
-            height: App.captionHeight; color: window.chromeBackground
+            height: App.captionHeight; color: appWindow.chromeBackground
             Item {
                 id: mainTitleBarDragRegion
                 objectName: "mainTitleBarDragRegion"
@@ -41,18 +41,18 @@ ApplicationWindow {
                 DragHandler {
                     target: null
                     acceptedButtons: Qt.LeftButton
-                    onActiveChanged: if(active) App.startSystemMove(window)
+                    onActiveChanged: if(active) App.startSystemMove(appWindow)
                 }
                 TapHandler {
                     acceptedButtons: Qt.LeftButton
-                    onDoubleTapped: window.visibility === Window.Maximized ? window.showNormal() : window.showMaximized()
+                    onDoubleTapped: appWindow.visibility === Window.Maximized ? appWindow.showNormal() : appWindow.showMaximized()
                 }
             }
         }
         Rectangle {
             id: navigation
             anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-            width: 42; color: window.chromeBackground; z: 20
+            width: 42; color: appWindow.chromeBackground; z: 20
             Image {
                 objectName: "navigationAppIcon"
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -67,9 +67,9 @@ ApplicationWindow {
                     required property int index
                     x: 5; y: App.captionHeight + index * 37; width: 32; height: 32
                     Accessible.name: modelData.title
-                    background: Rectangle { radius: 5; color: App.page === modelData.page ? window.chromeSelected : parent.hovered ? window.chromeIdle : "transparent" }
-                    contentItem: Icon { name: modelData.name; font.pixelSize: 17; color: App.page === modelData.page ? window.chromeAccent : window.chromeMuted }
-                    onClicked: modelData.page === 1 ? window.openTerminal() : App.page = modelData.page
+                    background: Rectangle { radius: 5; color: App.page === modelData.page ? appWindow.chromeSelected : parent.hovered ? appWindow.chromeIdle : "transparent" }
+                    contentItem: Icon { name: modelData.name; font.pixelSize: 17; color: App.page === modelData.page ? appWindow.chromeAccent : appWindow.chromeMuted }
+                    onClicked: modelData.page === 1 ? appWindow.openTerminal() : App.page = modelData.page
                 }
             }
             Item {
@@ -78,15 +78,15 @@ ApplicationWindow {
                 Text {
                     anchors.centerIn: parent
                     text: App.elevated ? "UTerminal · 管理员" : "UTerminal"
-                    rotation: -90; color: window.chromeMuted; font.pixelSize: 12
+                    rotation: -90; color: appWindow.chromeMuted; font.pixelSize: 12
                 }
             }
             ToolButton {
                 id: settingsButton
                 x: 5; anchors.bottom: parent.bottom; anchors.bottomMargin: 6; width: 32; height: 32
                 Accessible.name: "设置"
-                background: Rectangle { radius: 5; color: App.page === 2 ? window.chromeSelected : parent.hovered ? window.chromeIdle : "transparent" }
-                contentItem: Icon { name: "settings"; font.pixelSize: 17; color: App.page === 2 ? window.chromeAccent : window.chromeMuted }
+                background: Rectangle { radius: 5; color: App.page === 2 ? appWindow.chromeSelected : parent.hovered ? appWindow.chromeIdle : "transparent" }
+                contentItem: Icon { name: "settings"; font.pixelSize: 17; color: App.page === 2 ? appWindow.chromeAccent : appWindow.chromeMuted }
                 onClicked: App.page = 2
             }
         }
@@ -134,7 +134,7 @@ ApplicationWindow {
         }
         onAccepted: Sessions.acceptPaste(); onRejected: Sessions.cancelPaste()
     }
-    AppDialog { id: updateDialog; objectName: "updateConfirmationDialog"; title: "立即更新"; anchors.centerIn: parent; modal: true; width: Math.min(560,window.width-48); standardButtons: Dialog.NoButton; closePolicy: Popup.NoAutoClose
+    AppDialog { id: updateDialog; objectName: "updateConfirmationDialog"; title: "立即更新"; anchors.centerIn: parent; modal: true; width: Math.min(560,appWindow.width-48); standardButtons: Dialog.NoButton; closePolicy: Popup.NoAutoClose
         ColumnLayout { anchors.fill: parent; spacing: 8
             Label { text: "更新包已经下载完毕，是否立即重启更新？"; color: Theme.muted; font.pixelSize: 15; wrapMode: Text.Wrap; Layout.fillWidth: true }
             Label { text: "立即更新会关闭正在运行的终端和脚本。"; color: Theme.muted; wrapMode: Text.Wrap; Layout.fillWidth: true }
@@ -146,7 +146,7 @@ ApplicationWindow {
             }
         }
     }
-    Popup { id: notification; x: (window.width-width)/2; y: window.height-height-30; width: Math.min(700,window.width-80); padding: 16
+    Popup { id: notification; x: (appWindow.width-width)/2; y: appWindow.height-height-30; width: Math.min(700,appWindow.width-80); padding: 16
         background: PopupSurface {}
         contentItem: Text { text: App.notice; color: Theme.text; wrapMode: Text.Wrap; font.pixelSize: 13 }
         Timer { id: notificationTimer; interval: 6000; onTriggered: notification.close() }
@@ -162,8 +162,8 @@ ApplicationWindow {
     Connections { target: Sessions; function onPasteConfirmationRequested(text) { pasteDialog.value=text;pasteDialog.open() } }
     Connections { target: Plugins; function onChanged() { if(App.page === 1 && Plugins.powerShellReady && Sessions.count === 0) Qt.callLater(Sessions.ensureTab) } }
     Connections { target: Updates; function onInstallationRequested() { updateDialog.open() } }
-    Shortcut { sequence: "Ctrl+T"; enabled: App.page === 1; onActivated: Sessions.newTab() }
+    Shortcut { sequence: "Ctrl+T"; onActivated: App.page === 1 ? Sessions.newTab() : appWindow.openTerminal() }
     Shortcut { sequence: "Ctrl+Tab"; enabled: App.page === 1; onActivated: Sessions.nextTab() }
     Shortcut { sequence: "Ctrl+F"; enabled: App.page === 1 && !!Sessions.focusedPane; onActivated: Sessions.focusedPane.terminal.openSearch() }
-    Shortcut { objectName: "showScriptsShortcut"; sequence: "Ctrl+Q"; enabled: App.page === 1; onActivated: App.page = 0 }
+    Shortcut { objectName: "showScriptsShortcut"; sequence: "Ctrl+Q"; onActivated: App.page = 0 }
 }
