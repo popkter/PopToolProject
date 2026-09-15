@@ -5,13 +5,12 @@ import UTerminal
 ApplicationWindow {
     id: window
     width: 1362; height: 1024; minimumWidth: 1000; minimumHeight: 700
-    flags: Qt.Window | Qt.CustomizeWindowHint | Qt.WindowSystemMenuHint
+    flags: Qt.Window | Qt.CustomizeWindowHint | Qt.WindowTitleHint | Qt.WindowSystemMenuHint
            | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
-           | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
     topPadding: 0; leftPadding: 0; rightPadding: 0; bottomPadding: 0
-    visible: true
+    visible: false
     title: App.elevated ? "UTerminal · 管理员" : "UTerminal"
-    color: Theme.background
+    color: "transparent"
     readonly property color chromeBackground: Settings.dark ? "#202020" : "#f3f3f3"
     readonly property color chromeIdle: Settings.dark ? "#353535" : "#e5e5e5"
     readonly property color chromeSelected: Settings.dark ? "#3b3b3b" : "#dfdfdf"
@@ -27,15 +26,16 @@ ApplicationWindow {
     onClosing: close => { close.accepted = false; App.requestQuit() }
     Item {
         anchors.fill: parent
+        Rectangle { anchors.fill: parent; anchors.leftMargin: 42; anchors.topMargin: 42; color: Theme.background }
         Rectangle {
             id: topBar
-            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+            anchors.left: parent.left; anchors.right: parent.right; anchors.rightMargin: App.captionInset; anchors.top: parent.top
             height: App.captionHeight; color: window.chromeBackground
             Item {
                 id: mainTitleBarDragRegion
                 objectName: "mainTitleBarDragRegion"
                 anchors.left: parent.left; anchors.leftMargin: 42; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
-                anchors.rightMargin: Math.max(App.captionInset,SafeArea.margins.right)
+                anchors.rightMargin: 0
                 visible: App.page !== 1
                 Component.onCompleted: App.registerCaptionItem(mainTitleBarDragRegion)
                 DragHandler {
@@ -56,8 +56,8 @@ ApplicationWindow {
             Image {
                 objectName: "navigationAppIcon"
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: App.captionTop + (App.captionHeight-App.captionTop-height)/2
-                width: Math.min(28,Math.max(0,App.captionHeight-App.captionTop-6)); height: width
+                y: 5
+                width: 32; height: 32
                 source: App.resources + "icons/app-icon-ui.png"; fillMode: Image.PreserveAspectFit
             }
             Repeater {

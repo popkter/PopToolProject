@@ -4,9 +4,10 @@ import QtQuick.Layouts
 import UTerminal
 Item {
     id: page
-        readonly property real nativeCaptionHeight: typeof App !== "undefined" ? App.captionHeight : 32
-        readonly property real nativeCaptionTop: typeof App !== "undefined" ? App.captionTop : 0
-        Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: page.nativeCaptionHeight; color: Settings.dark ? "#202020" : "#f3f3f3"
+        readonly property real nativeCaptionHeight: 42
+        readonly property real nativeCaptionTop: 4
+        Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: page.nativeCaptionHeight; color: "transparent"
+                Rectangle { anchors.fill: parent; anchors.rightMargin: tabBar.captionInset; color: Settings.dark ? "#202020" : "#f3f3f3" }
                 readonly property real captionInset: Math.max(typeof App !== "undefined" ? App.captionInset : 138,SafeArea.margins.right)
                 readonly property real tabViewportLimit: Math.max(0,width-captionInset-82)
                 readonly property color idleHover: Settings.dark ? "#353535" : "#e5e5e5"
@@ -42,7 +43,7 @@ Item {
                             anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
                             width: 28; height: Math.min(28,terminalTab.height); padding: 0; text: "×"
                             contentItem: Text { text: closeTabButton.text; color: active ? Settings.terminalForeground : Settings.dark ? "#f5f5f5" : "#1a1a1a"; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-                            background: Rectangle { radius: 4; color: closeTabButton.down ? "#30ffffff" : closeTabButton.hovered ? "#20ffffff" : "transparent"; border.width: closeTabButton.activeFocus ? 1 : 0; border.color: Theme.accent }
+                            background: Rectangle { radius: 4; color: closeTabButton.down ? (Settings.dark ? "#30ffffff" : "#30000000") : closeTabButton.hovered ? (Settings.dark ? "#20ffffff" : "#18000000") : "transparent"; border.width: closeTabButton.activeFocus ? 1 : 0; border.color: Theme.accent }
                             onClicked: Sessions.closeTab(index)
                         }
                         HoverHandler { id: tabHover }

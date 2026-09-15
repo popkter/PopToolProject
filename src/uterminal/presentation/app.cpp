@@ -32,7 +32,17 @@ App::~App(){if(auto *application=QCoreApplication::instance())application->remov
 QString App::resources()const{return QUrl::fromLocalFile(m_resources+'/').toString();}
 void App::setPage(int p){if(p<0||p>2)return;bool entering=p!=m_page;m_page=p;emit pageChanged();if(entering&&p==1&&!m_plugins->powerShellReady()&&m_sessions->rowCount()==0)showPlugin("powershell");}
 bool App::elevated()const{return processElevated();}
-void App::attachWindow(QQuickWindow *window){m_window=window;m_windowHandle=window?window->winId():0;refreshCaptionMetrics();}
+void App::attachWindow(QQuickWindow *window){
+    m_window=window;m_windowHandle=window?window->winId():0;
+    if(!m_windowHandle)return;
+    const auto handle=reinterpret_cast<HWND>(m_windowHandle);
+    const DWMNCRENDERINGPOLICY policy=DWMNCRP_ENABLED;
+    DwmSetWindowAttribute(handle,DWMWA_NCRENDERING_POLICY,&policy,sizeof(policy));
+    const MARGINS margins{0,0,qRound(42*window->devicePixelRatio()),0};
+    DwmExtendFrameIntoClientArea(handle,&margins);
+    SetWindowPos(handle,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED);
+    refreshCaptionMetrics();
+}
 void App::updateTitleBar(QQuickWindow *window,bool dark,const QColor &background,const QColor &text){
     if(!window)return;
     const auto handle=reinterpret_cast<HWND>(window->winId());const BOOL enabled=dark;
@@ -62,13 +72,12 @@ void App::refreshCaptionMetrics(){
     const auto scale=m_window->devicePixelRatio();
     const bool nativeButtons=bounds.right>bounds.left;
     const auto top=nativeButtons?qMax(0.0,qreal(frame.top+bounds.top-origin.y)/scale):0.0;
-    const auto height=nativeButtons?qreal(frame.top+bounds.bottom-origin.y)/scale:qreal(bounds.bottom-bounds.top)/scale;
     // Qt's expanded titlebar can draw its own buttons, leaving a zero-width
     // DWM rectangle. Its safe-area margin is used by QML in that case.
     const auto inset=nativeButtons?qreal(client.right-(frame.left+bounds.left-origin.x))/scale:138.0;
-    if(height<=top||inset<=0)return;
-    if(qAbs(height-m_captionHeight)<0.01&&qAbs(top-m_captionTop)<0.01&&qAbs(inset-m_captionInset)<0.01)return;
-    m_captionHeight=height;m_captionTop=top;m_captionInset=inset;emit captionMetricsChanged();
+    if(inset<=0)return;
+    if(qAbs(top-m_captionTop)<0.01&&qAbs(inset-m_captionInset)<0.01)return;
+    m_captionTop=top;m_captionInset=inset;emit captionMetricsChanged();
 }
 int App::captionButtonHitTest(quintptr windowHandle,qintptr position)const{
     const auto window=reinterpret_cast<HWND>(windowHandle);
@@ -85,6 +94,23 @@ int App::captionButtonHitTest(quintptr windowHandle,qintptr position)const{
 bool App::nativeEventFilter(const QByteArray &,void *nativeMessage,qintptr *result){
     const auto *message=static_cast<MSG*>(nativeMessage);
     if(!message||!m_window||message->hwnd!=reinterpret_cast<HWND>(m_windowHandle))return false;
+    if(message->message==WM_NCMOUSELEAVE){
+        LRESULT nativeResult=0;
+        DwmDefWindowProc(message->hwnd,message->message,message->wParam,message->lParam,&nativeResult);
+    }
+    if(message->message==WM_NCPAINT||message->message==WM_NCACTIVATE){
+        const auto nativeResult=DefWindowProcW(message->hwnd,message->message,message->wParam,message->lParam);
+        if(result)*result=nativeResult;return true;
+    }
+    if(message->message==WM_NCCALCSIZE&&message->wParam){
+        auto *params=reinterpret_cast<NCCALCSIZE_PARAMS*>(message->lParam);
+        const auto dpi=GetDpiForWindow(message->hwnd);
+        const int borderX=GetSystemMetricsForDpi(SM_CXSIZEFRAME,dpi)+GetSystemMetricsForDpi(SM_CXPADDEDBORDER,dpi);
+        const int borderY=GetSystemMetricsForDpi(SM_CYSIZEFRAME,dpi)+GetSystemMetricsForDpi(SM_CXPADDEDBORDER,dpi);
+        params->rgrc[0].left+=borderX;params->rgrc[0].right-=borderX;params->rgrc[0].bottom-=borderY;
+        if(IsZoomed(message->hwnd))params->rgrc[0].top+=borderY;
+        if(result)*result=0;return true;
+    }
     if(message->message==WM_NCHITTEST){
         LRESULT dwmResult=HTNOWHERE;
         if(DwmDefWindowProc(message->hwnd,message->message,message->wParam,message->lParam,&dwmResult)&&
@@ -95,6 +121,10 @@ bool App::nativeEventFilter(const QByteArray &,void *nativeMessage,qintptr *resu
         if(button!=HTNOWHERE){if(result)*result=button;return true;}
         POINT point{GET_X_LPARAM(message->lParam),GET_Y_LPARAM(message->lParam)};
         if(ScreenToClient(message->hwnd,&point)){
+            const auto dpi=GetDpiForWindow(message->hwnd);
+            if(!IsZoomed(message->hwnd)&&point.y>=0&&point.y<GetSystemMetricsForDpi(SM_CYSIZEFRAME,dpi)){
+                if(result)*result=HTTOP;return true;
+            }
             const auto scale=m_window->devicePixelRatio();const QPointF scene(point.x/scale,point.y/scale);
             for(const auto &item:m_captionItems)if(item&&item->isVisible()&&item->contains(item->mapFromScene(scene))){
                 if(result)*result=HTCAPTION;return true;
@@ -111,6 +141,10 @@ bool App::nativeEventFilter(const QByteArray &,void *nativeMessage,qintptr *resu
         ShowWindow(message->hwnd,SW_MINIMIZE);
         if(result)*result=0;
         return true;
+    }
+    if(message->message==WM_DPICHANGED){
+        const MARGINS margins{0,0,MulDiv(42,HIWORD(message->wParam),96),0};
+        DwmExtendFrameIntoClientArea(message->hwnd,&margins);
     }
     if(message->message==WM_DPICHANGED||message->message==WM_WINDOWPOSCHANGED)QTimer::singleShot(0,this,&App::refreshCaptionMetrics);
     return false;

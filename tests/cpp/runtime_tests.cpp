@@ -28,6 +28,8 @@
 #include <dwmapi.h>
 #include <QJsonDocument>
 #include <QCryptographicHash>
+#include <QScreen>
+#include <QScopeGuard>
 #include "infrastructure/storage.h"
 
 class CatalogTestReply:public QNetworkReply {
@@ -110,7 +112,7 @@ private slots:
         ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
         QQuickWindow window;ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);
         if(!QGuiApplication::platformName().startsWith("windows"))QSKIP("Requires native Windows window");
-        for(bool dark:{true,false}){
+        for(bool dark:{true,false,true,false}){
             const QColor background(dark?"#222833":"#ffffff"),text(dark?"#eef1f6":"#111827");
             app.updateTitleBar(&window,dark,background,text);BOOL enabled=FALSE;
             const auto handle=reinterpret_cast<HWND>(window.winId());
@@ -125,13 +127,13 @@ private slots:
         QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
         ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
         ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);QQuickWindow window;
-        window.setFlags(Qt::Window|Qt::CustomizeWindowHint|Qt::WindowTitleHint|Qt::WindowSystemMenuHint|Qt::WindowMinimizeButtonHint|Qt::WindowMaximizeButtonHint|Qt::WindowCloseButtonHint|Qt::ExpandedClientAreaHint|Qt::NoTitleBarBackgroundHint);
+        window.setFlags(Qt::Window|Qt::CustomizeWindowHint|Qt::WindowTitleHint|Qt::WindowSystemMenuHint|Qt::WindowMinimizeButtonHint|Qt::WindowMaximizeButtonHint|Qt::WindowCloseButtonHint);
         window.setTitle("Caption layout test");
         window.resize(900,600);const auto handle=reinterpret_cast<HWND>(window.winId());app.attachWindow(&window);
         window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));QTest::qWait(200);const auto style=GetWindowLongPtrW(handle,GWL_STYLE);
         QVERIFY(style&WS_SYSMENU);QVERIFY(style&WS_MINIMIZEBOX);
         QQuickItem caption(window.contentItem());caption.setPosition({0,0});caption.setSize({900,100});app.registerCaptionItem(&caption);
-        POINT dragPoint{180,10};QVERIFY(ClientToScreen(handle,&dragPoint));
+        POINT dragPoint{180,30};QVERIFY(ClientToScreen(handle,&dragPoint));
         POINT mapped=dragPoint;QVERIFY(ScreenToClient(handle,&mapped));const auto scale=window.devicePixelRatio();
         QVERIFY(caption.isVisible());QVERIFY(caption.contains(caption.mapFromScene(QPointF(mapped.x/scale,mapped.y/scale))));
         const auto dragHit=SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(dragPoint.x,dragPoint.y));QCOMPARE(dragHit,LRESULT(HTCAPTION));
@@ -140,8 +142,6 @@ private slots:
         RECT buttons{},frame{};QVERIFY(DwmGetWindowAttribute(handle,DWMWA_CAPTION_BUTTON_BOUNDS,&buttons,sizeof(buttons))==S_OK);QVERIFY(GetWindowRect(handle,&frame));
         const auto buttonWidth=(buttons.right-buttons.left)/3;const POINT maximizePoint{frame.left+buttons.right-buttonWidth-buttonWidth/2,frame.top+(buttons.top+buttons.bottom)/2};
         const auto maximizeHit=SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(maximizePoint.x,maximizePoint.y));QCOMPARE(maximizeHit,LRESULT(HTMAXBUTTON));
-        // Match the application's titleless expanded area for layout checks.
-        window.setFlag(Qt::WindowTitleHint,false);window.show();app.attachWindow(&window);
         const auto layoutHandle=reinterpret_cast<HWND>(window.winId());
         for(bool maximized:{false,true,false}){
             if(maximized)window.showMaximized();else window.showNormal();
@@ -151,7 +151,8 @@ private slots:
             QVERIFY(ClientToScreen(layoutHandle,&origin));QVERIFY(GetClientRect(layoutHandle,&client));
             const auto dpr=window.devicePixelRatio();
             const bool nativeButtons=buttons.right>buttons.left;
-            const auto expectedHeight=nativeButtons?(frame.top+buttons.bottom-origin.y)/dpr:(buttons.bottom-buttons.top)/dpr;
+            QVERIFY(nativeButtons); // Real DWM buttons, not Qt's synthetic titlebar.
+            const auto expectedHeight=42.0;
             const auto expectedTop=nativeButtons?qMax(0.0,(frame.top+buttons.top-origin.y)/dpr):0.0;
             QTRY_VERIFY(qAbs(app.captionHeight()-expectedHeight)<0.01);
             QVERIFY(qAbs(app.captionTop()-expectedTop)<0.01);
@@ -160,6 +161,42 @@ private slots:
         }
         SendMessageW(layoutHandle,WM_SYSCOMMAND,SC_MINIMIZE,0);
         QTRY_VERIFY(IsIconic(layoutHandle));
+    }
+    void nativeCaptionHoverReadability(){
+        if(!QGuiApplication::platformName().startsWith("windows"))QSKIP("Requires Windows desktop");
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+        QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
+        ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
+        ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);
+        QQuickWindow window;auto format=window.requestedFormat();format.setAlphaBufferSize(8);window.setFormat(format);window.setColor(Qt::transparent);
+        window.setFlags(Qt::Window|Qt::CustomizeWindowHint|Qt::WindowTitleHint|Qt::WindowSystemMenuHint|Qt::WindowMinimizeButtonHint|Qt::WindowMaximizeButtonHint|Qt::WindowCloseButtonHint);
+        window.setTitle("Native caption hover regression");window.resize(640,360);app.attachWindow(&window);window.show();app.attachWindow(&window);
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        const auto handle=reinterpret_cast<HWND>(window.winId());SetForegroundWindow(handle);
+        POINT oldCursor{};GetCursorPos(&oldCursor);const auto restoreCursor=qScopeGuard([&]{SetCursorPos(oldCursor.x,oldCursor.y);});
+        for(bool dark:{true,false,true}){
+            app.updateTitleBar(&window,dark,QColor(dark?"#202020":"#f3f3f3"),QColor(dark?"white":"black"));
+            QTest::qWait(100);
+            RECT buttons{},frame{};POINT origin{};
+            QCOMPARE(DwmGetWindowAttribute(handle,DWMWA_CAPTION_BUTTON_BOUNDS,&buttons,sizeof(buttons)),S_OK);
+            QVERIFY(GetWindowRect(handle,&frame));QVERIFY(ClientToScreen(handle,&origin));
+            QVERIFY(buttons.right>buttons.left);
+            const auto width=(buttons.right-buttons.left)/3;
+            for(int button=0;button<3;++button){
+                const int x=frame.left+buttons.left+width*button+width/2,y=frame.top+(buttons.top+buttons.bottom)/2;
+                QVERIFY(SetCursorPos(x,y));QTest::qWait(180);DwmFlush();
+                const auto capture=window.screen()->grabWindow(window.winId()).toImage();QVERIFY(!capture.isNull());
+                const int cx=x-origin.x,cy=y-origin.y,r=qRound(9*window.devicePixelRatio());
+                const auto area=QRect(cx-r,cy-r,2*r,2*r).intersected(capture.rect());QVERIFY(!area.isEmpty());
+                int darkest=255,lightest=0;
+                for(int py=area.top();py<=area.bottom();++py)for(int px=area.left();px<=area.right();++px){
+                    const int value=qGray(capture.pixel(px,py));darkest=qMin(darkest,value);lightest=qMax(lightest,value);
+                }
+                const auto captureDirectory=qEnvironmentVariable("UTERMINAL_CHROME_CAPTURE_DIR");
+                if(!captureDirectory.isEmpty())capture.save(captureDirectory+QString("/caption-%1-%2.png").arg(dark?"dark":"light").arg(button));
+                QVERIFY2(lightest-darkest>80,qPrintable(QString("Unreadable native button %1, dark=%2, luminance range=%3").arg(button).arg(dark).arg(lightest-darkest)));
+            }
+        }
     }
     void terminalIsDefaultPage(){
         QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
@@ -695,6 +732,8 @@ private slots:
         QScopedPointer<QObject> object(component.create());QVERIFY2(object,qPrintable(component.errorString()));
         auto *page=qobject_cast<QQuickItem*>(object.data());QVERIFY(page);page->setParentItem(window.contentItem());page->setSize({930,700});
         auto *tabs=page->findChild<QQuickItem*>("terminalTabs");QVERIFY(tabs);
+        auto *bar=page->findChild<QQuickItem*>("terminalTabBar");QVERIFY(bar);
+        QCOMPARE(bar->height(),42.0);QCOMPARE(tabs->y(),4.0);QCOMPARE(tabs->height(),38.0);
         window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));
         auto fullyVisible=[&]{
             auto *item=qvariant_cast<QQuickItem*>(tabs->property("currentItem"));

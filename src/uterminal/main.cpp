@@ -31,6 +31,10 @@
 #include "application/updates.h"
 
 int main(int argc,char **argv){
+    // The OpenGL surface preserves DWM's native caption rendering in the
+    // transparent titlebar strip; the D3D composition surface covers it.
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+    QQuickWindow::setDefaultAlphaBuffer(true);
     QApplication application(argc,argv);
     application.setOrganizationName("UTerminal");application.setApplicationName("UTerminal");application.setApplicationVersion(QStringLiteral(UTERMINAL_VERSION));
     const auto data=ut::dataDirectory();
@@ -83,7 +87,7 @@ int main(int argc,char **argv){
     QObject::connect(&engine,&QQmlApplicationEngine::objectCreationFailed,&application,[]{QCoreApplication::exit(1);},Qt::QueuedConnection);
     engine.load(QUrl::fromLocalFile(resources+"/qml/Main.qml"));
     if(engine.rootObjects().isEmpty())return 1;
-    if(auto *window=qobject_cast<QQuickWindow*>(engine.rootObjects().first())){window->setIcon(applicationIcon);app.attachWindow(window);}
+    if(auto *window=qobject_cast<QQuickWindow*>(engine.rootObjects().first())){window->setIcon(applicationIcon);app.attachWindow(window);window->show();app.attachWindow(window);}
     instance.setReady();
     if(application.arguments().contains("--smoke-test")){
         const auto args=application.arguments();const int pageIndex=args.indexOf("--smoke-page");
