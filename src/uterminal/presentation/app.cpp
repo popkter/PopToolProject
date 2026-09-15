@@ -52,11 +52,23 @@ bool App::startSystemMove(QQuickWindow *window){return window&&window->startSyst
 void App::registerCaptionItem(QQuickItem *item){if(item&&!m_captionItems.contains(item))m_captionItems.append(item);}
 void App::refreshCaptionMetrics(){
     if(!m_windowHandle||!m_window)return;
-    RECT bounds{};const auto handle=reinterpret_cast<HWND>(m_windowHandle);
+    RECT bounds{},frame{},client{};const auto handle=reinterpret_cast<HWND>(m_windowHandle);
+    if(!IsWindowVisible(handle)||IsIconic(handle))return;
     if(DwmGetWindowAttribute(handle,DWMWA_CAPTION_BUTTON_BOUNDS,&bounds,sizeof(bounds))!=S_OK||bounds.bottom<=bounds.top)return;
-    const auto height=qBound(28.0,qreal(bounds.bottom-bounds.top)/m_window->devicePixelRatio(),48.0);
-    if(qAbs(height-m_captionHeight)<0.5)return;
-    m_captionHeight=height;emit captionMetricsChanged();
+    POINT origin{};
+    if(!GetWindowRect(handle,&frame)||!GetClientRect(handle,&client)||!ClientToScreen(handle,&origin))return;
+    // DWM returns window-relative physical pixels; QML lays out in client-relative
+    // logical pixels. Keep the frame offset, especially when maximized.
+    const auto scale=m_window->devicePixelRatio();
+    const bool nativeButtons=bounds.right>bounds.left;
+    const auto top=nativeButtons?qMax(0.0,qreal(frame.top+bounds.top-origin.y)/scale):0.0;
+    const auto height=nativeButtons?qreal(frame.top+bounds.bottom-origin.y)/scale:qreal(bounds.bottom-bounds.top)/scale;
+    // Qt's expanded titlebar can draw its own buttons, leaving a zero-width
+    // DWM rectangle. Its safe-area margin is used by QML in that case.
+    const auto inset=nativeButtons?qreal(client.right-(frame.left+bounds.left-origin.x))/scale:138.0;
+    if(height<=top||inset<=0)return;
+    if(qAbs(height-m_captionHeight)<0.01&&qAbs(top-m_captionTop)<0.01&&qAbs(inset-m_captionInset)<0.01)return;
+    m_captionHeight=height;m_captionTop=top;m_captionInset=inset;emit captionMetricsChanged();
 }
 int App::captionButtonHitTest(quintptr windowHandle,qintptr position)const{
     const auto window=reinterpret_cast<HWND>(windowHandle);

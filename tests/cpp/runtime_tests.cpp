@@ -125,8 +125,10 @@ private slots:
         QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
         ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
         ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);QQuickWindow window;
+        window.setFlags(Qt::Window|Qt::CustomizeWindowHint|Qt::WindowTitleHint|Qt::WindowSystemMenuHint|Qt::WindowMinimizeButtonHint|Qt::WindowMaximizeButtonHint|Qt::WindowCloseButtonHint|Qt::ExpandedClientAreaHint|Qt::NoTitleBarBackgroundHint);
+        window.setTitle("Caption layout test");
         window.resize(900,600);const auto handle=reinterpret_cast<HWND>(window.winId());app.attachWindow(&window);
-        window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));const auto style=GetWindowLongPtrW(handle,GWL_STYLE);
+        window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));QTest::qWait(200);const auto style=GetWindowLongPtrW(handle,GWL_STYLE);
         QVERIFY(style&WS_SYSMENU);QVERIFY(style&WS_MINIMIZEBOX);
         QQuickItem caption(window.contentItem());caption.setPosition({0,0});caption.setSize({900,100});app.registerCaptionItem(&caption);
         POINT dragPoint{180,10};QVERIFY(ClientToScreen(handle,&dragPoint));
@@ -138,9 +140,26 @@ private slots:
         RECT buttons{},frame{};QVERIFY(DwmGetWindowAttribute(handle,DWMWA_CAPTION_BUTTON_BOUNDS,&buttons,sizeof(buttons))==S_OK);QVERIFY(GetWindowRect(handle,&frame));
         const auto buttonWidth=(buttons.right-buttons.left)/3;const POINT maximizePoint{frame.left+buttons.right-buttonWidth-buttonWidth/2,frame.top+(buttons.top+buttons.bottom)/2};
         const auto maximizeHit=SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(maximizePoint.x,maximizePoint.y));QCOMPARE(maximizeHit,LRESULT(HTMAXBUTTON));
-        QTRY_VERIFY(app.captionHeight()>=28&&app.captionHeight()<=48);
-        SendMessageW(handle,WM_SYSCOMMAND,SC_MINIMIZE,0);
-        QTRY_VERIFY(IsIconic(handle));
+        // Match the application's titleless expanded area for layout checks.
+        window.setFlag(Qt::WindowTitleHint,false);window.show();app.attachWindow(&window);
+        const auto layoutHandle=reinterpret_cast<HWND>(window.winId());
+        for(bool maximized:{false,true,false}){
+            if(maximized)window.showMaximized();else window.showNormal();
+            QTest::qWait(100);
+            QVERIFY(DwmGetWindowAttribute(layoutHandle,DWMWA_CAPTION_BUTTON_BOUNDS,&buttons,sizeof(buttons))==S_OK);
+            QVERIFY(GetWindowRect(layoutHandle,&frame));POINT origin{};RECT client{};
+            QVERIFY(ClientToScreen(layoutHandle,&origin));QVERIFY(GetClientRect(layoutHandle,&client));
+            const auto dpr=window.devicePixelRatio();
+            const bool nativeButtons=buttons.right>buttons.left;
+            const auto expectedHeight=nativeButtons?(frame.top+buttons.bottom-origin.y)/dpr:(buttons.bottom-buttons.top)/dpr;
+            const auto expectedTop=nativeButtons?qMax(0.0,(frame.top+buttons.top-origin.y)/dpr):0.0;
+            QTRY_VERIFY(qAbs(app.captionHeight()-expectedHeight)<0.01);
+            QVERIFY(qAbs(app.captionTop()-expectedTop)<0.01);
+            const auto expectedInset=buttons.right>buttons.left?(client.right-frame.left-buttons.left+origin.x)/dpr:138.0;
+            QVERIFY(qAbs(app.captionInset()-expectedInset)<0.01);
+        }
+        SendMessageW(layoutHandle,WM_SYSCOMMAND,SC_MINIMIZE,0);
+        QTRY_VERIFY(IsIconic(layoutHandle));
     }
     void terminalIsDefaultPage(){
         QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());

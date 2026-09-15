@@ -18,6 +18,8 @@ class App : public QObject, public QAbstractNativeEventFilter {
     Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
     Q_PROPERTY(qreal captionHeight READ captionHeight NOTIFY captionMetricsChanged)
+    Q_PROPERTY(qreal captionTop READ captionTop NOTIFY captionMetricsChanged)
+    Q_PROPERTY(qreal captionInset READ captionInset NOTIFY captionMetricsChanged)
 public:
     App(QString resources,Scripts *scripts,Plugins *plugins,Sessions *sessions,Executions *runs,PythonEnvironment *python,Updates *updates,QObject *parent=nullptr);
     ~App() override;
@@ -27,6 +29,8 @@ public:
     QString notice()const{return m_notice;}
     bool elevated()const;
     qreal captionHeight()const{return m_captionHeight;}
+    qreal captionTop()const{return m_captionTop;}
+    qreal captionInset()const{return m_captionInset;}
     void attachWindow(QQuickWindow *window);
     Q_INVOKABLE void updateTitleBar(QQuickWindow *window,bool dark,const QColor &background,const QColor &text);
     Q_INVOKABLE bool startSystemMove(QQuickWindow *window);
@@ -67,6 +71,7 @@ private:
     quintptr m_windowHandle=0;
     QList<QPointer<QQuickItem>> m_captionItems;
     qreal m_captionHeight=32;
+    qreal m_captionTop=0,m_captionInset=138;
     QPointer<Pane> m_externalPane;
     QHash<QObject*,QMetaObject::Connection> m_modals;
     QString m_deferredPlugin;

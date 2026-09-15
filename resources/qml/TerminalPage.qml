@@ -5,12 +5,13 @@ import UTerminal
 Item {
     id: page
         readonly property real nativeCaptionHeight: typeof App !== "undefined" ? App.captionHeight : 32
+        readonly property real nativeCaptionTop: typeof App !== "undefined" ? App.captionTop : 0
         Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: page.nativeCaptionHeight; color: Settings.dark ? "#202020" : "#f3f3f3"
-                readonly property real captionInset: Math.max(138,SafeArea.margins.right)
+                readonly property real captionInset: Math.max(typeof App !== "undefined" ? App.captionInset : 138,SafeArea.margins.right)
                 readonly property real tabViewportLimit: Math.max(0,width-captionInset-82)
                 readonly property color idleHover: Settings.dark ? "#353535" : "#e5e5e5"
                 readonly property color idlePressed: Settings.dark ? "#404040" : "#d8d8d8"
-                ListView { id: tabs; objectName: "terminalTabs"; x: 0; y: 2; width: Math.min(contentWidth,tabBar.tabViewportLimit); height: Math.max(26,tabBar.height-y); orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 2
+                ListView { id: tabs; objectName: "terminalTabs"; x: 0; y: page.nativeCaptionTop; width: Math.min(contentWidth,tabBar.tabViewportLimit); height: tabBar.height-y; orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 2
                     currentIndex: Sessions.currentIndex
                     highlightMoveDuration: 0
                     function revealCurrentTab() {
@@ -39,7 +40,7 @@ Item {
                             id: closeTabButton
                             objectName: "closeTab_" + index
                             anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
-                            width: 28; height: 28; text: "×"
+                            width: 28; height: Math.min(28,terminalTab.height); padding: 0; text: "×"
                             contentItem: Text { text: closeTabButton.text; color: active ? Settings.terminalForeground : Settings.dark ? "#f5f5f5" : "#1a1a1a"; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                             background: Rectangle { radius: 4; color: closeTabButton.down ? "#30ffffff" : closeTabButton.hovered ? "#20ffffff" : "transparent"; border.width: closeTabButton.activeFocus ? 1 : 0; border.color: Theme.accent }
                             onClicked: Sessions.closeTab(index)
@@ -51,7 +52,7 @@ Item {
                 }
             ToolButton {
                 id: newTabButton; objectName: "newTerminalTab"
-                x: tabs.x+tabs.width+4; y: 0; width: 36; height: tabBar.height
+                x: tabs.x+tabs.width+4; y: page.nativeCaptionTop; width: 36; height: tabBar.height-y; padding: 0
                 background: Rectangle { radius: 4; color: newTabButton.down ? tabBar.idlePressed : newTabButton.hovered ? tabBar.idleHover : "transparent" }
                 contentItem: Icon { name: "add"; font.pixelSize: 18; color: Settings.dark ? "#f5f5f5" : "#1a1a1a" }
                 onClicked: Sessions.newTab()
@@ -59,7 +60,7 @@ Item {
             }
             ToolButton {
                 id: terminalMenuButton; objectName: "terminalMenuButton"
-                x: newTabButton.x+newTabButton.width; y: 0; width: 32; height: tabBar.height
+                x: newTabButton.x+newTabButton.width; y: page.nativeCaptionTop; width: 32; height: tabBar.height-y; padding: 0
                 background: Rectangle { radius: 4; color: terminalMenuButton.down ? tabBar.idlePressed : terminalMenuButton.hovered ? tabBar.idleHover : "transparent" }
                 contentItem: Icon { name: "expand_more"; font.pixelSize: 18; color: Settings.dark ? "#f5f5f5" : "#1a1a1a" }
                 onClicked: terminalActionsMenu.popup()

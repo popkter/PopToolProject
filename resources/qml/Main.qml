@@ -35,7 +35,7 @@ ApplicationWindow {
                 id: mainTitleBarDragRegion
                 objectName: "mainTitleBarDragRegion"
                 anchors.left: parent.left; anchors.leftMargin: 42; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
-                anchors.rightMargin: Math.max(138,SafeArea.margins.right)
+                anchors.rightMargin: Math.max(App.captionInset,SafeArea.margins.right)
                 visible: App.page !== 1
                 Component.onCompleted: App.registerCaptionItem(mainTitleBarDragRegion)
                 DragHandler {
@@ -53,7 +53,13 @@ ApplicationWindow {
             id: navigation
             anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
             width: 42; color: window.chromeBackground; z: 20
-            Image { x: 5; y: 5; width: 32; height: 32; source: App.resources + "icons/app-icon-ui.png"; fillMode: Image.PreserveAspectFit }
+            Image {
+                objectName: "navigationAppIcon"
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: App.captionTop + (App.captionHeight-App.captionTop-height)/2
+                width: Math.min(28,Math.max(0,App.captionHeight-App.captionTop-6)); height: width
+                source: App.resources + "icons/app-icon-ui.png"; fillMode: Image.PreserveAspectFit
+            }
             Repeater {
                 model: [{name:"terminal",title:"终端",page:1},{name:"code",title:"自定义",page:0}]
                 delegate: ToolButton {
