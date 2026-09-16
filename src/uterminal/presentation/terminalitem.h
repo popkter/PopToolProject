@@ -163,5 +163,4 @@ private:
     QRectF m_lastInputCursor;
     bool m_cursorBlinkOn = true;
     QTimer m_cursorTimer;
-    QTimer m_geometryUpdateTimer;
 };

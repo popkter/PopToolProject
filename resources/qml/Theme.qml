@@ -1,6 +1,9 @@
 pragma Singleton
 import QtQuick
 QtObject {
+    readonly property int captionHeight: 42
+    readonly property int captionButtonWidth: 46
+    readonly property int captionControlsWidth: captionButtonWidth * 3
     readonly property int dialogRadius: 10
     readonly property int popupRadius: 6
     readonly property color danger: Settings.dark ? "#ff9b9b" : "#bd3434"

@@ -101,6 +101,7 @@ public:
     Q_INVOKABLE void closeOthers(int index);
     Q_INVOKABLE void closeRight(int index);
     Q_INVOKABLE void renameTab(int index,const QString &title);
+    Q_INVOKABLE QString tabTitleAt(int index) const;
     Q_INVOKABLE void closePane(ut::Pane *pane);
     Q_INVOKABLE void focusPane(ut::Pane *pane);
     Q_INVOKABLE void endPane(ut::Pane *pane);

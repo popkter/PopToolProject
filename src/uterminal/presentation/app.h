@@ -17,9 +17,6 @@ class App : public QObject, public QAbstractNativeEventFilter {
     Q_PROPERTY(QString resources READ resources CONSTANT)
     Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
-    Q_PROPERTY(qreal captionHeight READ captionHeight CONSTANT)
-    Q_PROPERTY(qreal captionTop READ captionTop NOTIFY captionMetricsChanged)
-    Q_PROPERTY(qreal captionInset READ captionInset NOTIFY captionMetricsChanged)
 public:
     App(QString resources,Scripts *scripts,Plugins *plugins,Sessions *sessions,Executions *runs,PythonEnvironment *python,Updates *updates,QObject *parent=nullptr);
     ~App() override;
@@ -28,13 +25,11 @@ public:
     QString resources()const;
     QString notice()const{return m_notice;}
     bool elevated()const;
-    qreal captionHeight()const{return 42;}
-    qreal captionTop()const{return m_captionTop;}
-    qreal captionInset()const{return m_captionInset;}
     void attachWindow(QQuickWindow *window);
-    Q_INVOKABLE void updateTitleBar(QQuickWindow *window,bool dark,const QColor &background,const QColor &text);
+    Q_INVOKABLE void updateWindowAppearance(bool dark);
     Q_INVOKABLE bool startSystemMove(QQuickWindow *window);
     Q_INVOKABLE void registerCaptionItem(QQuickItem *item);
+    Q_INVOKABLE void registerCaptionControls(QQuickItem *item);
     void handleLaunch(const QJsonObject &request);
     Q_INVOKABLE void setModalOpen(QObject *dialog,bool open);
     Q_INVOKABLE void showNotice(const QString &text);
@@ -53,6 +48,7 @@ public:
     Q_INVOKABLE void requestQuit();
     Q_INVOKABLE void quitNow();
     bool nativeEventFilter(const QByteArray &eventType,void *message,qintptr *result) override;
+    bool eventFilter(QObject *object,QEvent *event) override;
 signals:
     void pageChanged();
     void noticeChanged();
@@ -61,16 +57,18 @@ signals:
     void pluginRequested(const QString &kind);
     void quitConfirmationRequested();
     void quitting();
-    void captionMetricsChanged();
 private:
     void finishExternalActivation();
     void activateWindow();
-    void refreshCaptionMetrics();
-    int captionButtonHitTest(quintptr window,qintptr position) const;
+    void initializeNativeWindow();
+    bool maximizeButtonContains(const QPointF &scene) const;
+    void setMaximizeButtonState(bool hovered,bool pressed);
     QPointer<QQuickWindow> m_window;
     quintptr m_windowHandle=0;
     QList<QPointer<QQuickItem>> m_captionItems;
-    qreal m_captionTop=0,m_captionInset=138;
+    QPointer<QQuickItem> m_captionControls;
+    bool m_maximizePressed=false;
+    bool m_initializingWindow=false,m_darkWindow=true;
     QPointer<Pane> m_externalPane;
     QHash<QObject*,QMetaObject::Connection> m_modals;
     QString m_deferredPlugin;

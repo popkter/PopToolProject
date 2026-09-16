@@ -5,7 +5,7 @@ import UTerminal
 ApplicationWindow {
     id: appWindow
     width: 1362; height: 1024; minimumWidth: 1000; minimumHeight: 700
-    flags: Qt.Window | Qt.CustomizeWindowHint | Qt.WindowTitleHint | Qt.WindowSystemMenuHint
+    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowSystemMenuHint
            | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
     topPadding: 0; leftPadding: 0; rightPadding: 0; bottomPadding: 0
     visible: false
@@ -17,20 +17,20 @@ ApplicationWindow {
     readonly property color chromeText: Settings.dark ? "#f5f5f5" : "#1a1a1a"
     readonly property color chromeMuted: Settings.dark ? "#b8b8b8" : "#616161"
     readonly property color chromeAccent: Theme.accent
-    function syncTitleBar() { App.updateTitleBar(appWindow,Settings.dark,appWindow.chromeBackground,appWindow.chromeText) }
+    function syncWindowAppearance() { App.updateWindowAppearance(Settings.dark) }
     function openTerminal() { App.page = 1; Sessions.ensureTab() }
-    Component.onCompleted: { syncTitleBar(); Qt.callLater(Sessions.ensureTab); if(Updates.readyToInstall) Qt.callLater(Updates.requestInstallation) }
-    Connections { target: Settings; function onChanged() { Qt.callLater(appWindow.syncTitleBar) } }
+    Component.onCompleted: { syncWindowAppearance(); Qt.callLater(Sessions.ensureTab); if(Updates.readyToInstall) Qt.callLater(Updates.requestInstallation) }
+    Connections { target: Settings; function onChanged() { Qt.callLater(appWindow.syncWindowAppearance) } }
     palette.window: Theme.background; palette.base: Theme.surface; palette.text: Theme.text; palette.windowText: Theme.text
     palette.button: Theme.surface; palette.buttonText: Theme.text; palette.highlight: Theme.accent; palette.highlightedText: "white"
     onClosing: close => { close.accepted = false; App.requestQuit() }
     Item {
         anchors.fill: parent
-        Rectangle { anchors.fill: parent; anchors.leftMargin: 42; anchors.topMargin: 42; color: Theme.background }
+        Rectangle { anchors.fill: parent; anchors.leftMargin: 42; anchors.topMargin: Theme.captionHeight; color: Theme.background }
         Rectangle {
-            id: topBar
-            anchors.left: parent.left; anchors.right: parent.right; anchors.rightMargin: App.captionInset; anchors.top: parent.top
-            height: App.captionHeight; color: appWindow.chromeBackground
+            id: topBar; visible: App.page !== 1
+            anchors.left: parent.left; anchors.right: parent.right; anchors.rightMargin: Theme.captionControlsWidth; anchors.top: parent.top
+            height: Theme.captionHeight; color: appWindow.chromeBackground
             Item {
                 id: mainTitleBarDragRegion
                 objectName: "mainTitleBarDragRegion"
@@ -65,7 +65,7 @@ ApplicationWindow {
                 delegate: ToolButton {
                     required property var modelData
                     required property int index
-                    x: 5; y: App.captionHeight + index * 37; width: 32; height: 32
+                    x: 5; y: Theme.captionHeight + index * 37; width: 32; height: 32
                     Accessible.name: modelData.title
                     background: Rectangle { radius: 5; color: App.page === modelData.page ? appWindow.chromeSelected : parent.hovered ? appWindow.chromeIdle : "transparent" }
                     contentItem: Icon { name: modelData.name; font.pixelSize: 17; color: App.page === modelData.page ? appWindow.chromeAccent : appWindow.chromeMuted }
@@ -92,10 +92,16 @@ ApplicationWindow {
         }
         StackLayout {
             anchors.left: navigation.right; anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
-            anchors.topMargin: App.page === 1 ? 0 : App.captionHeight; currentIndex: App.page
+            anchors.topMargin: App.page === 1 ? 0 : Theme.captionHeight; currentIndex: App.page
             ScriptsPage {}
             TerminalPage {}
             SettingsPage {}
+        }
+        CaptionButtons {
+            id: captionButtons
+            anchors.right: parent.right; anchors.top: parent.top; z: 30
+            targetWindow: appWindow
+            Component.onCompleted: App.registerCaptionControls(captionButtons)
         }
     }
     ScriptEditor { id: editor }

@@ -315,15 +315,6 @@ TerminalItem::TerminalItem(QQuickItem *parent)
         m_cursorBlinkOn = !m_cursorBlinkOn;
         update();
     });
-    // Window maximize/restore can deliver a burst of geometry changes. Resizing
-    // every libvterm session for each intermediate size repeats screen reflow
-    // and scrollback transfers unnecessarily.
-    m_geometryUpdateTimer.setSingleShot(true);
-    m_geometryUpdateTimer.setInterval(40);
-    connect(&m_geometryUpdateTimer, &QTimer::timeout, this, [this] {
-        updateTextureSize();
-        updateTerminalSize();
-    });
     updateMetrics();
 }
 
@@ -637,7 +628,13 @@ void TerminalItem::updateTerminalSize()
 void TerminalItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
 {
     QQuickPaintedItem::geometryChange(newGeometry, oldGeometry);
-    m_geometryUpdateTimer.start();
+    if (newGeometry.size() == oldGeometry.size())
+        return;
+    // Keep the painted surface and character grid in step with the item. A
+    // restarted debounce timer starves reflow during continuous edge dragging.
+    // updateTerminalSize only notifies the PTY when a cell boundary is crossed.
+    updateTextureSize();
+    updateTerminalSize();
 }
 
 QColor terminalColor(VTermScreen *screen, VTermColor color, const QColor &fallback)

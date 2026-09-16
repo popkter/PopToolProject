@@ -150,6 +150,7 @@ void Sessions::closeTab(int i){if(i<0||i>=m_tabs.size())return;beginRemoveRows({
 void Sessions::closeOthers(int i){for(int n=int(m_tabs.size())-1;n>=0;--n)if(n!=i)closeTab(n);}
 void Sessions::closeRight(int i){for(int n=int(m_tabs.size())-1;n>i;--n)closeTab(n);}
 void Sessions::renameTab(int i,const QString &title){if(i<0||i>=m_tabs.size()||title.trimmed().isEmpty())return;m_tabs[i].title=title.trimmed().left(200);m_tabs[i].fixedTitle=true;emit dataChanged(index(i),index(i));}
+QString Sessions::tabTitleAt(int i)const{return i>=0&&i<m_tabs.size()?m_tabs[i].title:QString();}
 void Sessions::copyMenuSelection(){if(!m_menuText.isEmpty())QGuiApplication::clipboard()->setText(m_menuText);}
 void Sessions::draftFromSelection(){if(m_menuText.trimmed().isEmpty())return;m_scripts->newDraft(m_menuText,m_menuPane?m_menuPane->language:"powershell");emit draftRequested();}
 void Sessions::acceptPaste(){if(m_pastePane&&m_pastePane->running())m_pastePane->terminal()->pasteText(m_pasteText);cancelPaste();}

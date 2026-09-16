@@ -20,6 +20,9 @@
 #include "application/plugins.h"
 #include "application/executions.h"
 #include "application/updates.h"
+#include "application/pythonenvironment.h"
+#include <QFontDatabase>
+#include <thread>
 #include "presentation/scripthighlighter.h"
 #include "presentation/scriptediting.h"
 #include <QTextBlock>
@@ -107,14 +110,102 @@ private slots:
         QKeyEvent key(QEvent::KeyPress,Qt::Key_C,Qt::ControlModifier,QString(QChar(3)));item.keyPressEvent(&key);
         QTRY_COMPARE_WITH_TIMEOUT(finished.count(),1,7000);QVERIFY(!output.contains("unexpected-completion"));process.close();
     }
-    void nativeTitleBarTheme(){
+    void customCaptionButtons(){
+        QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
+        ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
+        ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);
+        QQuickWindow window;window.resize(900,600);
+        window.setFlags(Qt::Window|Qt::FramelessWindowHint|Qt::WindowSystemMenuHint|Qt::WindowMinimizeButtonHint|Qt::WindowMaximizeButtonHint|Qt::WindowCloseButtonHint);
+        QQmlEngine engine;engine.rootContext()->setContextProperty("Settings",&settings);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(QStringLiteral(UTERMINAL_TEST_SOURCE_DIR "/resources/qml/CaptionButtons.qml")));
+        QScopedPointer<QObject> object(component.createWithInitialProperties({{"targetWindow",QVariant::fromValue(&window)}}));
+        QVERIFY2(object,qPrintable(component.errorString()));auto *controls=qobject_cast<QQuickItem*>(object.data());QVERIFY(controls);
+        controls->setParentItem(window.contentItem());controls->setX(762);
+        connect(&window,&QWindow::widthChanged,controls,[&]{controls->setX(window.width()-controls->width());});
+        auto findButton=[&](const QString &name)->QQuickItem*{
+            QList<QQuickItem*> pending{controls};
+            while(!pending.isEmpty()){
+                auto *item=pending.takeLast();if(item->objectName()==name)return item;
+                pending.append(item->childItems());
+            }
+            return nullptr;
+        };
+        const bool native=QGuiApplication::platformName().startsWith("windows");
+        auto physicalPosition=[&](QQuickItem *button){
+            const auto point=button->mapToScene(QPointF(23,21))*window.devicePixelRatio();
+            POINT screen{qRound(point.x()),qRound(point.y())};
+            ClientToScreen(reinterpret_cast<HWND>(window.winId()),&screen);
+            return screen;
+        };
+        POINT originalCursor{};if(native)GetCursorPos(&originalCursor);
+        const auto restoreCursor=qScopeGuard([&]{if(native)SetCursorPos(originalCursor.x,originalCursor.y);});
+        const auto captureDirectory=qEnvironmentVariable("UTERMINAL_CHROME_CAPTURE_DIR");
+        if(native){app.registerCaptionControls(controls);app.attachWindow(&window);}
+        window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));
+        if(native)SetForegroundWindow(reinterpret_cast<HWND>(window.winId()));
+        for(bool maximized:{false,true,false}){
+            if(maximized)window.showMaximized();else window.showNormal();
+            QTest::qWait(100);
+            for(const auto &name:{"minimizeWindow","maximizeWindow","closeWindow"}){
+                auto *button=findButton(name);QVERIFY(button);QCOMPARE(button->height(),42.0);
+                if(native){
+                    const auto handle=reinterpret_cast<HWND>(window.winId());
+                    QVERIFY(!(GetWindowLongPtrW(handle,GWL_STYLE)&WS_CAPTION));
+                    for(qreal y:{0.0,21.0,41.0}){
+                        const auto point=button->mapToScene(QPointF(23,y))*window.devicePixelRatio();POINT screen{qRound(point.x()),qRound(point.y())};
+                        QVERIFY(ClientToScreen(handle,&screen));
+                        QCOMPARE(SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(screen.x,screen.y)),LRESULT(button==findButton("maximizeWindow")?HTMAXBUTTON:HTCLIENT));
+                    }
+                }
+                const auto position=button->mapToScene(QPointF(23,21)).toPoint();
+                if(native){const auto screen=physicalPosition(button);QVERIFY(SetCursorPos(screen.x,screen.y));}
+                else QTest::mouseMove(&window,position);
+                QTRY_VERIFY2(button->property("visualHovered").toBool(),qPrintable(QString("button=%1 maximized=%2 active=%3 nativeHover=%4").arg(name).arg(maximized).arg(window.isActive()).arg(controls->property("nativeMaximizeHovered").toBool())));
+                if(native&&maximized&&button==findButton("maximizeWindow")&&!captureDirectory.isEmpty()){
+                    QTest::qWait(1500);
+                    const auto capture=window.screen()->grabWindow(0);const auto scale=window.devicePixelRatio();
+                    capture.copy(QRect(qMax(0,capture.width()-qRound(650*scale)),0,qRound(650*scale),qRound(420*scale))).save(captureDirectory+"/snap-layouts.png");
+                }
+            }
+        }
+        if(!captureDirectory.isEmpty())window.grabWindow().save(captureDirectory+"/custom-caption.png");
+        auto *maximize=findButton("maximizeWindow");
+        auto clickMaximize=[&]{
+            const auto position=maximize->mapToScene(QPointF(23,21)).toPoint();
+            if(native){
+                const auto screen=physicalPosition(maximize);QVERIFY(SetCursorPos(screen.x,screen.y));
+                INPUT input[2]{};for(auto &event:input)event.type=INPUT_MOUSE;
+                input[0].mi.dwFlags=MOUSEEVENTF_LEFTDOWN;input[1].mi.dwFlags=MOUSEEVENTF_LEFTUP;
+                QCOMPARE(SendInput(2,input,sizeof(INPUT)),UINT(2));
+            }else QTest::mouseClick(&window,Qt::LeftButton,Qt::NoModifier,position);
+        };
+        clickMaximize();
+        QTRY_COMPARE(window.visibility(),QWindow::Maximized);
+        clickMaximize();
+        QTRY_COMPARE(window.visibility(),QWindow::Windowed);
+        QVERIFY(!controls->property("nativeMaximizePressed").toBool());
+        if(native&&qEnvironmentVariableIsSet("UTERMINAL_TEST_SNAP_SELECTION")){
+            window.showMaximized();QTest::qWait(150);
+            auto key=[](WORD code,DWORD flags){INPUT event{};event.type=INPUT_KEYBOARD;event.ki.wVk=code;event.ki.dwFlags=flags;SendInput(1,&event,sizeof(event));};
+            key(VK_LWIN,0);key('Z',0);key('Z',KEYEVENTF_KEYUP);key(VK_LWIN,KEYEVENTF_KEYUP);QTest::qWait(600);
+            key('1',0);key('1',KEYEVENTF_KEYUP);QTest::qWait(300);
+            key('1',0);key('1',KEYEVENTF_KEYUP);QTest::qWait(400);
+            key(VK_ESCAPE,0);key(VK_ESCAPE,KEYEVENTF_KEYUP);
+            QTRY_VERIFY(window.width()<window.screen()->availableGeometry().width()*0.75);
+            qInfo()<<"Windows Snap layout selected"<<window.geometry();
+            window.showNormal();
+        }
+        QVERIFY(QMetaObject::invokeMethod(findButton("minimizeWindow"),"clicked"));QTRY_COMPARE(window.visibility(),QWindow::Minimized);
+        window.showNormal();
+        QVERIFY(QMetaObject::invokeMethod(findButton("closeWindow"),"clicked"));QTRY_VERIFY(!window.isVisible());
+    }
+    void nativeWindowAppearance(){
         QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
         ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
         QQuickWindow window;ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);
         if(!QGuiApplication::platformName().startsWith("windows"))QSKIP("Requires native Windows window");
         for(bool dark:{true,false,true,false}){
-            const QColor background(dark?"#222833":"#ffffff"),text(dark?"#eef1f6":"#111827");
-            app.updateTitleBar(&window,dark,background,text);BOOL enabled=FALSE;
+            app.attachWindow(&window);app.updateWindowAppearance(dark);BOOL enabled=FALSE;
             const auto handle=reinterpret_cast<HWND>(window.winId());
             QCOMPARE(DwmGetWindowAttribute(handle,DWMWA_USE_IMMERSIVE_DARK_MODE,&enabled,sizeof(enabled)),S_OK);QCOMPARE(bool(enabled),dark);
             DWM_WINDOW_CORNER_PREFERENCE corners=DWMWCP_DEFAULT;
@@ -127,7 +218,7 @@ private slots:
         QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
         ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
         ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);QQuickWindow window;
-        window.setFlags(Qt::Window|Qt::CustomizeWindowHint|Qt::WindowTitleHint|Qt::WindowSystemMenuHint|Qt::WindowMinimizeButtonHint|Qt::WindowMaximizeButtonHint|Qt::WindowCloseButtonHint);
+        window.setFlags(Qt::Window|Qt::FramelessWindowHint|Qt::WindowSystemMenuHint|Qt::WindowMinimizeButtonHint|Qt::WindowMaximizeButtonHint|Qt::WindowCloseButtonHint);
         window.setTitle("Caption layout test");
         window.resize(900,600);const auto handle=reinterpret_cast<HWND>(window.winId());app.attachWindow(&window);
         window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));QTest::qWait(200);const auto style=GetWindowLongPtrW(handle,GWL_STYLE);
@@ -139,70 +230,151 @@ private slots:
         const auto dragHit=SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(dragPoint.x,dragPoint.y));QCOMPARE(dragHit,LRESULT(HTCAPTION));
         MSG rightClick{};rightClick.hwnd=handle;rightClick.message=WM_NCRBUTTONUP;rightClick.wParam=HTCAPTION;qintptr menuResult=-1;
         QVERIFY(app.nativeEventFilter({},&rightClick,&menuResult));QCOMPARE(menuResult,qintptr(0));
-        RECT buttons{},frame{};QVERIFY(DwmGetWindowAttribute(handle,DWMWA_CAPTION_BUTTON_BOUNDS,&buttons,sizeof(buttons))==S_OK);QVERIFY(GetWindowRect(handle,&frame));
-        const auto buttonWidth=(buttons.right-buttons.left)/3;const POINT maximizePoint{frame.left+buttons.right-buttonWidth-buttonWidth/2,frame.top+(buttons.top+buttons.bottom)/2};
-        const auto maximizeHit=SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(maximizePoint.x,maximizePoint.y));QCOMPARE(maximizeHit,LRESULT(HTMAXBUTTON));
-        const auto layoutHandle=reinterpret_cast<HWND>(window.winId());
-        for(bool maximized:{false,true,false}){
-            if(maximized)window.showMaximized();else window.showNormal();
-            QTest::qWait(100);
-            QVERIFY(DwmGetWindowAttribute(layoutHandle,DWMWA_CAPTION_BUTTON_BOUNDS,&buttons,sizeof(buttons))==S_OK);
-            QVERIFY(GetWindowRect(layoutHandle,&frame));POINT origin{};RECT client{};
-            QVERIFY(ClientToScreen(layoutHandle,&origin));QVERIFY(GetClientRect(layoutHandle,&client));
-            const auto dpr=window.devicePixelRatio();
-            const bool nativeButtons=buttons.right>buttons.left;
-            QVERIFY(nativeButtons); // Real DWM buttons, not Qt's synthetic titlebar.
-            const auto expectedHeight=42.0;
-            const auto expectedTop=nativeButtons?qMax(0.0,(frame.top+buttons.top-origin.y)/dpr):0.0;
-            QTRY_VERIFY(qAbs(app.captionHeight()-expectedHeight)<0.01);
-            QVERIFY(qAbs(app.captionTop()-expectedTop)<0.01);
-            const auto expectedInset=buttons.right>buttons.left?(client.right-frame.left-buttons.left+origin.x)/dpr:138.0;
-            QVERIFY(qAbs(app.captionInset()-expectedInset)<0.01);
-            for(int index=0;index<3;++index){
-                const auto width=(buttons.right-buttons.left)/3;
-                const POINT center{frame.left+buttons.left+width*index+width/2,frame.top+(buttons.top+buttons.bottom)/2};
-                const LRESULT expected[]={HTMINBUTTON,HTMAXBUTTON,HTCLOSE};
-                QCOMPARE(SendMessageW(layoutHandle,WM_NCHITTEST,0,MAKELPARAM(center.x,center.y)),expected[index]);
-            }
-        }
-        SendMessageW(layoutHandle,WM_SYSCOMMAND,SC_MINIMIZE,0);
-        QTRY_VERIFY(IsIconic(layoutHandle));
+        SendMessageW(handle,WM_SYSCOMMAND,SC_MINIMIZE,0);
+        QTRY_VERIFY(IsIconic(handle));
     }
-    void nativeCaptionHoverReadability(){
+    void nativeFrameLifecycle(){
         if(!QGuiApplication::platformName().startsWith("windows"))QSKIP("Requires Windows desktop");
-        QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
         QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
         ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
         ut::App app(temporary.path(),&scripts,&plugins,&sessions,&runs,nullptr,nullptr);
-        QQuickWindow window;auto format=window.requestedFormat();format.setAlphaBufferSize(8);window.setFormat(format);window.setColor(Qt::transparent);
-        window.setFlags(Qt::Window|Qt::CustomizeWindowHint|Qt::WindowTitleHint|Qt::WindowSystemMenuHint|Qt::WindowMinimizeButtonHint|Qt::WindowMaximizeButtonHint|Qt::WindowCloseButtonHint);
-        window.setTitle("Native caption hover regression");window.resize(640,360);app.attachWindow(&window);window.show();app.attachWindow(&window);
-        QVERIFY(QTest::qWaitForWindowExposed(&window));
-        const auto handle=reinterpret_cast<HWND>(window.winId());SetForegroundWindow(handle);
+        QQuickWindow window;window.setFlags(Qt::Window|Qt::FramelessWindowHint);
+        window.resize(900,600);window.setMinimumSize({500,300});app.attachWindow(&window);
+        window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));
+        qInfo()<<"frame test DPR"<<window.devicePixelRatio()<<"screens"<<QGuiApplication::screens().size();
+        auto verifyStyle=[&]{
+            const auto style=GetWindowLongPtrW(reinterpret_cast<HWND>(window.winId()),GWL_STYLE);
+            QVERIFY(!(style&WS_CAPTION));QVERIFY(style&WS_THICKFRAME);QVERIFY(style&WS_SYSMENU);QVERIFY(style&WS_MAXIMIZEBOX);QVERIFY(style&WS_MINIMIZEBOX);
+        };
+        auto hit=[&](int x,int y){
+            const auto handle=reinterpret_cast<HWND>(window.winId());POINT point{x,y};ClientToScreen(handle,&point);
+            return SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(point.x,point.y));
+        };
+        const auto handle=reinterpret_cast<HWND>(window.winId());
+        verifyStyle();
+        // Reproduce a native/Qt style update attempting to restore the old caption.
+        const auto before=GetWindowLongPtrW(handle,GWL_STYLE);
+        SetWindowLongPtrW(handle,GWL_STYLE,before|WS_CAPTION);
+        verifyStyle();
+        qInfo()<<"WS_CAPTION restoration request rejected";
+        for(int i=0;i<40;++i){
+            window.resize(900+(i%2)*120,600+(i%3)*30);
+            SendMessageW(handle,WM_NCACTIVATE,i%2,0);SendMessageW(handle,WM_NCPAINT,1,0);
+            QCoreApplication::processEvents();verifyStyle();
+            RECT client{};QVERIFY(GetClientRect(handle,&client));
+            QCOMPARE(hit(0,0),LRESULT(HTTOPLEFT));QCOMPARE(hit(client.right-1,0),LRESULT(HTTOPRIGHT));
+            QCOMPARE(hit(0,client.bottom-1),LRESULT(HTBOTTOMLEFT));QCOMPARE(hit(client.right-1,client.bottom-1),LRESULT(HTBOTTOMRIGHT));
+            QCOMPARE(hit(client.right/2,0),LRESULT(HTTOP));QCOMPARE(hit(client.right/2,client.bottom-1),LRESULT(HTBOTTOM));
+            QCOMPARE(hit(0,client.bottom/2),LRESULT(HTLEFT));QCOMPARE(hit(client.right-1,client.bottom/2),LRESULT(HTRIGHT));
+        }
+        window.showMaximized();QTest::qWait(150);verifyStyle();
+        RECT client{};QVERIFY(GetClientRect(handle,&client));POINT origin{};QVERIFY(ClientToScreen(handle,&origin));
+        MONITORINFO monitor{sizeof(MONITORINFO)};QVERIFY(GetMonitorInfoW(MonitorFromWindow(handle,MONITOR_DEFAULTTONEAREST),&monitor));
+        QCOMPARE(origin.x,monitor.rcWork.left);QCOMPARE(origin.y,monitor.rcWork.top);
+        QCOMPARE(client.right,monitor.rcWork.right-monitor.rcWork.left);QCOMPARE(client.bottom,monitor.rcWork.bottom-monitor.rcWork.top);
+        QCOMPARE(hit(0,0),LRESULT(HTCLIENT));
+        window.showMinimized();QTest::qWait(50);window.showNormal();QTest::qWait(100);verifyStyle();
+        // Destroy/recreate the actual native surface, without re-attaching App.
+        window.hide();window.destroy();window.show();QVERIFY(QTest::qWaitForWindowExposed(&window));verifyStyle();
+        for(auto *screen:QGuiApplication::screens()){
+            window.setScreen(screen);window.setPosition(screen->availableGeometry().topLeft()+QPoint(20,20));
+            QTest::qWait(100);verifyStyle();
+        }
+    }
+    void mainWindowResizeStress(){
+        if(!QGuiApplication::platformName().startsWith("windows"))QSKIP("Requires Windows desktop");
+        QTemporaryDir temporary;const auto resources=QStringLiteral(UTERMINAL_TEST_SOURCE_DIR "/resources");
+        const auto runtime=temporary.path()+"/plugins/powershell/7.0.0-x64";
+        QVERIFY(QDir().mkpath(runtime+"/runtime"));
+        QVERIFY(QFile::copy(QCoreApplication::applicationDirPath()+"/uterminal_update_fixture.exe",runtime+"/runtime/pwsh.exe"));
+        QVERIFY(ut::writeJson(runtime+"/installed.json",{{"kind","powershell"},{"version","7.0.0"}}));
+        QVERIFY(ut::writeJson(temporary.path()+"/plugins/active.json",{{"powershell","7.0.0"}}));
+        ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),resources);
+        ut::Sessions sessions(&plugins,&settings,&scripts);ut::Executions runs(temporary.path(),&plugins,&settings,&scripts,&sessions);
+        ut::PythonEnvironment python(temporary.path(),&plugins);ut::Updates updates(temporary.path(),&settings,&plugins);
+        ut::App app(resources,&scripts,&plugins,&sessions,&runs,&python,&updates);
+        qmlRegisterUncreatableType<TerminalItem>("UTerminal",1,0,"TerminalItem","Owned by Sessions");
+        qmlRegisterUncreatableType<ut::Pane>("UTerminal",1,0,"Pane","Owned by Sessions");
+        qmlRegisterType<ut::PaneHost>("UTerminal",1,0,"PaneHost");
+        qmlRegisterType<ut::ScriptHighlighter>("UTerminal",1,0,"ScriptHighlighter");
+        qmlRegisterType<ut::ScriptEditing>("UTerminal",1,0,"ScriptEditing");
+        QFontDatabase::addApplicationFont(resources+"/fonts/MaterialIconsRound-Regular.otf");
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("App",&app);engine.rootContext()->setContextProperty("Settings",&settings);
+        engine.rootContext()->setContextProperty("Scripts",&scripts);engine.rootContext()->setContextProperty("Plugins",&plugins);
+        engine.rootContext()->setContextProperty("Sessions",&sessions);engine.rootContext()->setContextProperty("Runs",&runs);
+        engine.rootContext()->setContextProperty("Python",&python);engine.rootContext()->setContextProperty("Updates",&updates);
+        QQmlComponent component(&engine,QUrl::fromLocalFile(resources+"/qml/Main.qml"));
+        QScopedPointer<QObject> object(component.create());QVERIFY2(object,qPrintable(component.errorString()));
+        auto *window=qobject_cast<QQuickWindow*>(object.data());QVERIFY(window);app.attachWindow(window);
+        window->resize(1100,760);window->setPosition(window->screen()->availableGeometry().topLeft()+QPoint(40,40));
+        window->show();QVERIFY(QTest::qWaitForWindowExposed(window));QTest::qWait(300);
+        const auto handle=reinterpret_cast<HWND>(window->winId());SetForegroundWindow(handle);
         POINT oldCursor{};GetCursorPos(&oldCursor);const auto restoreCursor=qScopeGuard([&]{SetCursorPos(oldCursor.x,oldCursor.y);});
-        for(bool dark:{true,false,true}){
-            app.updateTitleBar(&window,dark,QColor(dark?"#202020":"#f3f3f3"),QColor(dark?"white":"black"));
-            QTest::qWait(100);
-            RECT buttons{},frame{};POINT origin{};
-            QCOMPARE(DwmGetWindowAttribute(handle,DWMWA_CAPTION_BUTTON_BOUNDS,&buttons,sizeof(buttons)),S_OK);
-            QVERIFY(GetWindowRect(handle,&frame));QVERIFY(ClientToScreen(handle,&origin));
-            QVERIFY(buttons.right>buttons.left);
-            const auto width=(buttons.right-buttons.left)/3;
-            for(int button=0;button<3;++button){
-                const int x=frame.left+buttons.left+width*button+width/2,y=frame.top+(buttons.top+buttons.bottom)/2;
-                QVERIFY(SetCursorPos(x,y));QTest::qWait(180);DwmFlush();
-                const auto capture=window.screen()->grabWindow(window.winId()).toImage();QVERIFY(!capture.isNull());
-                const int cx=x-origin.x,cy=y-origin.y,r=qRound(9*window.devicePixelRatio());
-                const auto area=QRect(cx-r,cy-r,2*r,2*r).intersected(capture.rect());QVERIFY(!area.isEmpty());
-                int darkest=255,lightest=0;
-                for(int py=area.top();py<=area.bottom();++py)for(int px=area.left();px<=area.right();++px){
-                    const int value=qGray(capture.pixel(px,py));darkest=qMin(darkest,value);lightest=qMax(lightest,value);
+        struct Trace:QAbstractNativeEventFilter {
+            HWND handle;QStringList messages;bool captionSeen=false;int sizing=0;
+            bool nativeEventFilter(const QByteArray &,void *event,qintptr *)override{
+                auto *msg=static_cast<MSG*>(event);if(msg->hwnd!=handle)return false;
+                if(msg->message==WM_WINDOWPOSCHANGED||msg->message==WM_STYLECHANGED||msg->message==WM_NCPAINT||msg->message==WM_NCACTIVATE||msg->message==WM_NCLBUTTONDOWN||msg->message==WM_SYSCOMMAND){
+                    const auto style=GetWindowLongPtrW(handle,GWL_STYLE);captionSeen|=bool(style&WS_CAPTION);
+                    messages.append(QString("message=%1 wparam=%2 style=%3").arg(msg->message,0,16).arg(qulonglong(msg->wParam),0,16).arg(qulonglong(style),0,16));
+                    if(msg->message==WM_WINDOWPOSCHANGED&&!(reinterpret_cast<WINDOWPOS*>(msg->lParam)->flags&SWP_NOSIZE))++sizing;
                 }
-                const auto captureDirectory=qEnvironmentVariable("UTERMINAL_CHROME_CAPTURE_DIR");
-                if(!captureDirectory.isEmpty())capture.save(captureDirectory+QString("/caption-%1-%2.png").arg(dark?"dark":"light").arg(button));
-                QVERIFY2(lightest-darkest>80,qPrintable(QString("Unreadable native button %1, dark=%2, luminance range=%3").arg(button).arg(dark).arg(lightest-darkest)));
+                return false;
+            }
+        } trace;trace.handle=handle;QCoreApplication::instance()->installNativeEventFilter(&trace);
+        const auto removeTrace=qScopeGuard([&]{QCoreApplication::instance()->removeNativeEventFilter(&trace);});
+        const auto directory=qEnvironmentVariable("UTERMINAL_CHROME_CAPTURE_DIR");
+        const auto saveTrace=qScopeGuard([&]{if(!directory.isEmpty()){QFile log(directory+"/resize-messages.txt");if(log.open(QIODevice::WriteOnly))log.write(trace.messages.join('\n').toUtf8());}});
+        int frameNumber=0;bool captionInFrame=false;
+        QTimer recorder;recorder.setInterval(25);
+        connect(&recorder,&QTimer::timeout,this,[&]{
+            captionInFrame|=bool(GetWindowLongPtrW(handle,GWL_STYLE)&WS_CAPTION);
+            if(directory.isEmpty())return;
+            RECT frame{};MONITORINFO monitor{sizeof(MONITORINFO)};
+            if(!GetWindowRect(handle,&frame)||!GetMonitorInfoW(MonitorFromWindow(handle,MONITOR_DEFAULTTONEAREST),&monitor))return;
+            const auto image=window->screen()->grabWindow(0);
+            image.copy(QRect(frame.left-monitor.rcMonitor.left,frame.top-monitor.rcMonitor.top,frame.right-frame.left,qRound(60*window->devicePixelRatio())))
+                .save(directory+QString("/resize-%1-%2.png").arg(app.page()).arg(frameNumber++,4,10,QChar('0')));
+        });
+        recorder.start();
+        for(int page:{0,1,2}){
+            app.setPage(page);QTest::qWait(100);
+            for(int edge=0;edge<8;++edge){
+                RECT frame{};QVERIFY(GetWindowRect(handle,&frame));
+                const bool left=edge==0||edge==4||edge==6,right=edge==1||edge==5||edge==7;
+                const bool top=edge==2||edge==4||edge==5,bottom=edge==3||edge==6||edge==7;
+                // The extreme corner pixel is outside DWM's rounded window region.
+                const auto dpi=GetDpiForWindow(handle);
+                const int inset=edge>=4?qMax(2,(GetSystemMetricsForDpi(SM_CXSIZEFRAME,dpi)+GetSystemMetricsForDpi(SM_CXPADDEDBORDER,dpi))/2):1;
+                POINT start{left?frame.left+inset:right?frame.right-1-inset:(frame.left+frame.right)/2,
+                            top?frame.top+inset:bottom?frame.bottom-1-inset:(frame.top+frame.bottom)/2};
+                const auto initialSizing=trace.sizing;
+                const LRESULT expectedHits[]={HTLEFT,HTRIGHT,HTTOP,HTBOTTOM,HTTOPLEFT,HTTOPRIGHT,HTBOTTOMLEFT,HTBOTTOMRIGHT};
+                QCOMPARE(SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(start.x,start.y)),expectedHits[edge]);
+                std::thread drag([=]{
+                    SetCursorPos(start.x,start.y);INPUT input{};input.type=INPUT_MOUSE;input.mi.dwFlags=MOUSEEVENTF_LEFTDOWN;SendInput(1,&input,sizeof(input));
+                    for(int step=0;step<8;++step){Sleep(25);const int delta=step%2?0:24;SetCursorPos(start.x+(left||right?delta:0),start.y+(top||bottom?delta:0));}
+                    input.mi.dwFlags=MOUSEEVENTF_LEFTUP;SendInput(1,&input,sizeof(input));
+                });
+                QTest::qWait(300);drag.join();QCoreApplication::processEvents();
+                QVERIFY2(trace.sizing>initialSizing,qPrintable(QString("No interactive resize: page %1 edge %2").arg(page).arg(edge)));
+                QVERIFY(!trace.captionSeen);QVERIFY(!captionInFrame);
             }
         }
+        recorder.stop();
+        qInfo()<<"interactive sizing messages"<<trace.sizing<<"recorded frames"<<frameNumber<<"DPR"<<window->devicePixelRatio();
+        app.setPage(0);
+        POINT title{qRound(window->width()/2*window->devicePixelRatio()),qRound(20*window->devicePixelRatio())};ClientToScreen(handle,&title);
+        QCOMPARE(SendMessageW(handle,WM_NCHITTEST,0,MAKELPARAM(title.x,title.y)),LRESULT(HTCAPTION));
+        SetCursorPos(title.x,title.y);
+        INPUT doubleClick[4]{};for(int i=0;i<4;++i){doubleClick[i].type=INPUT_MOUSE;doubleClick[i].mi.dwFlags=i%2?MOUSEEVENTF_LEFTUP:MOUSEEVENTF_LEFTDOWN;}
+        QCOMPARE(SendInput(4,doubleClick,sizeof(INPUT)),UINT(4));QTRY_COMPARE(window->visibility(),QWindow::Maximized);
+        window->showNormal();QTest::qWait(100);
+        QSignalSpy quitConfirmation(&app,&ut::App::quitConfirmationRequested);
+        QVERIFY(sessions.startProgram(qEnvironmentVariable("SystemRoot")+"/System32/cmd.exe",{"/D","/Q"},temporary.path(),QProcessEnvironment::systemEnvironment(),"cmd","close confirmation"));
+        QVERIFY(!window->close());QCOMPARE(quitConfirmation.count(),1);QVERIFY(window->isVisible());
+        sessions.closeAll();window->hide();
     }
     void terminalIsDefaultPage(){
         QTemporaryDir temporary;ut::Settings settings(temporary.path());ut::Scripts scripts(temporary.path());ut::Plugins plugins(temporary.path(),temporary.path());
@@ -485,6 +657,41 @@ private slots:
         QVERIFY(pane.process.start(qEnvironmentVariable("SystemRoot")+"/System32/cmd.exe",{"/D","/Q","/C","exit 7"},QDir::tempPath(),QProcessEnvironment::systemEnvironment()));
         QTRY_VERIFY_WITH_TIMEOUT(pane.stateLabel().contains(QStringLiteral("已退出")),10000);QVERIFY(pane.stateLabel().endsWith("7"));QCOMPARE(pane.runtimeLabel(),label);
     }
+    void terminalContinuousResize(){
+        struct ResizeTerminal : TerminalItem { using TerminalItem::inputMethodQuery; };
+        ResizeTerminal item;
+        item.setSize({180, 400});
+        item.setSessionId("resize");
+        const QByteArray text("abcdefghijklmnopqrstuvwxyz0123456789");
+        item.feedBytes(text);
+        const auto cursor = [&] { return item.inputMethodQuery(Qt::ImCursorRectangle).toRectF(); };
+        const auto wrappedY = cursor().y();
+        const int narrowColumns = item.columns();
+        QSignalSpy sizes(&item, &TerminalItem::terminalSizeChanged);
+        // No event-loop idle period: every intermediate size must take effect.
+        for (int width = 190; width <= 720; width += 10) {
+            item.setWidth(width);
+            QCOMPARE(item.textureSize().width(), qCeil(width * 1.25));
+        }
+        QVERIFY(item.columns() > narrowColumns);
+        QVERIFY(sizes.size() > 1);
+        QVERIFY(cursor().y() < wrappedY);
+        item.selectAll();
+        QCOMPARE(item.selectionText().trimmed(), QString::fromLatin1(text));
+        item.clearSelection();
+        item.setWidth(180);
+        QCOMPARE(item.columns(), narrowColumns);
+        QCOMPARE(cursor().y(), wrappedY);
+        const auto fixedCursor = cursor();
+        for (int height = 410; height <= 600; height += 10) {
+            item.setHeight(height);
+            QCOMPARE(item.textureSize().height(), qCeil(height * 1.25));
+            QCOMPARE(cursor(), fixedCursor);
+        }
+        const auto count = sizes.size();
+        item.setPosition({12, 18});
+        QCOMPARE(sizes.size(), count);
+    }
     void terminalColorsPreserveBuffer(){
         TerminalItem item;item.setSessionId("colors");item.setSize({500,200});QTest::qWait(60);
         item.feedBytes("saved output\r\n\x1b[48;2;10;20;30m   \x1b[0m");item.selectAll();const auto text=item.selectionText();
@@ -748,8 +955,29 @@ private slots:
             return left>=-0.5&&left+item->width()<=tabs->width()+0.5;
         };
         for(int i=0;i<9;++i){
+            auto *animation=page->findChild<QObject*>("terminalTabWidthAnimation");QVERIFY(animation);
+            if(i==3)animation->setProperty("duration",1000);
             QVERIFY(sessions.startProgram(qEnvironmentVariable("SystemRoot")+"/System32/cmd.exe",{"/D","/Q"},temporary.path(),QProcessEnvironment::systemEnvironment(),"cmd",QString("test %1").arg(i)));
+            if(i==3){
+                // During the first compression, the viewport stays at the
+                // first tab and the new tab moves left as widths shrink.
+                QTRY_VERIFY(tabs->property("compressing").toBool());
+                qreal previousX=10000;
+                for(int frame=0;frame<3;++frame){
+                    QTest::qWait(20);
+                    auto *item=qvariant_cast<QQuickItem*>(tabs->property("currentItem"));QVERIFY(item);
+                    const auto x=item->mapToItem(tabs,QPointF()).x();
+                    QVERIFY(x<=previousX+0.5);previousX=x;
+                    QVERIFY(qAbs(tabs->property("contentX").toDouble()-tabs->property("originX").toDouble())<0.5);
+                }
+            }
             QTRY_VERIFY(fullyVisible());
+            QTRY_COMPARE(tabs->property("tabWidth").toDouble(),tabs->property("targetTabWidth").toDouble());
+            if(i==3){QTRY_VERIFY(!tabs->property("compressing").toBool());animation->setProperty("duration",160);}
+            if(i>=7){
+                auto rightEdge=[&]{auto *item=qvariant_cast<QQuickItem*>(tabs->property("currentItem"));return item->mapToItem(tabs,QPointF(item->width(),0)).x();};
+                QTRY_VERIFY(qAbs(rightEdge()-tabs->width())<0.5);
+            }
         }
         QVERIFY(tabs->property("contentX").toDouble()>0);
         sessions.setCurrentIndex(0);QTRY_VERIFY(fullyVisible());
@@ -772,6 +1000,17 @@ private slots:
         const auto scroll=tabs->property("contentX").toDouble();
         sessions.renameTab(sessions.currentIndex(),"renamed");QTest::qWait(60);
         QCOMPARE(tabs->property("contentX").toDouble(),scroll);
+        // Each opening loads the target tab, including after a cancelled edit.
+        auto *menu=page->findChild<QObject*>("terminalTabMenu");auto *rename=page->findChild<QObject*>("renameTerminalDialog");
+        auto *input=page->findChild<QObject*>("terminalTabName");QVERIFY(menu);QVERIFY(rename);QVERIFY(input);
+        menu->setProperty("tabIndex",0);QVERIFY(QMetaObject::invokeMethod(rename,"open"));QTRY_VERIFY(rename->property("opened").toBool());
+        input->setProperty("text","A");QVERIFY(QMetaObject::invokeMethod(rename,"accept"));QTRY_VERIFY(!rename->property("visible").toBool());
+        QCOMPARE(sessions.tabTitleAt(0),QString("A"));
+        menu->setProperty("tabIndex",1);QVERIFY(QMetaObject::invokeMethod(rename,"open"));QTRY_VERIFY(rename->property("opened").toBool());
+        QCOMPARE(input->property("text").toString(),sessions.tabTitleAt(1));QVERIFY(input->property("text").toString()!="A");
+        input->setProperty("text","cancelled draft");QVERIFY(QMetaObject::invokeMethod(rename,"reject"));QTRY_VERIFY(!rename->property("visible").toBool());
+        menu->setProperty("tabIndex",0);QVERIFY(QMetaObject::invokeMethod(rename,"open"));QTRY_VERIFY(rename->property("opened").toBool());
+        QCOMPARE(input->property("text").toString(),QString("A"));QVERIFY(QMetaObject::invokeMethod(rename,"reject"));
         sessions.closeAll();QTRY_COMPARE(tabs->property("count").toInt(),0);
     }
     void processOutputAndExit(){

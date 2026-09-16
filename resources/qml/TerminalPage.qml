@@ -4,21 +4,31 @@ import QtQuick.Layouts
 import UTerminal
 Item {
     id: page
-        readonly property real nativeCaptionHeight: typeof App !== "undefined" ? App.captionHeight : 42
-        readonly property real nativeCaptionTop: 4
-        Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: page.nativeCaptionHeight; color: "transparent"
+        readonly property real tabBarHeight: Theme.captionHeight
+        readonly property real tabTopPadding: 4
+        Rectangle { id: tabBar; objectName: "terminalTabBar"; anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: page.tabBarHeight; color: "transparent"
                 Rectangle { anchors.fill: parent; anchors.rightMargin: tabBar.captionInset; color: Settings.dark ? "#202020" : "#f3f3f3" }
-                readonly property real captionInset: Math.max(typeof App !== "undefined" ? App.captionInset : 138,SafeArea.margins.right)
+                readonly property real captionInset: Theme.captionControlsWidth
                 readonly property real tabViewportLimit: Math.max(0,width-captionInset-82)
                 readonly property color idleHover: Settings.dark ? "#353535" : "#e5e5e5"
                 readonly property color idlePressed: Settings.dark ? "#404040" : "#d8d8d8"
-                ListView { id: tabs; objectName: "terminalTabs"; x: 0; y: page.nativeCaptionTop; width: Math.min(totalTabWidth,tabBar.tabViewportLimit); height: tabBar.height-y; orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 2
-                    property real tabWidth: Math.max(100, Math.min(188, (tabBar.tabViewportLimit - Math.max(0,count-1)*spacing)/Math.max(1,count)))
-                    Behavior on tabWidth { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                ListView { id: tabs; objectName: "terminalTabs"; x: 0; y: page.tabTopPadding; width: Math.min(totalTabWidth,tabBar.tabViewportLimit); height: tabBar.height-y; orientation: ListView.Horizontal; model: Sessions; clip: true; spacing: 2
+                    readonly property real targetTabWidth: Math.max(100, Math.min(188, (tabBar.tabViewportLimit - Math.max(0,count-1)*spacing)/Math.max(1,count)))
+                    property real tabWidth: targetTabWidth
+                    readonly property bool compressing: tabWidthAnimation.running && tabWidth > targetTabWidth + 0.01
+                    Behavior on tabWidth {
+                        NumberAnimation {
+                            id: tabWidthAnimation
+                            objectName: "terminalTabWidthAnimation"
+                            duration: 160; easing.type: Easing.OutCubic
+                            onRunningChanged: if (!running) Qt.callLater(tabs.revealCurrentTab)
+                        }
+                    }
                     readonly property real totalTabWidth: count*tabWidth + Math.max(0,count-1)*spacing
                     contentWidth: totalTabWidth
                     boundsBehavior: Flickable.StopAtBounds
                     currentIndex: Sessions.currentIndex
+                    highlightFollowsCurrentItem: false
                     WheelHandler {
                         onWheel: event => {
                             const delta = event.pixelDelta.x || event.pixelDelta.y || (event.angleDelta.x || event.angleDelta.y)/120*60
@@ -30,8 +40,10 @@ Item {
                     function revealCurrentTab() {
                         if (currentIndex < 0 || currentIndex >= count || width <= 0) return
                         forceLayout()
-                        positionViewAtIndex(currentIndex, ListView.Contain)
-                        if (contentWidth <= width) positionViewAtBeginning()
+                        // Anchor the first tab during compression. Following the
+                        // last tab here makes every shrinking tab drift right.
+                        if (compressing || contentWidth <= width + 0.5) positionViewAtBeginning()
+                        else positionViewAtIndex(currentIndex, currentIndex === count-1 ? ListView.End : ListView.Contain)
                     }
                     // Coalesce model and geometry changes, after delegate widths settle.
                     onCurrentIndexChanged: Qt.callLater(revealCurrentTab)
@@ -67,7 +79,7 @@ Item {
                 }
             ToolButton {
                 id: newTabButton; objectName: "newTerminalTab"
-                x: tabs.x+tabs.width+4; y: page.nativeCaptionTop; width: 36; height: tabBar.height-y; padding: 0
+                x: tabs.x+tabs.width+4; y: page.tabTopPadding; width: 36; height: tabBar.height-y; padding: 0
                 background: Rectangle { radius: 4; color: newTabButton.down ? tabBar.idlePressed : newTabButton.hovered ? tabBar.idleHover : "transparent" }
                 contentItem: Icon { name: "add"; font.pixelSize: 18; color: Settings.dark ? "#f5f5f5" : "#1a1a1a" }
                 onClicked: Sessions.newTab()
@@ -75,7 +87,7 @@ Item {
             }
             ToolButton {
                 id: terminalMenuButton; objectName: "terminalMenuButton"
-                x: newTabButton.x+newTabButton.width; y: page.nativeCaptionTop; width: 32; height: tabBar.height-y; padding: 0
+                x: newTabButton.x+newTabButton.width; y: page.tabTopPadding; width: 32; height: tabBar.height-y; padding: 0
                 background: Rectangle { radius: 4; color: terminalMenuButton.down ? tabBar.idlePressed : terminalMenuButton.hovered ? tabBar.idleHover : "transparent" }
                 contentItem: Icon { name: "expand_more"; font.pixelSize: 18; color: Settings.dark ? "#f5f5f5" : "#1a1a1a" }
                 onClicked: terminalActionsMenu.popup()
@@ -157,14 +169,17 @@ Item {
         AppMenuItem { text: "上下拆分窗格"; enabled: Sessions.panes.length > 0; onTriggered: Sessions.split(true) }
     }
     AppMenu { id: tabMenu; objectName: "terminalTabMenu"; property int tabIndex: -1
-        AppMenuItem { text: "重命名"; onTriggered: renameDialog.open() }
+        AppMenuItem { objectName: "renameTerminalTab"; text: "重命名"; onTriggered: renameDialog.open() }
         AppMenuItem { text: "关闭"; onTriggered: Sessions.closeTab(tabMenu.tabIndex) }
         AppMenuItem { text: "关闭其他标签"; onTriggered: Sessions.closeOthers(tabMenu.tabIndex) }
         AppMenuItem { text: "关闭右侧标签"; onTriggered: Sessions.closeRight(tabMenu.tabIndex) }
     }
-    AppDialog { id: renameDialog; title: "重命名标签"; anchors.centerIn: parent; modal: true; standardButtons: Dialog.Ok | Dialog.Cancel
-        Field { id: tabName; width: parent.width; placeholderText: "标签名称" }
-        onAccepted: Sessions.renameTab(tabMenu.tabIndex,tabName.text)
+    AppDialog { id: renameDialog; objectName: "renameTerminalDialog"; title: "重命名标签"; anchors.centerIn: parent; modal: true; standardButtons: Dialog.Ok | Dialog.Cancel
+        property int tabIndex: -1
+        onAboutToShow: { tabIndex=tabMenu.tabIndex; tabName.text=Sessions.tabTitleAt(tabIndex) }
+        onOpened: { tabName.forceActiveFocus(); tabName.selectAll() }
+        Field { id: tabName; objectName: "terminalTabName"; width: parent.width; placeholderText: "标签名称"; maximumLength: 200 }
+        onAccepted: Sessions.renameTab(tabIndex,tabName.text)
     }
     Connections { target: Sessions; function onContextMenuRequested(x,y) { const point=page.mapFromItem(null,x,y);contextMenu.popup(point.x,point.y) } }
 }
