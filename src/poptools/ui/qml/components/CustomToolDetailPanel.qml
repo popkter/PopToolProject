@@ -279,11 +279,22 @@ Rectangle {
                         Component {
                             id: choiceField
                             AppComboBox {
-                                model: parameterItem.modelData.options || []
-                                textRole: count > 0 && typeof model[0] === "object" ? "label" : ""
+                                id: choiceControl
+                                readonly property var choiceOptions: parameterItem.modelData.options || []
+                                function optionValue(index) {
+                                    if (index < 0 || index >= choiceOptions.length)
+                                        return ""
+                                    const option = choiceOptions[index]
+                                    return typeof option === "object" ? option.value : option
+                                }
+                                model: choiceOptions
+                                textRole: choiceOptions.length > 0 && typeof choiceOptions[0] === "object" ? "label" : ""
                                 leftPadding: 13
                                 font.pixelSize: 14
-                                onCurrentTextChanged: root.parameterValues[parameterItem.modelData.id] = currentText
+                                onCurrentIndexChanged: {
+                                    if (currentIndex >= 0)
+                                        root.parameterValues[parameterItem.modelData.id] = optionValue(currentIndex)
+                                }
                             }
                         }
 

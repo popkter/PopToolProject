@@ -44,6 +44,8 @@ class PresetController(QObject):
     recordingChanged = Signal()
     recordingError = Signal(str)
     recordingSaved = Signal(str)
+    exportingChanged = Signal()
+    recordingOutputDirectoryChanged = Signal()
     screenColorPicked = Signal(str)
     screenColorPickingCancelled = Signal()
 
@@ -53,6 +55,11 @@ class PresetController(QObject):
         self._recording = False
         self._recording_serial = ""
         self._recording_dir: Path | None = None
+        downloads = Path.home() / "Downloads"
+        self._recording_output_dir: Path | None = (
+            downloads if downloads.is_dir() else Path.home()
+        )
+        self._exporting = False
         self._video_process: QProcess | None = None
         self._log_process: QProcess | None = None
         self._stop_processes: list[QProcess] = []
@@ -75,6 +82,14 @@ class PresetController(QObject):
     @Property(bool, notify=recordingChanged)
     def recording(self) -> bool:
         return self._recording
+
+    @Property(bool, notify=exportingChanged)
+    def exporting(self) -> bool:
+        return self._exporting
+
+    @Property(str, notify=recordingOutputDirectoryChanged)
+    def recordingOutputDirectory(self) -> str:
+        return str(self._recording_output_dir) if self._recording_output_dir else ""
 
     @Slot(QObject, result=bool)
     def startScreenColorPicking(self, source_window: QObject | None) -> bool:
@@ -185,7 +200,6 @@ class PresetController(QObject):
                 str(work_dir / "recording.mp4"),
                 "--audio-source=voice-performance",
                 "--audio-codec=aac",
-                "--require-audio",
                 "--no-audio-playback",
                 "--no-control",
                 "--window-title",
@@ -216,6 +230,10 @@ class PresetController(QObject):
     def stopRecording(self) -> None:
         if not self._recording:
             return
+        self._exporting = True
+        self.exportingChanged.emit()
+        if self._recording_output_dir is not None:
+            self._save_parent = self._recording_output_dir
         adb = find_adb_executable()
         if adb:
             self._signal_remote_process(adb, "logcat")
@@ -286,7 +304,7 @@ class PresetController(QObject):
         if exit_code != 0 or recording_file is None or not recording_file.is_file():
             detail = output.splitlines()[-1] if output else f"退出代码 {exit_code}"
             self.recordingError.emit(
-                "音视频录制失败：设备可能不支持同时采集系统声音和麦克风。"
+                "录屏失败，请确认设备已连接且未处于受限状态。"
                 f"\n{detail}"
             )
             if self._log_process is not None:
@@ -395,6 +413,32 @@ class PresetController(QObject):
         self.saveRecording(source)
         return True
 
+    @Slot(result=bool)
+    def chooseRecordingOutputDirectory(self) -> bool:
+        downloads = Path.home() / "Downloads"
+        source = QFileDialog.getExistingDirectory(
+            None,
+            "选择录制文件保存目录",
+            str(self._recording_output_dir or (downloads if downloads.is_dir() else Path.home())),
+            QFileDialog.Option.ShowDirsOnly,
+        )
+        if not source:
+            return False
+        self._recording_output_dir = Path(source)
+        self.recordingOutputDirectoryChanged.emit()
+        return True
+
+    @Slot(str)
+    def setRecordingOutputDirectory(self, path: str) -> None:
+        raw = (path or "").strip()
+        if raw.startswith("file:"):
+            raw = QUrl(raw).toLocalFile()
+        if raw:
+            self._recording_output_dir = Path(raw)
+        else:
+            self._recording_output_dir = None
+        self.recordingOutputDirectoryChanged.emit()
+
     def _finish_save(self, parent: Path) -> None:
         if self._recording_dir is None:
             return
@@ -419,6 +463,8 @@ class PresetController(QObject):
             self.recordingError.emit(f"录制文件保存失败：{exc}")
         finally:
             self._recording_dir = None
+            self._exporting = False
+            self.exportingChanged.emit()
 
     def _discard_recording(self) -> None:
         """Remove recording files when the user does not save them."""
@@ -427,4 +473,6 @@ class PresetController(QObject):
             self._recording_dir = None
         if self._remote_log:
             self._delete_remote_file(self._remote_log)
+        self._exporting = False
+        self.exportingChanged.emit()
 

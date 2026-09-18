@@ -55,8 +55,10 @@ Window {
             return
         if (presetUtilities.recording) {
             presetUtilities.stopRecording()
-            if (workspaceLoader.item && workspaceLoader.item.openRecordingFolderDialog)
-                workspaceLoader.item.openRecordingFolderDialog()
+            if (!presetUtilities.recordingOutputDirectory
+                || presetUtilities.recordingOutputDirectory.length === 0)
+                if (workspaceLoader.item && workspaceLoader.item.openRecordingFolderDialog)
+                    workspaceLoader.item.openRecordingFolderDialog()
         } else {
             presetUtilities.startRecording(deviceController.selectedAndroidDevice)
         }
@@ -156,9 +158,14 @@ Window {
                         width: 132
                         height: 36
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.operationRunning ? "结束录制" : "开始录制"
-                        iconName: root.operationRunning ? "stop" : "play_arrow"
+                        text: (presetUtilities && presetUtilities.exporting)
+                              ? "正在导出"
+                              : (root.operationRunning ? "结束录制" : "开始录制")
+                        iconName: (presetUtilities && presetUtilities.exporting)
+                                  ? "hourglass_top"
+                                  : (root.operationRunning ? "stop" : "play_arrow")
                         successStyle: root.operationRunning
+                        enabled: !(presetUtilities && presetUtilities.exporting)
                         onClicked: root.toggleRecording()
                     }
 

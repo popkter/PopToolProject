@@ -63,21 +63,82 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         text: root.controller.recording
-              ? "点击右上角“结束录制”，选择目录后自动生成时间戳文件夹"
-              : "需要 Android 11+；设备须支持 VOICE_PERFORMANCE 音源。部分应用禁止采集内部音频"
+              ? "点击“结束记录”后自动导出到所选目录，生成时间戳文件夹"
+              : "需要 Android 11+；音频不可用时仅录制画面"
         color: Theme.textSecondary
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
+    }
+    TextField {
+        id: recordingDirectoryField
+        Layout.fillWidth: true
+        Layout.leftMargin: Theme.space40
+        Layout.rightMargin: Theme.space40
+        Layout.preferredHeight: 40
+        enabled: !root.controller.recording && !root.controller.exporting
+        placeholderText: "请选择录制保存目录"
+        color: Theme.textPrimary
+        font.pixelSize: Theme.fontBody
+        leftPadding: 13
+        rightPadding: 45
+        background: Rectangle {
+            radius: 7
+            color: Theme.surfaceContainerLow
+            border.color: parent.activeFocus ? Theme.primary : "#A8CFFF"
+            border.width: parent.activeFocus ? 2 : 1
+        }
+        Component.onCompleted: text = root.controller.recordingOutputDirectory
+        onTextChanged: {
+            if (text !== root.controller.recordingOutputDirectory)
+                root.controller.setRecordingOutputDirectory(text)
+        }
+        FilePathDropArea { target: recordingDirectoryField }
+        AppTextEditMenu { target: recordingDirectoryField }
+
+        PrimaryButton {
+            anchors.right: parent.right
+            anchors.rightMargin: 6
+            anchors.verticalCenter: parent.verticalCenter
+            width: 30
+            height: 30
+            compact: true
+            text: "选择目录"
+            iconName: "folder_open"
+            glyphSize: 19
+            tonal: true
+            foregroundColor: Theme.primaryText
+            border.width: 0
+            radius: 6
+            z: 201
+            color: hovered ? Theme.primaryContainerHover : Theme.primaryContainer
+            onClicked: root.controller.chooseRecordingOutputDirectory()
+        }
+    }
+    Connections {
+        target: root.controller
+        function onRecordingOutputDirectoryChanged() {
+            if (recordingDirectoryField.activeFocus)
+                return
+            const p = root.controller.recordingOutputDirectory
+            if (recordingDirectoryField.text !== p)
+                recordingDirectoryField.text = p
+        }
     }
     PrimaryButton {
         Layout.alignment: Qt.AlignHCenter
         Layout.preferredWidth: 168
         Layout.preferredHeight: 40
-        enabled: root.controller.recording
-                 || root.androidController.selectedAndroidDevice.length > 0
-        text: root.controller.recording ? "结束记录" : "开始记录"
-        iconName: root.controller.recording ? "stop" : "fiber_manual_record"
-        successStyle: root.controller.recording
+        enabled: !root.controller.exporting
+                 && (root.controller.recording
+                     || (root.androidController.selectedAndroidDevice.length > 0
+                         && root.controller.recordingOutputDirectory.length > 0))
+        text: root.controller.exporting
+              ? "正在导出"
+              : (root.controller.recording ? "结束记录" : "开始记录")
+        iconName: root.controller.exporting
+                  ? "hourglass_top"
+                  : (root.controller.recording ? "stop" : "fiber_manual_record")
+        successStyle: root.controller.recording && !root.controller.exporting
         onClicked: {
             if (root.controller.recording)
                 root.controller.stopRecording()
