@@ -7,6 +7,7 @@ Rectangle {
     clip: true
     required property string label
     required property string iconName
+    property string shortcutText: ""
     property bool selected: false
     property bool compact: false
     property bool dense: false
@@ -17,10 +18,13 @@ Rectangle {
 
     implicitHeight: compact ? 40 : (dense ? 48 : 52)
     radius: compact ? Theme.radiusSmall : Theme.radiusMedium
-    color: selected ? "#E8F2FF"
-                   : (mouseArea.containsMouse ? "#EEF1F5" : "transparent")
+    color: selected ? Theme.primaryContainer
+                   : (mouseArea.containsMouse
+                      ? (Theme.darkMode ? Theme.surfaceContainerHigh : "#EEF1F5")
+                      : "transparent")
     border.width: compact ? 1 : 0
-    border.color: selected ? "#88BFFF" : "#E0E5EB"
+    border.color: selected ? (Theme.darkMode ? Theme.primary : "#88BFFF")
+                           : (Theme.darkMode ? Theme.outlineVariant : "#E0E5EB")
 
     RowLayout {
         z: 1
@@ -35,7 +39,8 @@ Rectangle {
         MaterialIcon {
             icon: root.iconName
             iconSize: root.compact ? 20 : 21
-            color: root.selected ? "#1478E8" : "#53606F"
+            color: root.selected ? (Theme.darkMode ? Theme.primaryText : "#1478E8")
+                                 : (Theme.darkMode ? Theme.textSecondary : "#53606F")
             Layout.preferredWidth: 24
             Layout.preferredHeight: 32
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
@@ -97,7 +102,7 @@ Rectangle {
 
     HoverTips {
         visible: root.compact && mouseArea.containsMouse
-        text: root.label
+        text: root.label + (root.shortcutText.length > 0 ? " (" + root.shortcutText + ")" : "")
     }
 
     MouseArea {

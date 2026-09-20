@@ -8,6 +8,12 @@ AppDialog {
     required property var controller
     property bool editMode: false
     property string selectedIcon: "terminal"
+    property string androidDetectionText: ""
+    readonly property var androidModes: [
+        { "label": "自动检测", "value": "auto" },
+        { "label": "使用", "value": "use" },
+        { "label": "不使用", "value": "none" }
+    ]
     readonly property var commandIcons: [
         { "label": "终端", "value": "terminal" },
         { "label": "代码", "value": "code" },
@@ -154,13 +160,14 @@ AppDialog {
         return 0
     }
 
-    function openForCreate() {
+    function openForCreate(command, kind) {
         editMode = false
         titleField.text = ""
         descriptionField.text = ""
-        kindBox.currentIndex = 0
-        commandArea.text = ""
+        kindBox.currentIndex = kindIndex(kind || "powershell")
+        commandArea.text = command || ""
         selectedIcon = "terminal"
+        androidModeBox.currentIndex = 0
         open()
         titleField.forceActiveFocus()
     }
@@ -174,6 +181,8 @@ AppDialog {
                        ? tool.presentation.icon : "terminal"
         kindBox.currentIndex = kindIndex(tool.executor ? tool.executor.kind : "powershell")
         var executor = tool.executor || {}
+        androidModeBox.currentIndex = Math.max(0, ["auto", "use", "none"].indexOf(
+                                                  executor.android_device_mode || "auto"))
         var scriptParts = []
         if (executor.command)
             scriptParts.push(executor.command)
@@ -190,12 +199,32 @@ AppDialog {
         var saved = editMode
                 ? controller.saveSelected(titleField.text, descriptionField.text,
                                           kindBox.currentValue, commandArea.text,
-                                          selectedIcon)
+                                          selectedIcon, androidModeBox.currentValue)
                 : controller.createCommand(titleField.text, descriptionField.text,
                                            kindBox.currentValue, commandArea.text,
-                                           selectedIcon)
+                                           selectedIcon, androidModeBox.currentValue)
         if (saved)
             close()
+    }
+
+    Timer {
+        id: detectionTimer
+        interval: 350
+        onTriggered: root.androidDetectionText = root.controller.previewAndroidDetection(
+            kindBox.currentValue || "powershell", commandArea.text,
+            androidModeBox.currentValue || "auto")
+    }
+    Connections {
+        target: commandArea
+        function onTextChanged() { detectionTimer.restart() }
+    }
+    Connections {
+        target: kindBox
+        function onCurrentValueChanged() { detectionTimer.restart() }
+    }
+    Connections {
+        target: androidModeBox
+        function onCurrentValueChanged() { detectionTimer.restart() }
     }
 
     contentItem: ColumnLayout {
@@ -420,6 +449,36 @@ AppDialog {
                             border.color: descriptionField.activeFocus ? Theme.primary : Theme.outline
                             border.width: descriptionField.activeFocus ? 2 : 1
                         }
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 22
+                    Layout.rightMargin: 22
+                    spacing: 10
+                    Text {
+                        text: "Android 设备"
+                        color: Theme.textPrimary
+                        font.pixelSize: Theme.fontLabel
+                    }
+                    AppComboBox {
+                        id: androidModeBox
+                        objectName: "androidDeviceModeBox"
+                        Layout.preferredWidth: 160
+                        Layout.preferredHeight: 38
+                        leftPadding: 8
+                        rightPadding: 24
+                        model: root.androidModes
+                        textRole: "label"
+                        valueRole: "value"
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.androidDetectionText
+                        color: Theme.textSecondary
+                        font.pixelSize: Theme.fontSupporting
+                        wrapMode: Text.WordWrap
                     }
                 }
 

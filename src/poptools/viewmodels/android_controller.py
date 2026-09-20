@@ -10,7 +10,7 @@ from poptools.infrastructure.config_store import ConfigStore
 
 
 class AndroidController(QObject):
-    """Own global Android device selection and asynchronous process discovery."""
+    """Share discovery while keeping device preferences isolated by tool ID."""
 
     stateChanged = Signal()
 
@@ -25,8 +25,7 @@ class AndroidController(QObject):
         self.config_store = config_store
         self._device_service = device_service or AndroidDeviceService(self)
         self._process_service = process_service or AndroidProcessService(self)
-        self._preferred_device = config_store.preferred_android_device()
-        self._selected_device = ""
+        self._tool_devices = config_store.android_tool_devices()
         self._manual_device_refreshing = False
         self._device_service.devicesChanged.connect(self._on_devices_changed)
         self._device_service.refreshingChanged.connect(self._on_device_refreshing_changed)
@@ -50,16 +49,25 @@ class AndroidController(QObject):
     def androidProcesses(self) -> list[dict[str, str]]:
         return self._process_service.processes
 
-    @Property(str, notify=stateChanged)
-    def selectedAndroidDevice(self) -> str:
-        return self._selected_device
+    @Slot(str, result="QVariantMap")
+    def deviceForTool(self, tool_id: str) -> dict[str, object]:
+        serial = self._tool_devices.get(tool_id, "")
+        devices = self._device_service.devices
+        if tool_id and not serial and len(devices) == 1:
+            serial = devices[0].serial
+            self._tool_devices[tool_id] = serial
+            self.config_store.set_android_tool_device(tool_id, serial)
+        device = next((d for d in devices if d.serial == serial), None)
+        return {
+            "serial": serial,
+            "available": device is not None,
+            "label": device.label if device else f"{serial} · 不可用" if serial
+            else "请选择 Android 设备" if devices else "未检测到 Android 设备",
+        }
 
-    @Property(str, notify=stateChanged)
-    def selectedAndroidDeviceLabel(self) -> str:
-        for device in self._device_service.devices:
-            if device.serial == self._selected_device:
-                return device.label
-        return "未检测到 Android 设备"
+    def available_device_for_tool(self, tool_id: str) -> str:
+        state = self.deviceForTool(tool_id)
+        return str(state["serial"]) if state["available"] else ""
 
     @Property(bool, notify=stateChanged)
     def androidDeviceRefreshing(self) -> bool:
@@ -76,20 +84,23 @@ class AndroidController(QObject):
         elif already_refreshing:
             self.stateChanged.emit()
 
-    @Slot()
-    def refreshAndroidProcesses(self) -> None:
-        self._process_service.refresh(self._selected_device)
-
     @Slot(str)
-    def selectAndroidDevice(self, serial: str) -> None:
+    def refreshAndroidProcesses(self, serial: str) -> None:
+        self._process_service.refresh(serial)
+
+    @Slot(str, str)
+    def selectDeviceForTool(self, tool_id: str, serial: str) -> None:
         available = {device.serial for device in self._device_service.devices}
-        if serial not in available or serial == self._selected_device:
+        if not tool_id or serial not in available or serial == self._tool_devices.get(tool_id):
             return
-        self._selected_device = serial
-        self._preferred_device = serial
-        self.config_store.set_preferred_android_device(serial)
+        self._tool_devices[tool_id] = serial
+        self.config_store.set_android_tool_device(tool_id, serial)
         self.stateChanged.emit()
-        self.refreshAndroidProcesses()
+
+    def forget_tool(self, tool_id: str) -> None:
+        self._tool_devices.pop(tool_id, None)
+        self.config_store.set_android_tool_device(tool_id, "")
+        self.stateChanged.emit()
 
     def stopAutoRefresh(self) -> None:
         self._refresh_timer.stop()
@@ -106,16 +117,4 @@ class AndroidController(QObject):
         self.stateChanged.emit()
 
     def _on_devices_changed(self) -> None:
-        available = [device.serial for device in self._device_service.devices]
-        selected = self._selected_device
-        if selected not in available:
-            if self._preferred_device in available:
-                selected = self._preferred_device
-            else:
-                selected = available[0] if available else ""
-        self._selected_device = selected
-        if selected and selected != self._preferred_device:
-            self._preferred_device = selected
-            self.config_store.set_preferred_android_device(selected)
         self.stateChanged.emit()
-        self.refreshAndroidProcesses()

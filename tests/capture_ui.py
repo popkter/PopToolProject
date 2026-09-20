@@ -8,8 +8,10 @@ from typing import cast
 from PySide6.QtCore import QMetaObject, QObject, QTimer, QUrl
 from PySide6.QtGui import QFont, QFontDatabase, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQuick import QQuickWindow
 from PySide6.QtWidgets import QApplication
 
+from poptools.infrastructure.android_device_service import AndroidDevice, AndroidDeviceService
 from poptools.infrastructure.app_updater import UpdateRelease
 from poptools.infrastructure.config_store import ConfigStore
 from poptools.infrastructure.json_tool_repository import JsonToolRepository
@@ -74,7 +76,19 @@ def main() -> int:
     python_environment = PythonEnvironment(paths, config_store)
     execution = ExecutionManager(paths, python_environment)
     coordinator = ExecutionCoordinator(execution, config_store.max_parallel())
-    android_controller = AndroidController(config_store)
+    device_service = None
+    if os.environ.get("POPTOOLS_CAPTURE_ANDROID_DEVICES"):
+        class CaptureDeviceService(AndroidDeviceService):
+            def refresh(self) -> None:
+                self._set_devices([
+                    AndroidDevice(serial, model=f"Android_{index + 1}")
+                    for index, serial in enumerate(
+                        os.environ["POPTOOLS_CAPTURE_ANDROID_DEVICES"].split(",")
+                    )
+                ])
+
+        device_service = CaptureDeviceService()
+    android_controller = AndroidController(config_store, device_service)
     controller = AppController(registry, coordinator, config_store, android_controller)
     settings_controller = SettingsController(config_store, python_environment, coordinator)
     if os.environ.get("POPTOOLS_CAPTURE_DIALOG") == "settings":
@@ -164,6 +178,8 @@ def main() -> int:
         print("\n".join(qml_warnings), file=sys.stderr)
         return 1
     window = cast(QWindow, engine.rootObjects()[0])
+    if len(sys.argv) > 3 and sys.argv[3] != "__dynamic__":
+        QTimer.singleShot(350, lambda: controller.selectTool(sys.argv[3]))
     if os.environ.get("POPTOOLS_CAPTURE_JIRA_OUTPUT_MAX") == "1":
         jira_workspace = window.findChild(QObject, "jiraFeishuWorkspace")
         if jira_workspace is not None:
@@ -219,9 +235,16 @@ def main() -> int:
                     and QMetaObject.invokeMethod(custom_scripts_page, "closeDrawer"),
                 )
     capture_dialog = os.environ.get("POPTOOLS_CAPTURE_DIALOG")
+    if capture_dialog == "script-editor":
+        QTimer.singleShot(250, lambda: QMetaObject.invokeMethod(window, "openCommandEditorForEdit"))
+    if capture_dialog == "recent-tool":
+        QTimer.singleShot(450, lambda: controller.recentToolDialogRequested.emit(
+            controller.selectedTool["id"]
+        ))
     if os.environ.get("POPTOOLS_CAPTURE_DEVICE_MENU") == "1":
         def open_device_menu() -> None:
-            selector = window.findChild(QObject, "globalDeviceSelector")
+            selector = next((item for item in window.findChildren(QObject, "toolDeviceSelector")
+                             if item.property("visible")), None)
             if selector is not None:
                 QMetaObject.invokeMethod(selector, "openDeviceMenu")
 
@@ -291,8 +314,16 @@ def main() -> int:
     def capture() -> None:
         if os.environ.get("POPTOOLS_CAPTURE_QML_WARNINGS") == "1" and qml_warnings:
             print("\n".join(qml_warnings), file=sys.stderr)
-        screen = window.screen() or app.primaryScreen()
-        image = screen.grabWindow(window.winId()).toImage()
+        target_window = window
+        if capture_dialog == "recent-tool":
+            target_window = next(
+                (item for item in app.allWindows() if item.objectName() == "recentToolWindow"),
+                window,
+            )
+        screen = target_window.screen() or app.primaryScreen()
+        image = (target_window.grabWindow()
+                 if capture_dialog == "recent-tool" and isinstance(target_window, QQuickWindow)
+                 else screen.grabWindow(target_window.winId()).toImage())
         if image.isNull() or not image.save(str(output_path)):
             app.exit(2)
             return

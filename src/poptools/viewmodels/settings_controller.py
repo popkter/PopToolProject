@@ -29,7 +29,6 @@ class SettingsController(QObject):
     """Expose settings and configuration transfer without coupling them to tools."""
 
     configurationStatusChanged = Signal()
-    meritCountChanged = Signal()
     customScriptConcurrencyChanged = Signal()
     themeChanged = Signal()
     themeStylesChanged = Signal()
@@ -51,7 +50,6 @@ class SettingsController(QObject):
         self.python_environment = python_environment
         self.execution_coordinator = execution_coordinator
         self._configuration_status = ""
-        self._merit_count = config_store.merit_count()
         self._custom_script_concurrency = config_store.custom_script_concurrency()
         self._theme_mode = config_store.theme_mode()
         self._theme_catalog = theme_catalog or ThemeCatalog(
@@ -87,10 +85,6 @@ class SettingsController(QObject):
     @Property(str)
     def pythonEnvironmentStatus(self) -> str:
         return self.python_environment.state().status
-
-    @Property(int, notify=meritCountChanged)
-    def meritCount(self) -> int:
-        return self._merit_count
 
     @Property(int, notify=customScriptConcurrencyChanged)
     def customScriptConcurrency(self) -> int:
@@ -190,12 +184,6 @@ class SettingsController(QObject):
     def markUserGuideSeen(self) -> None:
         self.config_store.set_user_guide_seen(True)
         self.userGuideSeenChanged.emit()
-
-    @Slot(result=int)
-    def addMerit(self) -> int:
-        self._merit_count = self.config_store.increment_merit_count()
-        self.meritCountChanged.emit()
-        return self._merit_count
 
     @Slot(int, result=bool)
     def saveCustomScriptConcurrency(self, value: int) -> bool:

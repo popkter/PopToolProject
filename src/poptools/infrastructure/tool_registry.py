@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from poptools.domain.models import (
+    AndroidDeviceMode,
     ExecutorDefinition,
     ExecutorKind,
     PresentationDefinition,
@@ -55,11 +56,14 @@ class ToolRegistry:
         command: str,
         args: list[str],
         icon: str | None = None,
+        android_device_mode: str | None = None,
     ) -> ToolDefinition:
         current = self._tools[tool_id]
         executor = current.executor.model_copy(
             update={"kind": ExecutorKind(kind), "command": command.strip(), "args": args}
         )
+        if android_device_mode is not None:
+            executor.android_device_mode = AndroidDeviceMode(android_device_mode)
         parameters = synchronize_parameters(
             [executor.command, *executor.args, *executor.env.values()],
             current.parameters,
@@ -117,6 +121,7 @@ class ToolRegistry:
         kind: ExecutorKind | str,
         command: str,
         icon: str = "terminal",
+        android_device_mode: str = "auto",
     ) -> ToolDefinition:
         normalized_command = command.strip()
         if not normalized_command:
@@ -130,7 +135,10 @@ class ToolRegistry:
             title=title.strip() or "未命名命令",
             description=description.strip(),
             editable=True,
-            executor=ExecutorDefinition(kind=ExecutorKind(kind), command=normalized_command),
+            executor=ExecutorDefinition(
+                kind=ExecutorKind(kind), command=normalized_command,
+                android_device_mode=AndroidDeviceMode(android_device_mode),
+            ),
             parameters=parameters,
             presentation=PresentationDefinition(icon=icon.strip() or "terminal"),
         )

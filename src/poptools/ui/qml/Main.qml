@@ -65,22 +65,45 @@ ApplicationWindow {
         || (userGuideDialogLoader.item && userGuideDialogLoader.item.visible)
 
     onToolSearchQueryChanged: appController.setToolSearchQuery(toolSearchQuery)
-    function addMeritBurst() {
-        if (meritClickCooldown.running) {
+    function openTerminalPage() {
+        if (!developerConsoleController.pluginInstalled) {
+            window.requestTerminalEnable()
             return
         }
-        meritClickCooldown.restart()
-        settingsController.addMerit()
-        if (meritBurstModel.count >= 12) {
-            return
+        window.hideScrcpyWindow()
+        window.developerSelected = true
+        window.settingsSelected = false
+        developerConsoleController.ensureStarted()
+    }
+
+    function openCustomScriptsPage() {
+        window.hideScrcpyWindow()
+        window.developerSelected = false
+        window.settingsSelected = false
+        appController.navigate("custom")
+    }
+
+    Shortcut {
+        sequence: "Ctrl+T"
+        context: Qt.WindowShortcut
+        autoRepeat: false
+        enabled: !window.applicationOverlayVisible
+        onActivated: {
+            if (window.developerSelected && !window.settingsSelected) {
+                if (developerConsoleController.canCreateTerminalTab)
+                    developerConsoleController.createTerminalTab()
+            } else {
+                window.openTerminalPage()
+            }
         }
-        meritBurstModel.append({
-            burstId: Date.now().toString() + "-" + Math.random().toString(),
-            offsetX: Math.round((Math.random() - 0.5)
-                                * Math.max(0, Math.min(140, primaryNavWidth - 100))),
-            offsetY: Math.round((Math.random() - 0.5) * 36),
-            expiresAt: Date.now() + 1250
-        })
+    }
+
+    Shortcut {
+        sequence: "Ctrl+Q"
+        context: Qt.WindowShortcut
+        autoRepeat: false
+        enabled: !window.applicationOverlayVisible
+        onActivated: window.openCustomScriptsPage()
     }
 
     function openSettingsDialog() {
@@ -89,9 +112,9 @@ ApplicationWindow {
         hideScrcpyWindow()
     }
 
-    function openCommandEditorForCreate() {
+    function openCommandEditorForCreate(command, kind) {
         commandEditorDialogLoader.active = true
-        Qt.callLater(function () { commandEditorDialogLoader.item.openForCreate() })
+        Qt.callLater(function () { commandEditorDialogLoader.item.openForCreate(command, kind) })
     }
 
     function openCommandEditorForEdit() {
@@ -139,11 +162,6 @@ ApplicationWindow {
     }
 
     Timer {
-        id: meritClickCooldown
-        interval: 180
-    }
-
-    Timer {
         id: updateDialogOpenTimer
         interval: 250
         repeat: true
@@ -156,22 +174,6 @@ ApplicationWindow {
             Qt.callLater(function () { updateDialogLoader.item.open() })
         }
     }
-
-    Timer {
-        interval: 100
-        repeat: true
-        running: meritBurstModel.count > 0
-        onTriggered: {
-            const now = Date.now()
-            for (var i = meritBurstModel.count - 1; i >= 0; i--) {
-                if (meritBurstModel.get(i).expiresAt <= now) {
-                    meritBurstModel.remove(i)
-                }
-            }
-        }
-    }
-
-    ListModel { id: meritBurstModel }
 
     onClosing: function (close) {
         if (trayController.available && !trayController.quitting) {
@@ -454,7 +456,8 @@ ApplicationWindow {
         anchors.left: parent.left
         anchors.right: parent.right
         height: 40
-        color: window.developerSelected ? "#F7F8FA" : Theme.surface
+        color: window.developerSelected
+            ? (Theme.darkMode ? Theme.sidebar : "#F7F8FA") : Theme.surface
         z: 900
 
         Rectangle {
@@ -462,7 +465,7 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: window.primaryNavWidth
-            color: "#F7F8FA"
+            color: Theme.darkMode ? Theme.sidebar : "#F7F8FA"
             z: -1
         }
 
@@ -540,62 +543,14 @@ ApplicationWindow {
             anchors.leftMargin: window.primaryNavWidth + 12
             anchors.verticalCenter: parent.verticalCenter
             text: "UTerminal"
-            color: "#252A31"
+            color: Theme.darkMode ? Theme.textPrimary : "#252A31"
             font.pixelSize: 14
             font.weight: Font.DemiBold
         }
     }
 
-    Item {
-        id: meritBurstLayer
-        anchors.fill: parent
-        enabled: false
-        z: 970
-
-        Repeater {
-            model: meritBurstModel
-
-            Item {
-                required property string burstId
-                required property real offsetX
-                required property real offsetY
-                width: 1
-                height: 1
-                x: window.primaryNavWidth / 2 + offsetX
-                y: window.height - 96 + offsetY
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    y: -height / 2
-                    text: "功德 +1"
-                    color: Theme.primary
-                    font.pixelSize: Theme.fontTitleLarge
-                    font.weight: Font.Bold
-                    style: Text.Outline
-                    styleColor: Theme.surface
-                }
-
-                SequentialAnimation on y {
-                    NumberAnimation {
-                        to: window.height - 260 + offsetY
-                        duration: 1100
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                SequentialAnimation on opacity {
-                    NumberAnimation {
-                        from: 1
-                        to: 0
-                        duration: 1100
-                        easing.type: Easing.InCubic
-                    }
-                }
-            }
-        }
-    }
-
     RowLayout {
-        anchors.top: window.developerSelected ? parent.top : customTitleBar.bottom
+        anchors.top: customTitleBar.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -606,7 +561,7 @@ ApplicationWindow {
             Layout.minimumWidth: window.primaryNavWidth
             Layout.maximumWidth: window.primaryNavWidth
             Layout.fillHeight: true
-            color: "#F7F8FA"
+            color: Theme.darkMode ? Theme.sidebar : "#F7F8FA"
             clip: false
             z: 2
 
@@ -614,8 +569,7 @@ ApplicationWindow {
                 anchors.fill: parent
                 anchors.leftMargin: Theme.space12
                 anchors.rightMargin: Theme.space12
-                anchors.topMargin: (window.developerSelected ? customTitleBar.height : 0)
-                    + Theme.space8
+                anchors.topMargin: Theme.space8
                 anchors.bottomMargin: Theme.space12
                 spacing: Theme.space8
 
@@ -641,12 +595,6 @@ ApplicationWindow {
                             smooth: true
                             mipmap: true
                             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-
-                            MouseArea {
-                                anchors.fill: parent
-                                acceptedButtons: Qt.LeftButton
-                                onDoubleClicked: window.addMeritBurst()
-                            }
                         }
 
                         ColumnLayout {
@@ -673,25 +621,6 @@ ApplicationWindow {
                             }
                         }
                     }
-
-                    Text {
-                        id: meritCountLabel
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        visible: meritBurstModel.count > 0
-                        text: "累计功德 +" + settingsController.meritCount
-                        color: Theme.primary
-                        font.pixelSize: window.compactHeight ? Theme.fontMicro : Theme.fontCaption
-                        fontSizeMode: Text.Fit
-                        minimumPixelSize: 8
-                        font.weight: Font.DemiBold
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        style: Text.Outline
-                        styleColor: Theme.surface
-                        z: 2
-                    }
                 }
 
                 NavItem {
@@ -699,37 +628,24 @@ ApplicationWindow {
                     Layout.minimumWidth: 0
                     visible: true
                     label: "终端"
+                    shortcutText: "Ctrl+T"
                     iconName: "terminal"
                     compact: window.compactPrimaryNav
                     dense: window.compactHeight
                     selected: window.developerSelected && !window.settingsSelected
-                    onClicked: {
-                        if (!developerConsoleController.pluginInstalled) {
-                            window.requestTerminalEnable()
-                            return
-                        }
-                        // scrcpy is a native child window and would otherwise
-                        // cover QML dialogs regardless of their z value.
-                        window.hideScrcpyWindow()
-                        window.developerSelected = true
-                        window.settingsSelected = false
-                        developerConsoleController.ensureStarted()
-                    }
+                    onClicked: window.openTerminalPage()
                 }
                 NavItem {
                     Layout.fillWidth: true
                     Layout.minimumWidth: 0
                     label: "自定义"
+                    shortcutText: "Ctrl+Q"
                     iconName: "build"
                     compact: window.compactPrimaryNav
                     dense: window.compactHeight
                     selected: !window.developerSelected && !window.settingsSelected
                         && appController.section === "custom"
-                    onClicked: {
-                        window.developerSelected = false
-                        window.settingsSelected = false
-                        appController.navigate("custom")
-                    }
+                    onClicked: window.openCustomScriptsPage()
                 }
                 NavItem {
                     Layout.fillWidth: true
@@ -767,16 +683,6 @@ ApplicationWindow {
                     Layout.fillHeight: true
                 }
 
-                DeviceSelector {
-                    id: globalDeviceSelector
-                    objectName: "globalDeviceSelector"
-                    Layout.fillWidth: true
-                    Layout.minimumWidth: 0
-                    controller: androidController
-                    compact: window.compactPrimaryNav
-                    dense: window.compactHeight
-                    popupWidth: Theme.primaryNavigationWidth - Theme.space20 * 2
-                }
             }
         }
 
@@ -848,6 +754,9 @@ ApplicationWindow {
                     Layout.fillHeight: true
                     controller: developerConsoleController
                     parentWindow: window
+                    onCreateScriptRequested: function(command, kind) {
+                        window.openCommandEditorForCreate(command, kind)
+                    }
                 }
 
                 SettingsPage {

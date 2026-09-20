@@ -60,7 +60,9 @@ Window {
                 if (workspaceLoader.item && workspaceLoader.item.openRecordingFolderDialog)
                     workspaceLoader.item.openRecordingFolderDialog()
         } else {
-            presetUtilities.startRecording(deviceController.selectedAndroidDevice)
+            const device = deviceController.deviceForTool(root.toolId)
+            if (device.available)
+                presetUtilities.startRecording(device.serial)
         }
     }
 
@@ -278,9 +280,10 @@ Window {
         id: commandWorkspace
         CommandWorkspace {
             controller: appController
+            androidController: root.deviceController
             parentWindow: root
             parameterValues: root.parameterValues
-            scrcpySelected: false
+            scrcpySelected: appController.selectedTool.workspace === "scrcpy"
             overlaysVisible: false
         }
     }

@@ -400,6 +400,12 @@ void TerminalItem::clearSelection()
     }
 }
 
+QString TerminalItem::selectionText() const
+{
+    const auto *session = activeSession();
+    return session ? selectedText(session) : QString();
+}
+
 void TerminalItem::copySelection()
 {
     if (const auto *session = activeSession()) {

@@ -33,6 +33,12 @@ class ExecutorKind(StrEnum):
     URL = "url"
 
 
+class AndroidDeviceMode(StrEnum):
+    AUTO = "auto"
+    USE = "use"
+    NONE = "none"
+
+
 class ParameterKind(StrEnum):
     TEXT = "text"
     MULTILINE = "multiline"
@@ -83,6 +89,7 @@ class ExecutorDefinition(BaseModel):
     encoding: str = "utf-8"
     env: dict[str, str] = Field(default_factory=dict)
     requirements: list[str] = Field(default_factory=list)
+    android_device_mode: AndroidDeviceMode = AndroidDeviceMode.AUTO
 
 
 class PresentationDefinition(BaseModel):

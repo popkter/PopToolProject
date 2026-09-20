@@ -21,12 +21,25 @@ ColumnLayout {
     readonly property real parameterItemSpacing: 13
     readonly property real parameterItemHeight:
         parameterLabelHeight + parameterLabelSpacing + parameterInputHeight
-    readonly property real parameterContentHeight: parameterCount > 0
+    readonly property real parameterFieldsHeight: parameterCount > 0
         ? parameterCount * parameterItemHeight
             + (parameterCount - 1) * parameterItemSpacing
         : 0
+    readonly property real parameterContentHeight: parameterFieldsHeight
+        + (deviceSelector.visible ? deviceSelector.implicitHeight + spacing : 0)
 
     spacing: Theme.sectionSpacing
+
+    DeviceSelector {
+        id: deviceSelector
+        Layout.fillWidth: true
+        visible: !!root.controller.selectedTool.uses_android_device
+        enabled: !root.scrcpySelected || !root.controller.running
+        controller: root.androidController
+        toolId: root.controller.selectedTool.id || ""
+        requiredDevice: !!root.controller.selectedTool.requires_android_device
+        explicitTarget: !!root.controller.selectedTool.android_explicit_target
+    }
 
     Rectangle {
         id: scrcpyHost
@@ -131,8 +144,7 @@ ColumnLayout {
         Layout.preferredWidth: 168
         Layout.preferredHeight: 40
         enabled: root.controller.running
-                 || (root.androidController
-                     && root.androidController.selectedAndroidDevice.length > 0)
+                 || deviceSelector.deviceState.available
         text: root.controller.running ? "结束投屏" : "开始投屏"
         iconName: root.controller.running ? "stop" : "cast_connected"
         dangerStyle: root.controller.running
@@ -156,7 +168,7 @@ ColumnLayout {
         Flow {
             id: parameterFlow
             width: commandParameterScroll.availableWidth
-            height: root.parameterContentHeight
+            height: root.parameterFieldsHeight
             spacing: root.parameterItemSpacing
 
             Repeater {

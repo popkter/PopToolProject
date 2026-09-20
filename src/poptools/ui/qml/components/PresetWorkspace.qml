@@ -37,6 +37,7 @@ ColumnLayout {
             Layout.fillHeight: true
             controller: root.utilities
             androidController: root.androidBackend
+            toolId: root.toolController.selectedTool.id || ""
         }
 
         JiraFeishuWorkspace {

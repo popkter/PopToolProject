@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import shlex
 from pathlib import Path
 from typing import Any
@@ -18,7 +17,10 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QGuiApplication, QWindow
 from PySide6.QtWidgets import QFileDialog
 
+from poptools.domain.adb_detection import AdbAnalysis, analyze_adb
 from poptools.domain.models import (
+    AndroidDeviceMode,
+    ExecutorDefinition,
     ExecutorKind,
     ParameterKind,
     ToolDefinition,
@@ -36,6 +38,7 @@ from poptools.infrastructure.python_doctor import (
     pip_package_names,
 )
 from poptools.infrastructure.tool_registry import ToolRegistry
+from poptools.paths import package_root, resource_path
 from poptools.runners import ExecutionCoordinator
 from poptools.viewmodels.android_controller import AndroidController
 from poptools.viewmodels.tool_list_model import ToolListModel
@@ -75,6 +78,7 @@ class AppController(QObject):
     sectionChanged = Signal()
     sectionTitleChanged = Signal()
     selectedToolChanged = Signal()
+    selectedToolDataChanged = Signal()
     consoleTextChanged = Signal()
     runningChanged = Signal()
     statusTextChanged = Signal()
@@ -95,6 +99,7 @@ class AppController(QObject):
         python_doctor: PythonDoctor | None = None,
     ) -> None:
         super().__init__()
+        self.selectedToolChanged.connect(self.selectedToolDataChanged)
         self.registry = registry
         self.execution_coordinator = execution_coordinator
         self.execution = execution_coordinator.execution
@@ -129,6 +134,11 @@ class AppController(QObject):
         self.execution_coordinator.capacityRequested.connect(self.executionCapacityRequested)
         self._refresh(select_first=True)
         self._tools_ready = True
+        self._analysis_timer = QTimer(self)
+        self._analysis_timer.setInterval(2000)
+        self._last_analysis: AdbAnalysis | None = None
+        self._analysis_timer.timeout.connect(self._refresh_adb_analysis)
+        self._analysis_timer.start()
 
     @Property(QObject, constant=True)
     def toolsModel(self) -> QObject:
@@ -146,17 +156,22 @@ class AppController(QObject):
     def sectionTitle(self) -> str:
         return SECTION_TITLES[self._section]
 
-    @Property("QVariantMap", notify=selectedToolChanged)
+    @Property("QVariantMap", notify=selectedToolDataChanged)
     def selectedTool(self) -> dict[str, Any]:
         if self._selected is None:
             return {}
         data = self._selected.to_qml()
+        analysis = self._analyze_tool(self._selected)
         data["parameters"] = [
-            parameter
+            {**parameter, "kind": "text"}
+            if parameter["kind"] == ParameterKind.ANDROID_DEVICE.value else parameter
             for parameter in data["parameters"]
-            if parameter["kind"] != ParameterKind.ANDROID_DEVICE.value
+            if parameter["kind"] != ParameterKind.ANDROID_DEVICE.value or not analysis.uses_adb
         ]
-        data["uses_android_device"] = self._tool_uses_adb(self._selected)
+        data["uses_android_device"] = analysis.uses_adb
+        data["requires_android_device"] = analysis.needs_device
+        data["android_explicit_target"] = analysis.explicit_target
+        data["android_detection_reason"] = analysis.reason
         data["workspace"] = (
             "scrcpy"
             if self.execution_coordinator.is_scrcpy(self._selected)
@@ -248,7 +263,7 @@ class AppController(QObject):
             return
 
         parameters = self._selected.parameters
-        if not parameters:
+        if not parameters and not self._analyze_tool(self._selected).uses_adb:
             self.runSelected({})
             return
 
@@ -390,16 +405,23 @@ class AppController(QObject):
     def runSelected(self, values: dict[str, Any]) -> bool:
         if self._selected is None:
             return False
-        selected_device = self.android_controller.selectedAndroidDevice
-        if self._tool_requires_android_device(self._selected) and not selected_device:
-            self._append_console("未检测到已连接的 Android 设备，请连接设备并刷新。\n")
+        analysis = self._analyze_tool(self._selected)
+        selected_device = (
+            self.android_controller.available_device_for_tool(self._selected.id)
+            if analysis.uses_adb else ""
+        )
+        if analysis.needs_device and not selected_device:
+            self._append_console("请在当前脚本的“目标设备”中选择已连接的 Android 设备。\n")
             self._status_text = "等待 Android 设备"
             self.statusTextChanged.emit()
             return False
 
         run_values = dict(values)
-        if selected_device and self._tool_uses_adb(self._selected):
-            run_values["device"] = selected_device
+        run_values.pop("__android_device__", None)
+        if selected_device:
+            for parameter in self._selected.parameters:
+                if parameter.kind == ParameterKind.ANDROID_DEVICE:
+                    run_values[parameter.id] = selected_device
             run_values["__android_device__"] = selected_device
         started = self._start_execution(run_values, selected_device)
         if not started:
@@ -460,8 +482,10 @@ class AppController(QObject):
 
     @Slot(str, str, str, str, result=bool)
     @Slot(str, str, str, str, str, result=bool)
+    @Slot(str, str, str, str, str, str, result=bool)
     def saveSelected(
-        self, title: str, description: str, kind: str, command: str, icon: str = ""
+        self, title: str, description: str, kind: str, command: str, icon: str = "",
+        android_device_mode: str | None = None,
     ) -> bool:
         if (
             self._selected is None
@@ -478,6 +502,7 @@ class AppController(QObject):
                 command=command,
                 args=[],
                 icon=icon or None,
+                android_device_mode=android_device_mode,
             )
             selected_id = self._selected.id
             self._refresh(select_id=selected_id)
@@ -525,6 +550,7 @@ class AppController(QObject):
 
     @Slot(str, str, str, str, result=bool)
     @Slot(str, str, str, str, str, result=bool)
+    @Slot(str, str, str, str, str, str, result=bool)
     def createCommand(
         self,
         title: str,
@@ -532,6 +558,7 @@ class AppController(QObject):
         kind: str,
         command: str,
         icon: str = "terminal",
+        android_device_mode: str = "auto",
     ) -> bool:
         try:
             tool = self.registry.create_custom(
@@ -540,6 +567,7 @@ class AppController(QObject):
                 kind=ExecutorKind(kind),
                 command=command,
                 icon=icon,
+                android_device_mode=android_device_mode,
             )
             if self._section != ToolSection.CUSTOM:
                 self._section = ToolSection.CUSTOM
@@ -813,6 +841,7 @@ class AppController(QObject):
         title = self._selected.title
         if not self.registry.delete(self._selected.id):
             return False
+        self.android_controller.forget_tool(self._selected.id)
         self._selected = None
         self._refresh(select_first=False)
         self._append_console(f"已删除本地命令：{title}\n")
@@ -873,19 +902,35 @@ class AppController(QObject):
         return "".join(lazy_pinyin(title)).casefold()
 
     @staticmethod
-    def _tool_uses_adb(tool: ToolDefinition) -> bool:
-        requirements = {item.lower() for item in tool.executor.requirements}
-        command = tool.executor.command.strip().lower()
-        return "adb" in requirements or bool(
-            re.search(r"(?im)(?:^|[;&|])\s*(?:&\s*)?adb(?:\.exe)?(?=\s|$)", command)
-        )
+    def _analyze_tool(tool: ToolDefinition) -> AdbAnalysis:
+        def resolve(source: str) -> Path:
+            path = Path(source)
+            if path.is_absolute():
+                return path
+            candidate = Path(resource_path(source))
+            return candidate if candidate.exists() else package_root() / source
 
-    @staticmethod
-    def _tool_requires_android_device(tool: ToolDefinition) -> bool:
-        requirements = {item.lower() for item in tool.executor.requirements}
-        return "android_device" in requirements or any(
-            parameter.kind == ParameterKind.ANDROID_DEVICE for parameter in tool.parameters
-        )
+        return analyze_adb(tool, resolve)
+
+    def _refresh_adb_analysis(self) -> None:
+        analysis = self._analyze_tool(self._selected) if self._selected else None
+        if analysis != self._last_analysis:
+            self._last_analysis = analysis
+            self.selectedToolDataChanged.emit()
+
+    @Slot(str, str, str, result=str)
+    def previewAndroidDetection(self, kind: str, command: str, mode: str) -> str:
+        try:
+            tool = ToolDefinition(
+                id="preview", section=ToolSection.CUSTOM, title="preview",
+                executor=ExecutorDefinition(
+                    kind=ExecutorKind(kind), command=command,
+                    android_device_mode=AndroidDeviceMode(mode),
+                ),
+            )
+            return self._analyze_tool(tool).reason
+        except ValueError:
+            return "请选择运行方式。"
 
     @Slot()
     def confirmExecutionReplacement(self) -> None:

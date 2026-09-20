@@ -21,7 +21,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "console_expanded": True,
         "terminal_enabled": False,
         "user_guide_seen": False,
-        "merit_count": 0,
         "skipped_update_version": "",
         "prerelease_updates_enabled": False,
         "last_update_check_at": 0.0,
@@ -33,7 +32,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "default_timeout_seconds": 300,
         "confirm_untrusted_commands": True,
     },
-    "android": {"preferred_device": None, "adb_source": "bundled"},
+    "android": {"tool_devices": {}, "adb_source": "bundled"},
     "bash": {"provider": "auto", "custom_executable": None},
     "python": {"provider": "managed", "custom_executable": None},
     "custom_tools": {
@@ -111,15 +110,23 @@ class ConfigStore:
             self.save_config(config)
         return value
 
-    def preferred_android_device(self) -> str:
+    def android_tool_devices(self) -> dict[str, str]:
         config = self.load_config()
-        value = config.get("android", {}).get("preferred_device")
-        return str(value) if value else ""
+        value = config.get("android", {}).get("tool_devices", {})
+        if not isinstance(value, dict):
+            return {}
+        return {key: serial for key, serial in value.items()
+                if isinstance(key, str) and isinstance(serial, str) and serial}
 
-    def set_preferred_android_device(self, serial: str) -> None:
+    def set_android_tool_device(self, tool_id: str, serial: str) -> None:
         config = self.load_config()
         android = config.setdefault("android", {})
-        android["preferred_device"] = serial or None
+        selections = self.android_tool_devices()
+        if serial:
+            selections[tool_id] = serial
+        else:
+            selections.pop(tool_id, None)
+        android["tool_devices"] = selections
         self.save_config(config)
 
     def user_guide_seen(self) -> bool:
@@ -312,20 +319,6 @@ class ConfigStore:
         app["terminal_enabled"] = bool(enabled)
         self.save_config(config)
 
-    def merit_count(self) -> int:
-        config = self.load_config()
-        app = config.get("app")
-        if not isinstance(app, dict):
-            app = {}
-            config["app"] = app
-        value = app.get("merit_count", 0)
-        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-            value = 0
-        if app.get("merit_count") != value:
-            app["merit_count"] = value
-            self.save_config(config)
-        return value
-
     def custom_script_concurrency(self) -> int:
         config = self.load_config()
         execution = config.get("execution")
@@ -355,20 +348,6 @@ class ConfigStore:
         execution["custom_script_concurrency"] = value
         execution["max_parallel"] = value + 1
         self.save_config(config)
-
-    def increment_merit_count(self) -> int:
-        config = self.load_config()
-        app = config.get("app")
-        if not isinstance(app, dict):
-            app = {}
-            config["app"] = app
-        current = app.get("merit_count", 0)
-        if not isinstance(current, int) or isinstance(current, bool) or current < 0:
-            current = 0
-        value = current + 1
-        app["merit_count"] = value
-        self.save_config(config)
-        return value
 
     def theme_mode(self) -> str:
         config = self.load_config()

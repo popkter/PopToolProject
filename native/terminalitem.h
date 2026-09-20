@@ -55,6 +55,7 @@ public:
     Q_INVOKABLE void removeSession(const QString &sessionId);
     Q_INVOKABLE void clearSelection();
     Q_INVOKABLE void copySelection();
+    Q_INVOKABLE QString selectionText() const;
     Q_INVOKABLE void pasteClipboard();
     Q_INVOKABLE void pasteText(const QString &text);
     Q_INVOKABLE void selectAll();

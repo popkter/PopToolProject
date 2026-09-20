@@ -7,9 +7,19 @@ ColumnLayout {
     id: root
     required property var controller
     required property var androidController
+    required property string toolId
     property string statusMessage: ""
     property bool statusError: false
     spacing: Theme.space20
+
+    DeviceSelector {
+        id: deviceSelector
+        Layout.fillWidth: true
+        controller: root.androidController
+        toolId: root.toolId
+        requiredDevice: true
+        enabled: !root.controller.recording && !root.controller.exporting
+    }
 
     function openSaveDialog() {
         root.controller.chooseRecordingDirectory()
@@ -54,7 +64,7 @@ ColumnLayout {
             }
             Text {
                 Layout.alignment: Qt.AlignHCenter
-                text: root.androidController.selectedAndroidDeviceLabel
+                text: deviceSelector.deviceState.label
                 color: Theme.textSecondary
                 font.pixelSize: Theme.fontSupporting
             }
@@ -130,7 +140,7 @@ ColumnLayout {
         Layout.preferredHeight: 40
         enabled: !root.controller.exporting
                  && (root.controller.recording
-                     || (root.androidController.selectedAndroidDevice.length > 0
+                     || (deviceSelector.deviceState.available
                          && root.controller.recordingOutputDirectory.length > 0))
         text: root.controller.exporting
               ? "正在导出"
@@ -143,7 +153,7 @@ ColumnLayout {
             if (root.controller.recording)
                 root.controller.stopRecording()
             else
-                root.controller.startRecording(root.androidController.selectedAndroidDevice)
+                root.controller.startRecording(deviceSelector.deviceState.serial)
         }
     }
     Text {

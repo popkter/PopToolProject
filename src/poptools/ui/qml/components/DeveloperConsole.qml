@@ -11,27 +11,17 @@ Item {
     id: root
     required property var controller
     required property var parentWindow
+    signal createScriptRequested(string command, string kind)
     readonly property int terminalToolbarControlHeight: 40
-    readonly property real terminalTabMaximumWidth: 620
-    readonly property real terminalTabMinimumWidth: 160
-    readonly property real terminalTabMaximumFontSize: 13
-    readonly property real terminalTabMinimumFontSize: 12
+    readonly property real terminalTabMaximumWidth: 240
+    readonly property real terminalTabMinimumWidth: 120
     readonly property real responsiveTerminalTabWidth: {
         var tabCount = Math.max(1, root.controller.terminalTabs.length)
-        var addButtonWidth = 40
+        var addButtonWidth = terminalTabAddButton.width
         var totalSpacing = terminalTabs.spacing * tabCount
         var fittedWidth = (terminalTabStrip.width - addButtonWidth - totalSpacing) / tabCount
         return Math.max(root.terminalTabMinimumWidth,
             Math.min(root.terminalTabMaximumWidth, fittedWidth))
-    }
-    readonly property real responsiveTerminalTabFontSize: {
-        var widthRange = root.terminalTabMaximumWidth - root.terminalTabMinimumWidth
-        var widthProgress = widthRange > 0
-            ? (root.responsiveTerminalTabWidth - root.terminalTabMinimumWidth) / widthRange
-            : 1
-        return root.terminalTabMinimumFontSize
-            + (root.terminalTabMaximumFontSize - root.terminalTabMinimumFontSize)
-                * Math.max(0, Math.min(1, widthProgress))
     }
     property string renamingTabId: ""
     property string lastPressedTabId: ""
@@ -179,7 +169,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             radius: 0
-            color: "#10151D"
+            color: Theme.consoleBackground
             clip: true
 
             ColumnLayout {
@@ -188,9 +178,9 @@ Item {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 80
+                    Layout.preferredHeight: 44
                     radius: 0
-                    color: "#F0F1F3"
+                    color: Theme.darkMode ? Theme.surface : "#F0F1F3"
 
                     RowLayout {
                         z: 1
@@ -224,6 +214,9 @@ Item {
                                 boundsBehavior: Flickable.StopAtBounds
                                 onWidthChanged: Qt.callLater(root.ensureActiveTerminalTabVisible)
                                 onContentWidthChanged: Qt.callLater(root.ensureActiveTerminalTabVisible)
+                                ScrollBar.horizontal: ScrollBar {
+                                    policy: ScrollBar.AsNeeded
+                                }
                                 Row {
                                     id: terminalTabs
                                     anchors.verticalCenter: parent.verticalCenter
@@ -235,35 +228,43 @@ Item {
                                             required property int index
                                             required property var modelData
                                             width: root.responsiveTerminalTabWidth
-                                            height: 30
-                                            radius: 12
-                                            color: modelData.active ? "#FFFFFF" : "transparent"
+                                            height: 34
+                                            radius: 6
+                                            color: modelData.active ? Theme.surfaceContainerLow
+                                                : tabHover.hovered
+                                                  ? (Theme.darkMode ? Theme.surfaceContainerHigh : "#E3E7EC")
+                                                  : "transparent"
                                             border.width: modelData.active ? 1 : 0
-                                            border.color: "#E1E5EA"
+                                            border.color: Theme.darkMode ? Theme.outlineVariant : "#E1E5EA"
+                                            HoverHandler { id: tabHover }
                                             RowLayout {
                                                 z: 1
                                                 anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 8; spacing: 6
                                                 Text {
                                                     Layout.fillWidth: true
+                                                    Layout.minimumWidth: 0
                                                     visible: root.renamingTabId !== tab.modelData.tabId
                                                     text: tab.modelData.title || "Android 调试"
-                                                    color: tab.modelData.active ? "#404750" : "#6B737D"
-                                                    font.pixelSize: root.responsiveTerminalTabFontSize
+                                                    color: tab.modelData.active
+                                                        ? (Theme.darkMode ? Theme.textPrimary : "#404750")
+                                                        : (Theme.darkMode ? Theme.textSecondary : "#6B737D")
+                                                    font.pixelSize: 13
                                                     elide: Text.ElideRight
                                                 }
                                                 TextField {
                                                     id: renameField
                                                     Layout.fillWidth: true
+                                                    Layout.minimumWidth: 0
                                                     Layout.preferredHeight: 28
                                                     visible: root.renamingTabId === tab.modelData.tabId
-                                                    color: "#404750"
-                                                    font.pixelSize: root.responsiveTerminalTabFontSize
+                                                    color: Theme.darkMode ? Theme.textPrimary : "#404750"
+                                                    font.pixelSize: 13
                                                     leftPadding: 6; rightPadding: 6; topPadding: 0; bottomPadding: 0
                                                     selectByMouse: true
                                                     background: Rectangle {
                                                         radius: 4
-                                                        color: "#FFFFFF"
-                                                        border.color: "#1478E8"
+                                                        color: Theme.surfaceContainerLow
+                                                        border.color: Theme.darkMode ? Theme.primary : "#1478E8"
                                                         border.width: 1
                                                     }
                                                     onVisibleChanged: if (visible) {
@@ -283,7 +284,8 @@ Item {
                                                 }
                                                 PrimaryButton {
                                                     visible: root.controller.terminalTabs.length > 1
-                                                        && tabHoverArea.containsMouse
+                                                    opacity: tab.modelData.active || tabHover.hovered ? 1 : 0
+                                                    enabled: opacity > 0
                                                     Layout.preferredWidth: 20
                                                     Layout.preferredHeight: 20
                                                     compact: true
@@ -291,8 +293,10 @@ Item {
                                                     iconName: "close"
                                                     glyphSize: 15
                                                     tonal: true
-                                                    foregroundColor: "#7A838D"
-                                                    color: hovered ? "#E8ECF1" : "transparent"
+                                                    foregroundColor: Theme.darkMode ? Theme.textSecondary : "#7A838D"
+                                                    color: hovered
+                                                        ? (Theme.darkMode ? Theme.surfaceContainerHigh : "#E8ECF1")
+                                                        : "transparent"
                                                     border.width: 0
                                                     radius: 4
                                                     onClicked: root.controller.closeTerminalTab(tab.modelData.tabId)
@@ -324,7 +328,7 @@ Item {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 width: 1
                                                 height: 20
-                                                color: "#D8DDE3"
+                                                color: Theme.darkMode ? Theme.outlineVariant : "#D8DDE3"
                                                 opacity: 1
                                                 visible: !tab.modelData.active
                                                     && tab.index < root.controller.terminalTabs.length - 1
@@ -342,17 +346,20 @@ Item {
                                     terminalTabs.implicitWidth + terminalTabs.spacing,
                                     parent.width - width))
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: 40
-                                height: root.terminalToolbarControlHeight
-                                radius: 0
+                                width: 32
+                                height: 32
+                                radius: Theme.radiusSmall
                                 compact: true
-                                text: "新增终端标签"
+                                text: "新增终端标签 (Ctrl+T)"
                                 iconName: "add"
                                 glyphSize: 20
                                 tonal: true
-                                foregroundColor: "#5B6570"
-                                border.width: 0
-                                color: hovered ? "#E3E7EC" : "transparent"
+                                foregroundColor: Theme.darkMode ? Theme.primaryText : "#1478E8"
+                                border.width: 1
+                                border.color: hovered ? (Theme.darkMode ? Theme.primary : "#88BFFF")
+                                    : (Theme.darkMode ? Theme.outlineVariant : "#E0E5EB")
+                                color: pressed ? Theme.primaryContainerHover
+                                    : hovered ? Theme.primaryContainer : Theme.surfaceContainerLow
                                 enabled: root.controller.canCreateTerminalTab
                                 disabledOpacity: 1
                                 onClicked: root.controller.createTerminalTab()
@@ -367,9 +374,12 @@ Item {
                                         wheel.accepted = false
                                         return
                                     }
-                                    var angleDelta = wheel.angleDelta.y !== 0
-                                        ? wheel.angleDelta.y : wheel.angleDelta.x
-                                    root.scrollTerminalTabs(-angleDelta)
+                                    var delta = wheel.pixelDelta.x !== 0
+                                        ? wheel.pixelDelta.x : wheel.pixelDelta.y
+                                    if (delta === 0)
+                                        delta = wheel.angleDelta.x !== 0
+                                            ? wheel.angleDelta.x : wheel.angleDelta.y
+                                    root.scrollTerminalTabs(-delta)
                                     wheel.accepted = true
                                 }
                             }
@@ -454,6 +464,17 @@ Item {
                         id: terminalContextMenu
                         objectName: "terminalContextMenu"
                         AppMenuItem { text: "复制"; enabled: terminalView.hasSelection; onTriggered: terminalView.copySelection() }
+                        AppMenuItem {
+                            objectName: "addSelectionToCustomScript"
+                            text: "添加到自定义脚本"
+                            enabled: terminalView.hasSelection
+                            onTriggered: {
+                                var command = terminalView.selectionText()
+                                if (command.trim().length > 0)
+                                    root.createScriptRequested(command,
+                                        Qt.platform.os === "windows" ? "powershell" : "bash")
+                            }
+                        }
                         AppMenuItem { text: "粘贴"; onTriggered: root.pasteClipboard() }
                         AppMenuItem { text: "全选"; onTriggered: terminalView.selectAll() }
                         AppMenuItem { text: "清屏"; onTriggered: root.clearTerminal() }

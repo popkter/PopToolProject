@@ -323,44 +323,13 @@ Rectangle {
                 }
             }
 
-            Column {
-                visible: !!root.displayedTool.uses_android_device
+            DeviceSelector {
                 width: parent.width
-                spacing: 6
-                Text {
-                    text: "目标设备"
-                    color: Theme.textPrimary
-                    font.pixelSize: 12
-                    font.weight: Font.DemiBold
-                }
-                Rectangle {
-                    width: parent.width
-                    height: 41
-                    radius: 8
-                    color: Theme.darkMode ? Theme.surfaceContainer : "#FAFBFC"
-                    border.color: Theme.outline
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 13
-                        anchors.rightMargin: 10
-                        spacing: 10
-                        MaterialIcon { icon: "smartphone"; iconSize: 19; color: Theme.success }
-                        Text {
-                            Layout.fillWidth: true
-                            text: root.androidBackend.selectedAndroidDeviceLabel
-                            color: Theme.textPrimary
-                            font.pixelSize: 13
-                            elide: Text.ElideMiddle
-                        }
-                        Text {
-                            text: root.androidBackend.selectedAndroidDevice.length > 0 ? "已连接" : "未连接"
-                            color: root.androidBackend.selectedAndroidDevice.length > 0 ? Theme.success : Theme.textSecondary
-                            font.pixelSize: 11
-                        }
-                        MaterialIcon { icon: "expand_more"; iconSize: 18; color: Theme.textSecondary }
-                    }
-                }
-                Item { width: 1; height: 6 }
+                visible: !!root.displayedTool.uses_android_device
+                controller: root.androidBackend
+                toolId: root.displayedTool.id || ""
+                requiredDevice: !!root.displayedTool.requires_android_device
+                explicitTarget: !!root.displayedTool.android_explicit_target
             }
         }
     }
