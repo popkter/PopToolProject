@@ -316,6 +316,7 @@ ApplicationWindow {
 
     component ResizeHandle: MouseArea {
         required property int resizeEdges
+        property bool systemResizeActive: false
         property real resizeStartGlobalX: 0
         property real resizeStartGlobalY: 0
         property real resizeStartX: 0
@@ -329,6 +330,13 @@ ApplicationWindow {
         preventStealing: true
 
         onPressed: function(mouse) {
+            // Let the window manager synchronize both axes and the window position.
+            // Separate geometry writes expose intermediate sizes during corner drags.
+            systemResizeActive = window.startSystemResize(resizeEdges)
+            mouse.accepted = true
+            if (systemResizeActive)
+                return
+
             const globalPoint = mapToGlobal(mouse.x, mouse.y)
             resizeStartGlobalX = globalPoint.x
             resizeStartGlobalY = globalPoint.y
@@ -336,11 +344,10 @@ ApplicationWindow {
             resizeStartY = window.y
             resizeStartWidth = window.width
             resizeStartHeight = window.height
-            mouse.accepted = true
         }
 
         onPositionChanged: function(mouse) {
-            if (!pressed)
+            if (!pressed || systemResizeActive)
                 return
 
             const globalPoint = mapToGlobal(mouse.x, mouse.y)
@@ -350,30 +357,37 @@ ApplicationWindow {
             const resizeRight = (resizeEdges & Qt.RightEdge) !== 0
             const resizeTop = (resizeEdges & Qt.TopEdge) !== 0
             const resizeBottom = (resizeEdges & Qt.BottomEdge) !== 0
+            let newX = resizeStartX
+            let newY = resizeStartY
+            let newWidth = resizeStartWidth
+            let newHeight = resizeStartHeight
 
             if (resizeLeft || resizeRight) {
                 const requestedWidth = resizeLeft
                     ? resizeStartWidth - deltaX
                     : resizeStartWidth + deltaX
-                const newWidth = Math.max(
+                newWidth = Math.round(Math.max(
                     window.minimumWidth,
-                    Math.min(window.maximumWidth, requestedWidth))
-                window.width = newWidth
+                    Math.min(window.maximumWidth, requestedWidth)))
                 if (resizeLeft)
-                    window.x = resizeStartX + resizeStartWidth - newWidth
+                    newX = resizeStartX + resizeStartWidth - newWidth
             }
 
             if (resizeTop || resizeBottom) {
                 const requestedHeight = resizeTop
                     ? resizeStartHeight - deltaY
                     : resizeStartHeight + deltaY
-                const newHeight = Math.max(
+                newHeight = Math.round(Math.max(
                     window.minimumHeight,
-                    Math.min(window.maximumHeight, requestedHeight))
-                window.height = newHeight
+                    Math.min(window.maximumHeight, requestedHeight)))
                 if (resizeTop)
-                    window.y = resizeStartY + resizeStartHeight - newHeight
+                    newY = resizeStartY + resizeStartHeight - newHeight
             }
+
+            // Platforms without native resizing still receive one geometry update.
+            if (window.x !== newX || window.y !== newY
+                    || window.width !== newWidth || window.height !== newHeight)
+                window.setGeometry(newX, newY, newWidth, newHeight)
         }
     }
 
