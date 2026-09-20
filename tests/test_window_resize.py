@@ -1,7 +1,8 @@
 """Exercise the main window's actual resize handler with a controllable platform."""
 
 import pytest
-from PySide6.QtCore import QObject, QPoint, Qt, QUrl
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QPoint, QPointF, Qt, QUrl
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtTest import QTest
 
@@ -78,15 +79,34 @@ EDGES = [
 ]
 
 
+def send_mouse(window, event_type, position):
+    """Deliver one event without moving the OS cursor or pumping native events.
+
+    QTest.mouseMove can also deliver pending platform moves on Windows runners.
+    Exact geometry-call assertions require a controlled input event stream.
+    """
+    moving = event_type == QEvent.Type.MouseMove
+    released = event_type == QEvent.Type.MouseButtonRelease
+    event = QMouseEvent(
+        event_type,
+        QPointF(position),
+        QPointF(window.mapToGlobal(position)),
+        Qt.MouseButton.NoButton if moving else Qt.MouseButton.LeftButton,
+        Qt.MouseButton.NoButton if released else Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QCoreApplication.sendEvent(window, event)
+
+
 @pytest.mark.parametrize("edges", EDGES)
 @pytest.mark.parametrize("native", [False, True])
 def test_resize_all_edges(resize_window, edges, native):
     root, geometry, handle = resize_window
     handle.setProperty("resizeEdges", edges.value)
     geometry.setProperty("nativeSupported", native)
-    QTest.mousePress(root, Qt.MouseButton.LeftButton, pos=QPoint(120, 100))
-    QTest.mouseMove(root, QPoint(160, 130))
-    QTest.mouseRelease(root, Qt.MouseButton.LeftButton, pos=QPoint(160, 130))
+    send_mouse(root, QEvent.Type.MouseButtonPress, QPoint(120, 100))
+    send_mouse(root, QEvent.Type.MouseMove, QPoint(160, 130))
+    send_mouse(root, QEvent.Type.MouseButtonRelease, QPoint(160, 130))
     assert geometry.property("nativeEdges") == edges.value
     assert geometry.property("geometryCalls") == (0 if native else 1)
     left = bool(edges & Qt.Edge.LeftEdge) and not native
@@ -112,10 +132,10 @@ def test_corner_limits_keep_opposite_corner_fixed(resize_window, edges, expand):
     geometry.setProperty("height", height)
     dx = 40 * (-1 if left else 1) * (1 if expand else -1)
     dy = 30 * (-1 if top else 1) * (1 if expand else -1)
-    QTest.mousePress(root, Qt.MouseButton.LeftButton, pos=QPoint(120, 100))
+    send_mouse(root, QEvent.Type.MouseButtonPress, QPoint(120, 100))
     target = QPoint(120 + dx, 100 + dy)
-    QTest.mouseMove(root, target)
-    QTest.mouseRelease(root, Qt.MouseButton.LeftButton, pos=target)
+    send_mouse(root, QEvent.Type.MouseMove, target)
+    send_mouse(root, QEvent.Type.MouseButtonRelease, target)
     expected_width, expected_height = (1500, 1100) if expand else (960, 720)
     assert geometry.property("width") == expected_width
     assert geometry.property("height") == expected_height
@@ -128,8 +148,24 @@ def test_maximized_window_disables_resize(resize_window):
     root, geometry, handle = resize_window
     geometry.setProperty("visibility", 4)  # QWindow.Maximized
     assert not handle.property("visible")
-    QTest.mousePress(root, Qt.MouseButton.LeftButton, pos=QPoint(120, 100))
-    QTest.mouseMove(root, QPoint(160, 130))
-    QTest.mouseRelease(root, Qt.MouseButton.LeftButton, pos=QPoint(160, 130))
+    send_mouse(root, QEvent.Type.MouseButtonPress, QPoint(120, 100))
+    send_mouse(root, QEvent.Type.MouseMove, QPoint(160, 130))
+    send_mouse(root, QEvent.Type.MouseButtonRelease, QPoint(160, 130))
     assert geometry.property("nativeEdges") == 0
     assert geometry.property("geometryCalls") == 0
+
+
+def test_each_move_commits_both_axes_once(resize_window):
+    root, geometry, handle = resize_window
+    send_mouse(root, QEvent.Type.MouseButtonPress, QPoint(120, 100))
+    for count, target in enumerate([QPoint(140, 110), QPoint(160, 130)], start=1):
+        send_mouse(root, QEvent.Type.MouseMove, target)
+        assert geometry.property("geometryCalls") == count
+        assert geometry.property("width") == 1200 + target.x() - 120
+        assert geometry.property("height") == 900 + target.y() - 100
+        # Duplicate positions must not cause another geometry update.
+        send_mouse(root, QEvent.Type.MouseMove, target)
+        assert geometry.property("geometryCalls") == count
+    send_mouse(root, QEvent.Type.MouseButtonRelease, QPoint(160, 130))
+    send_mouse(root, QEvent.Type.MouseMove, QPoint(180, 150))
+    assert geometry.property("geometryCalls") == 2
