@@ -35,11 +35,13 @@ def _parse_parameter_name(name: str) -> tuple[str, ParameterKind]:
     _validate_parameter_id(parameter_id)
     if not type_separator:
         return parameter_id, ParameterKind.TEXT
-    if parameter_type.strip() != ParameterKind.FILE.value:
+    kinds = {"file": ParameterKind.FILE, "dir": ParameterKind.DIRECTORY}
+    kind = kinds.get(parameter_type.strip())
+    if kind is None:
         raise ValueError(
             f"参数“{parameter_id}”使用了不支持的控件类型“{parameter_type.strip()}”"
         )
-    return parameter_id, ParameterKind.FILE
+    return parameter_id, kind
 
 
 def _parse_choice_options(content: str) -> tuple[ParameterOption, ...]:
@@ -73,7 +75,7 @@ def _parse_placeholder(content: str) -> _ParsedPlaceholder:
         options = _parse_choice_options(definition)
         if options:
             if parameter_kind != ParameterKind.TEXT:
-                raise ValueError("文件参数不能同时定义为下拉选择框")
+                raise ValueError("文件或文件夹参数不能同时定义为下拉选择框")
             return _ParsedPlaceholder(
                 parameter_id,
                 options[0].value,
@@ -218,7 +220,9 @@ def synchronize_parameters(
                 updates["label"] = label
             if kind != ParameterKind.TEXT:
                 updates["kind"] = kind
-            elif existing_parameter.kind in (ParameterKind.CHOICE, ParameterKind.FILE):
+            elif existing_parameter.kind in (
+                ParameterKind.CHOICE, ParameterKind.FILE, ParameterKind.DIRECTORY
+            ):
                 updates["kind"] = ParameterKind.TEXT
             parameters.append(existing_parameter.model_copy(update=updates))
             continue
@@ -244,6 +248,24 @@ def render_template(template: str, values: dict[str, object]) -> str:
     return PLACEHOLDER_PATTERN.sub(replace, _script_body(template))
 
 
+def strip_parameter_defaults(template: str) -> str:
+    """Remove literal defaults for sharing, retaining types and choice definitions."""
+    def replace(match: re.Match[str]) -> str:
+        placeholder = _parse_placeholder(match.group(1))
+        # Choice values define the control, rather than the sender's saved input.
+        if placeholder.options or placeholder.default is None:
+            return match.group(0)
+        name = placeholder.parameter_id
+        if placeholder.kind == ParameterKind.FILE:
+            name += "@file"
+        elif placeholder.kind == ParameterKind.DIRECTORY:
+            name += "@dir"
+        return "${" + name + "}"
+
+    # Includes Var/pVal definitions without removing their labels or declarations.
+    return PLACEHOLDER_PATTERN.sub(replace, template)
+
+
 def update_parameter_default(template: str, parameter_id: str, default: str) -> str:
     """Persist a text parameter default back into its placeholder definition."""
 
@@ -265,6 +287,8 @@ def update_parameter_default(template: str, parameter_id: str, default: str) -> 
         definition_name = definition.parameter_id
         if definition.kind == ParameterKind.FILE:
             definition_name += "@file"
+        elif definition.kind == ParameterKind.DIRECTORY:
+            definition_name += "@dir"
         replacement = f"{definition_name}:{default}" if default else definition_name
         parsed_replacement = _parse_placeholder(replacement)
         if parsed_replacement.options:
@@ -285,6 +309,8 @@ def update_parameter_default(template: str, parameter_id: str, default: str) -> 
             placeholder_name = parameter_id
             if placeholder.kind == ParameterKind.FILE:
                 placeholder_name += "@file"
+            elif placeholder.kind == ParameterKind.DIRECTORY:
+                placeholder_name += "@dir"
             replacement = f"{placeholder_name}:{default}" if default else placeholder_name
             parsed_replacement = _parse_placeholder(replacement)
             if parsed_replacement.options:

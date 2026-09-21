@@ -10,6 +10,7 @@ Rectangle {
     required property var controller
     required property var updateBackend
     signal terminalEnableRequested()
+    signal userHelpRequested()
     color: Theme.darkMode ? Theme.surface : "#FBFCFE"
 
     function scrollToBottom() {
@@ -86,7 +87,7 @@ Rectangle {
 
                     Card {
                         Layout.fillWidth: true
-                        implicitHeight: 159
+                        implicitHeight: appearanceContent.implicitHeight + 32
                         ColumnLayout {
                             id: appearanceContent
                             anchors.fill: parent
@@ -106,17 +107,20 @@ Rectangle {
                                     delegate: Rectangle {
                                         id: themeChoice
                                         required property var modelData
+                                        objectName: "themeChoice_" + modelData.value
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 76
+                                        Layout.preferredHeight: 48
+                                        Layout.minimumHeight: 48
+                                        Layout.maximumHeight: 48
                                         radius: Theme.radiusMedium
                                         color: root.controller.themeMode === modelData.value ? Theme.primaryContainer : Theme.surfaceContainerLow
                                         border.width: root.controller.themeMode === modelData.value ? 2 : 1
                                         border.color: root.controller.themeMode === modelData.value ? Theme.primary : Theme.outline
-                                        Column {
+                                        Row {
                                             anchors.centerIn: parent
-                                            spacing: 4
-                                            MaterialIcon { anchors.horizontalCenter: parent.horizontalCenter; icon: themeChoice.modelData.icon; iconSize: 25; color: root.controller.themeMode === themeChoice.modelData.value ? Theme.primary : Theme.textSecondary }
-                                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: themeChoice.modelData.label; color: root.controller.themeMode === themeChoice.modelData.value ? Theme.primary : Theme.textPrimary; font.pixelSize: Theme.fontBody; font.weight: Font.DemiBold }
+                                            spacing: 8
+                                            MaterialIcon { anchors.verticalCenter: parent.verticalCenter; icon: themeChoice.modelData.icon; iconSize: 20; color: root.controller.themeMode === themeChoice.modelData.value ? Theme.primary : Theme.textSecondary }
+                                            Text { anchors.verticalCenter: parent.verticalCenter; text: themeChoice.modelData.label; color: root.controller.themeMode === themeChoice.modelData.value ? Theme.primary : Theme.textPrimary; font.pixelSize: Theme.fontBody; font.weight: Font.DemiBold }
                                         }
                                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.controller.saveThemeMode(themeChoice.modelData.value) }
                                     }
@@ -277,7 +281,7 @@ Rectangle {
 
                     Card {
                         Layout.fillWidth: true
-                        implicitHeight: 192 + (root.updateBackend.status.length > 0 ? 24 : 0)
+                        implicitHeight: aboutContent.implicitHeight + 32
                         ColumnLayout {
                             id: aboutContent
                             anchors.fill: parent; anchors.margins: 16; spacing: 8
@@ -292,6 +296,7 @@ Rectangle {
                             }
                             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.outlineVariant }
                             RowLayout {
+                                id: aboutActions
                                 Layout.fillWidth: true
                                 spacing: Theme.space8
                                 PrimaryButton {
@@ -337,6 +342,21 @@ Rectangle {
                                     enabled: root.updateBackend.canChangeUpdateChannel
                                     onClicked: root.updateBackend.checkForUpdates()
                                 }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.space8
+                                PrimaryButton {
+                                    objectName: "openUserHelpButton"
+                                    Layout.preferredWidth: (aboutActions.width - 3 * Theme.space8) / 4
+                                    Layout.minimumWidth: 0
+                                    Layout.preferredHeight: 40
+                                    tonal: true
+                                    text: "用户帮助"
+                                    iconName: "menu_book"
+                                    onClicked: root.userHelpRequested()
+                                }
+                                Item { Layout.fillWidth: true }
                             }
                             Text {
                                 Layout.fillWidth: true

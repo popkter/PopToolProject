@@ -35,6 +35,23 @@ Rectangle {
     border.width: 1
     clip: true
 
+    component ParameterDefaultButton: PrimaryButton {
+        enabled: !root.controller.running
+        width: 30
+        height: 30
+        compact: true
+        text: "设为默认值"
+        iconName: "save"
+        glyphSize: 19
+        tonal: true
+        foregroundColor: Theme.primaryText
+        border.width: 0
+        radius: 6
+        // Keep the button above the text edit menu's input overlay.
+        z: 201
+        color: hovered ? Theme.primaryContainerHover : Theme.primaryContainer
+    }
+
     function kindLabel() {
         if (!root.displayedTool.executor)
             return ""
@@ -217,21 +234,25 @@ Rectangle {
 
                     Loader {
                         width: parent.width
-                        height: 40
+                        height: parameterItem.modelData.kind === "multiline" ? 88 : 40
                         sourceComponent: parameterItem.modelData.kind === "choice"
                             ? choiceField : parameterItem.modelData.kind === "boolean"
-                            ? booleanField : textField
+                            ? booleanField : parameterItem.modelData.kind === "multiline"
+                            ? multilineField : textField
 
                         Component {
                             id: textField
                             TextField {
                                 id: parameterTextField
+                                readonly property bool pathPickerVisible:
+                                    parameterItem.modelData.kind === "file"
+                                    || parameterItem.modelData.kind === "directory"
                                 text: String(parameterItem.modelData.default || "")
                                 placeholderText: parameterItem.modelData.placeholder || ""
                                 color: Theme.textPrimary
                                 font.pixelSize: 14
                                 leftPadding: 13
-                                rightPadding: parameterItem.modelData.kind === "file" ? 45 : 13
+                                rightPadding: pathPickerVisible ? 81 : 45
                                 echoMode: parameterItem.modelData.kind === "secret"
                                     ? TextInput.Password : TextInput.Normal
                                 background: Rectangle {
@@ -244,15 +265,24 @@ Rectangle {
                                 FilePathDropArea { target: parameterTextField }
                                 AppTextEditMenu { target: parameterTextField }
 
+                                ParameterDefaultButton {
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: parameterTextField.pathPickerVisible ? 42 : 6
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    onClicked: root.controller.setParameterDefault(
+                                        parameterItem.modelData.id, parameterTextField.text)
+                                }
+
                                 PrimaryButton {
                                     anchors.right: parent.right
                                     anchors.rightMargin: 6
                                     anchors.verticalCenter: parent.verticalCenter
-                                    visible: parameterItem.modelData.kind === "file"
+                                    visible: parameterTextField.pathPickerVisible
                                     width: 30
                                     height: 30
                                     compact: true
-                                    text: "选择文件"
+                                    text: parameterItem.modelData.kind === "directory"
+                                        ? "选择文件夹" : "选择文件"
                                     iconName: "folder_open"
                                     glyphSize: 19
                                     tonal: true
@@ -265,13 +295,45 @@ Rectangle {
                                         ? Theme.primaryContainerHover
                                         : Theme.primaryContainer
                                     onClicked: {
-                                        const selectedPath = root.controller.chooseParameterFile(
-                                            parameterTextField.text)
+                                        const selectedPath = parameterItem.modelData.kind === "directory"
+                                            ? root.controller.chooseParameterDirectory(parameterTextField.text)
+                                            : root.controller.chooseParameterFile(parameterTextField.text)
                                         if (selectedPath.length > 0) {
                                             parameterTextField.text = selectedPath
                                             parameterTextField.forceActiveFocus()
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        Component {
+                            id: multilineField
+                            TextArea {
+                                id: parameterTextArea
+                                text: String(parameterItem.modelData.default || "")
+                                placeholderText: parameterItem.modelData.placeholder || ""
+                                color: Theme.textPrimary
+                                font.pixelSize: 14
+                                leftPadding: 13
+                                rightPadding: 45
+                                wrapMode: TextEdit.Wrap
+                                background: Rectangle {
+                                    radius: 7
+                                    color: Theme.surfaceContainerLow
+                                    border.color: parent.activeFocus ? Theme.primary : "#A8CFFF"
+                                    border.width: parent.activeFocus ? 2 : 1
+                                }
+                                onTextChanged: root.parameterValues[parameterItem.modelData.id] = text
+                                FilePathDropArea { target: parameterTextArea }
+                                AppTextEditMenu { target: parameterTextArea }
+                                ParameterDefaultButton {
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 6
+                                    anchors.top: parent.top
+                                    anchors.topMargin: 5
+                                    onClicked: root.controller.setParameterDefault(
+                                        parameterItem.modelData.id, parameterTextArea.text)
                                 }
                             }
                         }

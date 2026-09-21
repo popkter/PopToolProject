@@ -513,7 +513,7 @@ AppDialog {
                             }
                             Item { Layout.fillWidth: true }
                             Text {
-                                text: "支持文本、默认值、下拉选项和 ${标题@file} 文件选择参数"
+                                text: "支持文本、默认值、下拉选项、${标题@file} 文件和 ${标题@dir} 文件夹选择参数"
                                 color: Theme.textSecondary
                                 font.pixelSize: Theme.fontMicro
                             }
@@ -575,7 +575,7 @@ AppDialog {
                         Text {
                             id: helperText
                             Layout.fillWidth: true
-                            text: "${请输入数值:1} 生成默认值输入框；${触摸点显示:开启=1|关闭=0} 生成下拉菜单；${APK安装包@file} 生成文件选择框。重复使用可写 Var value = ${显示名称:默认值}。"
+                            text: "${请输入数值:1} 生成默认值输入框；${触摸点显示:开启=1|关闭=0} 生成下拉菜单；${APK安装包@file} 生成文件选择框；${日志目录@dir} 生成文件夹选择框。重复使用可写 Var value = ${显示名称:默认值}。"
                             color: Theme.teal
                             font.pixelSize: Theme.fontCaption
                             wrapMode: Text.WordWrap

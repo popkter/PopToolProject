@@ -110,6 +110,10 @@ class SettingsController(QObject):
     def userGuideSeen(self) -> bool:
         return self.config_store.user_guide_seen()
 
+    @Property(QUrl, constant=True)
+    def userGuideUrl(self) -> QUrl:
+        return QUrl.fromLocalFile(str(package_root() / "resources" / "help" / "guide.html"))
+
     @Property(bool, notify=themeChanged)
     def darkTheme(self) -> bool:
         if self._theme_mode == "dark":

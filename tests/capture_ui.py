@@ -9,6 +9,7 @@ from PySide6.QtCore import QMetaObject, QObject, QTimer, QUrl
 from PySide6.QtGui import QFont, QFontDatabase, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
+from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication
 
 from poptools.infrastructure.android_device_service import AndroidDevice, AndroidDeviceService
@@ -36,6 +37,7 @@ def main() -> int:
     output_path = Path(sys.argv[1] if len(sys.argv) > 1 else "implementation.png").resolve()
     os.environ.setdefault("QT_QUICK_BACKEND", "software")
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+    QtWebEngineQuick.initialize()
     app = QApplication(sys.argv)
     register_terminal_type()
     system_font = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "msyh.ttc"

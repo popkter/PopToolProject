@@ -119,6 +119,9 @@ def main() -> int:
         return 0
 
     try:
+        from PySide6.QtWebEngineQuick import QtWebEngineQuick
+
+        QtWebEngineQuick.initialize()
         app = QApplication(sys.argv)
         pending_update_result = apply_pending_update(
             ConfigStore(paths),

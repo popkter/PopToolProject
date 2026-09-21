@@ -10,10 +10,13 @@ from PySide6.QtCore import QObject
 from poptools.domain.models import (
     ExecutorDefinition,
     ExecutorKind,
+    ParameterDefinition,
+    ParameterKind,
     ToolDefinition,
     ToolOrigin,
     ToolSection,
 )
+from poptools.domain.parameter_templates import render_template, synchronize_parameters
 from poptools.infrastructure.custom_tool_transfer import (
     TRANSFER_FORMAT,
     decode_custom_tool,
@@ -48,6 +51,54 @@ def test_custom_tool_clipboard_round_trip_preserves_definition() -> None:
 
     assert payload["format"] == TRANSFER_FORMAT
     assert imported.model_dump(mode="json") == source.model_dump(mode="json")
+
+
+def test_share_removes_defaults_from_metadata_and_all_executor_templates() -> None:
+    command = (
+        'Var logs = ${日志目录@dir:C:/private-logs}\n'
+        'pVal token = ${令牌=private-token}\n'
+        'echo "${logs}" "${token}" "${文件@file:C:/private-file}" '
+        '"${普通:private-text}" "${旧格式=private-legacy}" '
+        '"${模式:开启=1|关闭=0}"'
+    )
+    source = custom_tool(
+        executor=ExecutorDefinition(
+            kind=ExecutorKind.POWERSHELL, command=command,
+            args=["${参数:private-arg}"], cwd="${位置@dir:C:/private-cwd}",
+            env={"TEST": "${环境:private-env}"},
+        ),
+        parameters=synchronize_parameters([command]) + [
+            ParameterDefinition(id="password", label="Password", kind=ParameterKind.SECRET,
+                                default="private-password"),
+            ParameterDefinition(id="multi", label="Multi", kind=ParameterKind.MULTILINE,
+                                default="private-multi\n{value}"),
+        ],
+    )
+    before = source.model_dump(mode="json")
+    encoded = encode_custom_tool(source)
+    exported = json.loads(encoded)["tool"]
+    imported = decode_custom_tool(encoded)
+    assert "private-" not in encoded
+    assert all("default" not in parameter for parameter in exported["parameters"])
+    assert all(parameter.default == "" for parameter in imported.parameters)
+    assert imported.executor.command == (
+        'Var logs = ${日志目录@dir}\n'
+        'pVal token = ${令牌}\n'
+        'echo "${logs}" "${token}" "${文件@file}" '
+        '"${普通}" "${旧格式}" "${模式:开启=1|关闭=0}"'
+    )
+    assert imported.executor.args == ["${参数}"]
+    assert imported.executor.cwd == "${位置@dir}"
+    assert imported.executor.env == {"TEST": "${环境}"}
+    assert [parameter.kind for parameter in imported.parameters] == [
+        parameter.kind for parameter in source.parameters
+    ]
+    assert imported.parameters[5].options == source.parameters[5].options
+    assert source.model_dump(mode="json") == before
+    assert render_template(imported.executor.command, {
+        "logs": "D:/received", "token": "new-token", "文件": "new-file",
+        "普通": "new-text", "旧格式": "new-legacy", "模式": "0",
+    }) == 'echo "D:/received" "new-token" "new-file" "new-text" "new-legacy" "0"'
 
 
 def test_import_accepts_raw_tool_json_and_normalizes_custom_metadata() -> None:

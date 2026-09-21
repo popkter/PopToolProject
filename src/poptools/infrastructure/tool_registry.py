@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Iterable
+from contextlib import suppress
 from pathlib import Path
 
 from poptools.domain.models import (
     AndroidDeviceMode,
     ExecutorDefinition,
     ExecutorKind,
+    ParameterKind,
     PresentationDefinition,
     ToolDefinition,
     ToolOrigin,
@@ -157,17 +159,35 @@ class ToolRegistry:
         self, tool_id: str, parameter_id: str, default: str
     ) -> ToolDefinition:
         current = self._tools[tool_id]
-        if current.section != ToolSection.CUSTOM or not current.editable:
-            raise ValueError("只有可编辑的客制脚本可以修改参数默认值")
-        command = update_parameter_default(current.executor.command, parameter_id, default)
-        return self.update_tool(
-            tool_id,
-            title=current.title,
-            description=current.description,
-            kind=current.executor.kind,
-            command=command,
-            args=list(current.executor.args),
+        parameter = next((item for item in current.parameters if item.id == parameter_id), None)
+        if parameter is None:
+            raise ValueError("参数不存在")
+        if parameter.kind in (
+            ParameterKind.CHOICE, ParameterKind.BOOLEAN, ParameterKind.ANDROID_DEVICE
+        ):
+            raise ValueError("此参数不是文本输入框")
+        # Metadata supports every literal value, including multiline text and braces.
+        # Keep editable script placeholders in sync where the syntax can represent it.
+        command = current.executor.command
+        if current.editable:
+            with suppress(ValueError):
+                command = update_parameter_default(command, parameter_id, default)
+        updated = current.model_copy(
+            update={
+                "revision": current.revision + 1,
+                "origin": (ToolOrigin.CUSTOM if current.origin == ToolOrigin.CUSTOM
+                           else ToolOrigin.OVERRIDE),
+                "executor": current.executor.model_copy(update={"command": command}),
+                "parameters": [
+                    item.model_copy(update={"default": default})
+                    if item.id == parameter_id else item
+                    for item in current.parameters
+                ],
+            }
         )
+        self.repository.save_tool(updated)
+        self.reload()
+        return self._tools[tool_id]
 
     def reset(self, tool_id: str) -> bool:
         changed = self.repository.remove_override(tool_id)

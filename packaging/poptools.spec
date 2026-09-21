@@ -78,18 +78,6 @@ def keep_qt_entry(entry):
         destination.startswith("icudt") and destination.endswith(".dll")
     ):
         return False
-    if destination.startswith(
-        (
-            "pyside6/qt6webengine",
-            "pyside6/qtwebengine",
-            "pyside6/qt6webchannel",
-            "pyside6/qtwebchannel",
-            "pyside6/qtwebengineprocess",
-            "pyside6/qml/qtwebengine/",
-            "pyside6/qml/qtwebchannel/",
-        )
-    ):
-        return False
     if destination.startswith(UNUSED_QT_QML_PREFIXES + UNUSED_CONTROL_STYLE_PREFIXES):
         return False
     if destination.startswith(UNUSED_QT_BINARY_PREFIXES + UNUSED_CONTROL_STYLE_BINARIES):
@@ -100,18 +88,8 @@ def keep_qt_entry(entry):
         return False
     if "/designer/" in destination or destination.startswith("pyside6/qml/qtquick/tooling/"):
         return False
-    if destination.startswith("pyside6/resources/"):
-        filename = destination.rsplit("/", 1)[-1]
-        if (
-            filename.startswith("qtwebengine_")
-            or filename.startswith("v8_context_snapshot")
-            or filename == "icudtl.dat"
-            or "devtools_resources" in filename
-            or ".debug." in filename
-        ):
-            return False
-    if destination.startswith("pyside6/translations/qtwebengine"):
-        return False
+    if "/qtwebengine_locales/" in destination:
+        return destination.endswith(("/en-us.pak", "/zh-cn.pak"))
     if destination.startswith("pyside6/translations/"):
         return destination.endswith(("_en.qm", "_zh_cn.qm"))
     return True
@@ -123,6 +101,7 @@ common_datas = [
     (str(PACKAGE / "resources" / "tools"), "poptools/resources/tools"),
     (str(PACKAGE / "resources" / "python"), "poptools/resources/python"),
     (str(PACKAGE / "resources" / "fonts"), "poptools/resources/fonts"),
+    (str(PACKAGE / "resources" / "help"), "poptools/resources/help"),
     (str(PACKAGE / "resources" / "icons" / "app-icon-ui.png"), "poptools/resources/icons"),
 ]
 
@@ -191,9 +170,6 @@ analysis = Analysis(
         "ruff",
         "PIL",
         "PyInstaller",
-        "PySide6.QtWebChannel",
-        "PySide6.QtWebEngineCore",
-        "PySide6.QtWebEngineQuick",
         "PySide6.QtWebEngineWidgets",
     ],
     noarchive=False,

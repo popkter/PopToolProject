@@ -781,6 +781,7 @@ ApplicationWindow {
                     controller: settingsController
                     updateBackend: updateController
                     onTerminalEnableRequested: window.requestTerminalEnable()
+                    onUserHelpRequested: window.openUserGuideDialog()
                 }
             }
         }

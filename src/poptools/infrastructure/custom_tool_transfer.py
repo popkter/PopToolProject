@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from poptools.domain.models import ExecutorKind, ToolDefinition, ToolOrigin, ToolSection
+from poptools.domain.parameter_templates import strip_parameter_defaults
 
 TRANSFER_FORMAT = "poptools.custom-script"
 TRANSFER_FORMAT_VERSION = 1
@@ -12,10 +13,22 @@ TRANSFER_FORMAT_VERSION = 1
 def encode_custom_tool(tool: ToolDefinition) -> str:
     if tool.section != ToolSection.CUSTOM:
         raise ValueError("只能分享客制脚本")
+    # Sanitize a detached export, never the local tool or its persisted defaults.
+    shared = tool.model_dump(mode="json")
+    for parameter in shared["parameters"]:
+        parameter.pop("default", None)
+    executor = shared["executor"]
+    executor["command"] = strip_parameter_defaults(executor["command"])
+    executor["args"] = [strip_parameter_defaults(value) for value in executor["args"]]
+    executor["env"] = {
+        name: strip_parameter_defaults(value) for name, value in executor["env"].items()
+    }
+    if executor["cwd"] is not None:
+        executor["cwd"] = strip_parameter_defaults(executor["cwd"])
     payload = {
         "format": TRANSFER_FORMAT,
         "format_version": TRANSFER_FORMAT_VERSION,
-        "tool": tool.model_dump(mode="json"),
+        "tool": shared,
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
 

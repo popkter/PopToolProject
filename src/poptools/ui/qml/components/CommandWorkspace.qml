@@ -201,23 +201,15 @@ ColumnLayout {
                             id: normalField
                             TextField {
                                 id: normalTextField
-                                readonly property string savedDefault:
-                                    String(modelData.default || "")
-                                readonly property bool defaultButtonVisible:
-                                    modelData.kind === "text"
-                                    && root.controller.selectedTool.section === "custom"
-                                    && root.controller.selectedTool.editable
-                                    && !root.controller.running
-                                    && text.length > 0
-                                    && text !== savedDefault
+                                readonly property bool pathPickerVisible:
+                                    modelData.kind === "file" || modelData.kind === "directory"
                                 implicitHeight: parameterInputLoader.singleLineHeight
                                 text: String(modelData.default || "")
                                 placeholderText: modelData.placeholder || ""
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontBody
                                 leftPadding: Theme.space16
-                                rightPadding: defaultButtonVisible || modelData.kind === "file"
-                                    ? Theme.space40 : Theme.space16
+                                rightPadding: pathPickerVisible ? 88 : 48
                                 echoMode: modelData.kind === "secret"
                                           ? TextInput.Password : TextInput.Normal
                                 background: Rectangle {
@@ -259,9 +251,9 @@ ColumnLayout {
 
                                 PrimaryButton {
                                     anchors.right: parent.right
-                                    anchors.rightMargin: Theme.space8
+                                    anchors.rightMargin: normalTextField.pathPickerVisible ? 48 : Theme.space8
                                     anchors.verticalCenter: parent.verticalCenter
-                                    visible: normalTextField.defaultButtonVisible
+                                    enabled: !root.controller.running
                                     width: 32
                                     height: 32
                                     compact: true
@@ -285,11 +277,11 @@ ColumnLayout {
                                     anchors.right: parent.right
                                     anchors.rightMargin: Theme.space8
                                     anchors.verticalCenter: parent.verticalCenter
-                                    visible: modelData.kind === "file"
+                                    visible: modelData.kind === "file" || modelData.kind === "directory"
                                     width: 32
                                     height: 32
                                     compact: true
-                                    text: "选择文件"
+                                    text: modelData.kind === "directory" ? "选择文件夹" : "选择文件"
                                     iconName: "folder_open"
                                     glyphSize: 20
                                     tonal: true
@@ -302,8 +294,9 @@ ColumnLayout {
                                         ? Theme.primaryContainerHover
                                         : Theme.primaryContainer
                                     onClicked: {
-                                        const selectedPath = root.controller.chooseParameterFile(
-                                            normalTextField.text)
+                                        const selectedPath = modelData.kind === "directory"
+                                            ? root.controller.chooseParameterDirectory(normalTextField.text)
+                                            : root.controller.chooseParameterFile(normalTextField.text)
                                         if (selectedPath.length > 0) {
                                             normalTextField.text = selectedPath
                                             normalTextField.forceActiveFocus()
@@ -323,7 +316,7 @@ ColumnLayout {
                                 color: Theme.textPrimary
                                 font.pixelSize: Theme.fontBody
                                 leftPadding: Theme.space16
-                                rightPadding: Theme.space16
+                                rightPadding: 48
                                 topPadding: Theme.space16
                                 bottomPadding: Theme.space16
                                 wrapMode: TextEdit.Wrap
@@ -335,6 +328,27 @@ ColumnLayout {
                                 }
                                 AppTextEditMenu { target: multilineTextArea }
                                 onTextChanged: root.parameterValues[modelData.id] = text
+                                PrimaryButton {
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: Theme.space8
+                                    anchors.top: parent.top
+                                    anchors.topMargin: Theme.space8
+                                    enabled: !root.controller.running
+                                    width: 32
+                                    height: 32
+                                    compact: true
+                                    text: "设为默认值"
+                                    z: 201
+                                    iconName: "save"
+                                    glyphSize: 20
+                                    tonal: true
+                                    foregroundColor: Theme.primaryText
+                                    border.width: 0
+                                    radius: Theme.radiusSmall
+                                    color: hovered ? Theme.primaryContainerHover : Theme.primaryContainer
+                                    onClicked: root.controller.setParameterDefault(
+                                        modelData.id, multilineTextArea.text)
+                                }
                             }
                         }
 
