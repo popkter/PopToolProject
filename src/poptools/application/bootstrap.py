@@ -7,6 +7,7 @@ tests and future frontends without duplicating application construction.
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,7 +15,7 @@ from poptools.infrastructure.config_store import ConfigStore
 from poptools.infrastructure.json_tool_repository import JsonToolRepository
 from poptools.infrastructure.python_environment import PythonEnvironment
 from poptools.infrastructure.tool_registry import ToolRegistry
-from poptools.paths import AppPaths, resource_path
+from poptools.paths import AppPaths, configure_plugin_paths, resource_path
 from poptools.runners import ExecutionCoordinator, ExecutionManager
 from poptools.viewmodels import (
     AndroidController,
@@ -50,12 +51,32 @@ class ApplicationComponents:
     update_controller: UpdateController
 
 
+def plugin_usage_reason(plugin, terminal, execution, app) -> str:
+    if plugin == "powershell":
+        tabs = [tab.title for tab in terminal._tabs if tab.session is not None]
+        if tabs:
+            return "请先停止终端会话：" + "、".join(tabs)
+    # Scripts can invoke any plugin through PATH, including after their initial launch.
+    if any(worker.active for worker in execution._executions.values()):
+        return "请先结束正在运行的脚本，脚本可能调用插件工具"
+    if plugin == "android" and execution._scrcpy.active:
+        return "请先结束正在运行或启动中的投屏任务"
+    if plugin == "python":
+        if app._python_doctor_process is not None:
+            return "请先等待 Python 依赖诊断完成"
+        if app._python_package_install is not None:
+            return "请先等待 Python 依赖安装完成"
+    return ""
+
+
 def build_components(
     paths: AppPaths, terminal_working_directory: Path | None = None
 ) -> ApplicationComponents:
     """Build the application graph from concrete infrastructure adapters."""
 
     paths.ensure()
+    if sys.platform == "win32":
+        configure_plugin_paths(paths)
     config_store = ConfigStore(paths)
     config_store.load_config()
     python_environment = PythonEnvironment(paths, config_store)
@@ -82,6 +103,26 @@ def build_components(
         python_environment, working_directory=terminal_working_directory
     )
     update_controller = UpdateController(config_store)
+    if sys.platform == "win32":
+        from poptools.infrastructure.managed_powershell import ManagedPowerShell
+        manager = settings_controller.pluginManager
+        developer_console_controller._plugin = ManagedPowerShell(manager.service)
+        developer_console_controller._plugin_manager = manager
+        manager.changed.connect(developer_console_controller.pluginStateChanged)
+        manager.changed.connect(android_controller.refreshPluginAvailability)
+        manager.completed.connect(developer_console_controller.onManagedPluginCompleted)
+        execution_coordinator.plugin_mutation_active = lambda: manager.mutating
+        android_controller.plugin_discovery_allowed = lambda: (
+            not manager.mutating and not manager.androidPaused
+        )
+        android_controller.resume_plugin_discovery = manager.resumeDiscovery
+        app_controller.plugin_mutation_active = lambda: manager.mutating
+        manager.busy_check = lambda plugin: plugin_usage_reason(
+            plugin, developer_console_controller, execution_coordinator, app_controller
+        )
+        from PySide6.QtCore import QCoreApplication
+        if QCoreApplication.instance():
+            QCoreApplication.instance().aboutToQuit.connect(manager.shutdown)
     settings_controller.scriptsImported.connect(app_controller.reloadImportedScripts)
     settings_controller.consoleMessage.connect(app_controller.appendConsoleMessage)
     return ApplicationComponents(

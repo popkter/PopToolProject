@@ -44,6 +44,9 @@ class PythonEnvironment:
     @property
     def managed_runtime_executable(self) -> Path:
         if sys.platform == "win32":
+            from poptools.paths import plugin_record
+            if plugin_record(self.paths, "python"):
+                return self.paths.python_runtime_dir / "python.exe"
             installed = installed_runtime_path("python", "python.exe")
             if installed.is_file():
                 return installed
@@ -177,7 +180,11 @@ class PythonEnvironment:
         return True, ""
 
     def ensure_ready(self) -> PythonEnvironmentState:
-        if getattr(sys, "frozen", False) and not self.managed_executable.is_file():
+        if (
+            sys.platform != "win32"
+            and getattr(sys, "frozen", False)
+            and not self.managed_executable.is_file()
+        ):
             prepare_managed_python(self.paths)
         return self.state()
 

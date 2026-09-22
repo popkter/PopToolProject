@@ -16,15 +16,15 @@ Rectangle {
     signal clicked()
     signal actionClicked()
 
-    implicitHeight: compact ? 40 : (dense ? 48 : 52)
+    implicitHeight: compact ? Theme.navigationItemHeight : (dense ? Theme.controlHeightLarge : 52)
     radius: compact ? Theme.radiusSmall : Theme.radiusMedium
     color: selected ? Theme.primaryContainer
                    : (mouseArea.containsMouse
-                      ? (Theme.darkMode ? Theme.surfaceContainerHigh : "#EEF1F5")
-                      : "transparent")
-    border.width: compact ? 1 : 0
-    border.color: selected ? (Theme.darkMode ? Theme.primary : "#88BFFF")
-                           : (Theme.darkMode ? Theme.outlineVariant : "#E0E5EB")
+                      ? (Theme.navigationHover)
+                      : (root.compact ? Theme.navigationHover : "transparent"))
+    border.width: 0
+    border.color: selected ? (Theme.navigationActiveBorder)
+                           : (Theme.navigationBorder)
 
     RowLayout {
         z: 1
@@ -38,9 +38,9 @@ Rectangle {
         Item { visible: root.compact; Layout.fillWidth: true }
         MaterialIcon {
             icon: root.iconName
-            iconSize: root.compact ? 20 : 21
-            color: root.selected ? (Theme.darkMode ? Theme.primaryText : "#1478E8")
-                                 : (Theme.darkMode ? Theme.textSecondary : "#53606F")
+            iconSize: root.compact ? 24 : 21
+            color: root.selected ? (Theme.navigationActiveIcon)
+                                 : (Theme.navigationIcon)
             Layout.preferredWidth: 24
             Layout.preferredHeight: 32
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
@@ -49,7 +49,7 @@ Rectangle {
             visible: !root.compact
             text: root.label
             color: root.selected ? Theme.primary : Theme.textPrimary
-            font.pixelSize: 15
+            font.pixelSize: Theme.fontComponentTitle
             font.weight: root.selected ? Font.Bold : Font.Medium
             Layout.fillWidth: true
             Layout.minimumWidth: 0

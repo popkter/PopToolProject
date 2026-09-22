@@ -9,7 +9,6 @@ from PySide6.QtCore import QMetaObject, QObject, QTimer, QUrl
 from PySide6.QtGui import QFont, QFontDatabase, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
-from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from PySide6.QtWidgets import QApplication
 
 from poptools.infrastructure.android_device_service import AndroidDevice, AndroidDeviceService
@@ -37,7 +36,6 @@ def main() -> int:
     output_path = Path(sys.argv[1] if len(sys.argv) > 1 else "implementation.png").resolve()
     os.environ.setdefault("QT_QUICK_BACKEND", "software")
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
-    QtWebEngineQuick.initialize()
     app = QApplication(sys.argv)
     register_terminal_type()
     system_font = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "msyh.ttc"
@@ -116,9 +114,9 @@ def main() -> int:
     if len(sys.argv) > 2 and sys.argv[2] == "update":
         update_controller._on_check_completed(
             UpdateRelease(
-                version="0.2.0",
-                tag="v0.2.0",
-                name="泡泡工具箱 0.2.0",
+                version="99.0.0",
+                tag="v99.0.0",
+                name="泡泡工具箱 99.0.0（界面预览）",
                 notes="新增应用内自动更新功能。\n\n修复已知问题并优化启动性能。",
                 page_url="https://github.com/popkter/PopToolProject/releases/tag/v0.2.0",
                 asset_url="https://example.test/app.exe",
@@ -190,6 +188,12 @@ def main() -> int:
                 lambda: jira_workspace.setProperty("outputExpanded", True),
             )
     if len(sys.argv) > 2 and sys.argv[2] == "developer":
+        if os.environ.get("POPTOOLS_CAPTURE_EMPTY_TERMINAL") == "1":
+            def close_preview_tabs() -> None:
+                for tab in developer_console_controller.terminalTabs:
+                    developer_console_controller.closeTerminalTab(tab["tabId"])
+
+            QTimer.singleShot(400, close_preview_tabs)
         window.setProperty("developerSelected", True)
         if os.environ.get("POPTOOLS_CAPTURE_TERMINAL_MENU") == "1":
             def open_terminal_menu() -> None:
@@ -237,8 +241,24 @@ def main() -> int:
                     and QMetaObject.invokeMethod(custom_scripts_page, "closeDrawer"),
                 )
     capture_dialog = os.environ.get("POPTOOLS_CAPTURE_DIALOG")
+    if capture_dialog == "user-guide":
+        QTimer.singleShot(250, lambda: QMetaObject.invokeMethod(window, "openUserGuideDialog"))
+        if os.environ.get("POPTOOLS_CAPTURE_GUIDE_PREVIEW") == "1":
+            def show_guide_preview() -> None:
+                window.findChild(QObject, "userGuideDialog").setProperty("sectionIndex", 2)
+
+            def scroll_guide_preview() -> None:
+                scroll = window.findChild(QObject, "guideScroll")
+                scroll.setProperty("contentY", max(0, scroll.property("contentHeight") - scroll.property("height")))
+
+            QTimer.singleShot(500, show_guide_preview)
+            QTimer.singleShot(800, scroll_guide_preview)
     if capture_dialog == "script-editor":
         QTimer.singleShot(250, lambda: QMetaObject.invokeMethod(window, "openCommandEditorForEdit"))
+    if capture_dialog == "delete-script":
+        QTimer.singleShot(250, lambda: QMetaObject.invokeMethod(window, "openDeleteCommandDialog"))
+    if capture_dialog == "confirm-run":
+        QTimer.singleShot(250, lambda: window.openConfirmRunDialog({}))
     if capture_dialog == "recent-tool":
         QTimer.singleShot(450, lambda: controller.recentToolDialogRequested.emit(
             controller.selectedTool["id"]

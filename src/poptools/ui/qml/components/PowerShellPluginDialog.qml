@@ -5,220 +5,77 @@ import "../theme"
 
 AppDialog {
     id: root
-
     required property var controller
     required property var parentWindow
     property bool cancelRequested: false
-
-    width: Math.min(572, Overlay.overlay.width - 24)
-    height: Math.min(410, Overlay.overlay.height - 24)
-    anchors.centerIn: Overlay.overlay
-    modal: true
-    padding: 0
-    closePolicy: root.controller.pluginInstalling
-                 ? Popup.NoAutoClose : Popup.CloseOnEscape
+    width: Math.min(Theme.dialogWidth, Overlay.overlay.width - 24)
+    height: Math.min(Math.max(321, body.implicitHeight + 48), Overlay.overlay.height - 24)
+    leftPadding: Theme.space16
+    rightPadding: Theme.space16
+    closePolicy: controller.pluginInstalling ? Popup.NoAutoClose : Popup.CloseOnEscape
 
     function cancel() {
-        if (!root.controller.pluginInstalling) {
-            root.close()
-            return
-        }
-        if (!root.cancelRequested
-                && root.controller.cancelPowerShellPluginInstall())
-            root.cancelRequested = true
+        if (!controller.pluginInstalling) { close(); return }
+        if (!cancelRequested && controller.cancelPowerShellPluginInstall())
+            cancelRequested = true
     }
-
     onOpened: cancelRequested = false
     onClosed: cancelRequested = false
-
     Connections {
         target: root.controller
-
         function onPluginInstallFinished(success, message) {
-            if (root.cancelRequested) {
-                root.cancelRequested = false
-                root.close()
-            }
+            if (root.cancelRequested) { root.cancelRequested = false; root.close() }
         }
     }
-
     contentItem: ColumnLayout {
-        spacing: 0
-
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 92
-            color: Theme.surfaceContainerLow
-            radius: Theme.radiusLarge
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                height: 22
-                color: parent.color
-            }
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 22
-                anchors.rightMargin: 16
-                spacing: 14
-
-                Rectangle {
-                    Layout.preferredWidth: 48
-                    Layout.preferredHeight: 48
-                    radius: Theme.radiusMedium
-                    color: Theme.primaryContainer
-
-                    MaterialIcon {
-                        anchors.centerIn: parent
-                        icon: "terminal"
-                        iconSize: 28
-                        color: Theme.primary
-                    }
-                }
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 3
-
-                    Text {
-                        text: "安装 PowerShell 7 插件"
-                        color: Theme.textPrimary
-                        font.pixelSize: Theme.fontDialogTitle
-                        font.weight: Font.Bold
-                    }
-                    Text {
-                        Layout.fillWidth: true
-                        text: "为内置终端安装应用专用的 PowerShell 运行环境"
-                        color: Theme.textSecondary
-                        font.pixelSize: Theme.fontSupporting
-                        elide: Text.ElideRight
-                    }
-                }
-                PrimaryButton {
-                    Layout.preferredWidth: 42
-                    Layout.preferredHeight: 42
-                    compact: true
-                    text: "关闭"
-                    iconName: "close"
-                    glyphSize: 23
-                    tonal: true
-                    foregroundColor: Theme.textSecondary
-                    border.width: 0
-                    radius: height / 2
-                    color: hovered && enabled
-                           ? Theme.surfaceContainerHigh : "transparent"
-                    enabled: !root.controller.pluginInstalling
-                    disabledOpacity: 0.38
-                    onClicked: root.close()
-                }
-            }
-        }
-
+        id: body
+        spacing: Theme.space16
         ColumnLayout {
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.leftMargin: 22
-            Layout.rightMargin: 22
-            Layout.topMargin: 18
-            Layout.bottomMargin: 16
-            spacing: 10
-
-            Text {
-                Layout.fillWidth: true
-                text: "终端需要应用专用的 PowerShell " + root.controller.pluginVersion
-                    + "。是否下载并安装官方 PowerShell 7 插件？"
-                color: Theme.textPrimary
-                font.pixelSize: Theme.fontBody
-                wrapMode: Text.WordWrap
-            }
-            Text {
-                Layout.fillWidth: true
-                text: "插件约 120 MB，仅安装到当前用户的应用数据目录，不修改系统 PowerShell。"
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontCaption
-                wrapMode: Text.WordWrap
-            }
-            Text {
-                text: "安装目录"
-                color: Theme.textSecondary
-                font.pixelSize: Theme.fontCaption
-            }
-            TextField {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 42
-                readOnly: true
-                text: root.controller.pluginDirectory
-                selectByMouse: true
-                color: Theme.textPrimary
-                font.family: "Cascadia Mono"
-                font.pixelSize: Theme.fontCaption
-                leftPadding: 12
-                rightPadding: 12
-                background: Rectangle {
-                    radius: Theme.radiusMedium
-                    color: Theme.surface
-                    border.color: Theme.outline
-                }
-            }
-            ProgressBar {
-                Layout.fillWidth: true
-                visible: root.controller.pluginInstalling
-                from: 0
-                to: 100
-                value: root.controller.pluginInstallProgress
-            }
-            Text {
-                Layout.fillWidth: true
-                visible: root.controller.pluginInstallStatus.length > 0
-                text: root.controller.pluginInstallStatus
-                color: text.indexOf("失败") >= 0
-                       ? Theme.errorColor : Theme.textSecondary
-                font.pixelSize: Theme.fontCaption
-                wrapMode: Text.WordWrap
-            }
-            Item { Layout.fillHeight: true }
+            spacing: 2
+            Text { text: root.controller.pluginInstalled ? "PowerShell 7" : "安装 PowerShell 7"; color: Theme.textPrimary; font.pixelSize: Theme.fontDialogTitle; font.weight: Font.DemiBold }
+            Text { Layout.fillWidth: true; text: "安装后可运行对应脚本"; color: Theme.textSecondary; font.pixelSize: Theme.fontDialogDescription; wrapMode: Text.Wrap }
         }
-
         Rectangle {
-            id: dialogFooter
+            Layout.fillWidth: true; Layout.preferredHeight: Theme.controlHeightLarge
+            radius: Theme.radiusMedium; color: Theme.surfaceContainer; border.color: Theme.outline
+            Text { anchors.left: parent.left; anchors.leftMargin: Theme.space16; anchors.verticalCenter: parent.verticalCenter; text: root.controller.pluginVersion; color: Theme.textPrimary; font.pixelSize: Theme.fontPageDescription }
+        }
+        Text {
             Layout.fillWidth: true
-            Layout.preferredHeight: 76
-            radius: Theme.radiusLarge
-            color: Theme.surface
-
-            Rectangle {
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: 1
-                color: Theme.outlineVariant
+            text: root.controller.pluginInstallStatus || (root.controller.pluginInstalled ? "已安装" : "将下载应用专用的官方运行环境")
+            font.pixelSize: Theme.fontDialogDescription
+            color: text.indexOf("失败") >= 0 ? Theme.errorColor : Theme.textSecondary
+            wrapMode: Text.Wrap
+        }
+        AppProgressBar {
+            id: progressBar
+            Layout.fillWidth: true; Layout.preferredHeight: 24
+            visible: root.controller.pluginInstalling
+            from: 0; to: 100; value: root.controller.pluginInstallProgress
+            
+            
+        }
+        Text {
+            Layout.fillWidth: true
+            text: root.controller.pluginDirectory
+            color: Theme.textSecondary; font.pixelSize: Theme.fontCaption
+            elide: Text.ElideMiddle
+        }
+        Item { Layout.fillHeight: true }
+        RowLayout {
+            Layout.fillWidth: true; spacing: Theme.space16
+            PrimaryButton {
+                Layout.fillWidth: true; Layout.preferredWidth: 0; implicitHeight: Theme.controlHeightLarge; radius: Theme.radiusMedium
+                text: root.controller.pluginInstalling ? "取消安装" : "关闭"; iconName: ""; tonal: true
+                color: Theme.surfaceContainerLow; border.color: Theme.outline; foregroundColor: Theme.textPrimary
+                enabled: !root.cancelRequested; onClicked: root.cancel()
             }
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 20
-                anchors.rightMargin: 20
-                spacing: 10
-
-                Item { Layout.fillWidth: true }
-                PrimaryButton {
-                    implicitWidth: 112
-                    implicitHeight: 48
-                    text: root.controller.pluginInstalling ? "取消安装" : "取消"
-                    iconName: "close"
-                    tonal: true
-                    enabled: !root.cancelRequested
-                    onClicked: root.cancel()
-                }
-                PrimaryButton {
-                    implicitWidth: 142
-                    implicitHeight: 48
-                    text: root.controller.pluginInstalling ? "安装中…" : "确认安装"
-                    iconName: root.controller.pluginInstalling
-                              ? "hourglass_top" : "download"
-                    enabled: !root.controller.pluginInstalling
-                    onClicked: root.controller.installPowerShellPlugin()
-                }
+            PrimaryButton {
+                Layout.fillWidth: true; Layout.preferredWidth: 0; implicitHeight: Theme.controlHeightLarge; radius: Theme.radiusMedium
+                text: root.controller.pluginInstalling ? "安装中…" : root.controller.pluginInstalled ? "已安装" : "安装使用"; iconName: ""
+                enabled: !root.controller.pluginInstalling && !root.controller.pluginInstalled
+                onClicked: root.controller.installPowerShellPlugin()
             }
         }
     }

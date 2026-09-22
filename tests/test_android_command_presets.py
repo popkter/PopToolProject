@@ -91,3 +91,16 @@ def test_preset_model_filters_tools_by_category() -> None:
     for category, expected_count in EXPECTED_CATEGORY_COUNTS.items():
         model.set_category(category)
         assert model.rowCount() == expected_count
+
+
+def test_keyboard_navigation_respects_search_and_kind_filters() -> None:
+    tools = _definitions()
+    model = ToolListModel()
+    model.set_tools(tools, selected_id=tools[0].id)
+    assert model.adjacentToolId(-1, "all") == tools[0].id
+    assert model.adjacentToolId(1, "all") == tools[1].id
+    model.set_filter(tools[-1].title)
+    assert model.adjacentToolId(1, "all") == tools[-1].id
+    assert model.adjacentToolId(1, "not-an-executor") == ""
+    model.set_filter("no script matches this query")
+    assert model.adjacentToolId(-1, "all") == ""

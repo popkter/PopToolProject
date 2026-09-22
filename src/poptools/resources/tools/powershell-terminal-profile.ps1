@@ -3,17 +3,20 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 & "$env:SystemRoot\System32\chcp.com" 65001 > $null
 
 function global:python {
+    if (-not $env:POPTOOLS_PYTHON) { Write-Error '请在设置的插件管理中安装 Python。'; return }
     & $env:POPTOOLS_PYTHON @args
 }
 
 function global:pip {
+    if (-not $env:POPTOOLS_PIP) { Write-Error '请在设置的插件管理中安装 Python。'; return }
     & $env:POPTOOLS_PIP -m pip @args
 }
 
-if ($env:POPTOOLS_ADB -and (Test-Path -LiteralPath $env:POPTOOLS_ADB)) {
-    function global:adb {
-        & $env:POPTOOLS_ADB @args
+function global:adb {
+    if (-not $env:POPTOOLS_ADB -or -not (Test-Path -LiteralPath $env:POPTOOLS_ADB)) {
+        Write-Error '请在设置的插件管理中安装 Android 工具（ADB + scrcpy）。'; return
     }
+    & $env:POPTOOLS_ADB @args
 }
 
 Import-Module PSReadLine

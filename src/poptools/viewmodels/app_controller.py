@@ -668,6 +668,9 @@ class AppController(QObject):
         return self._run_python_doctor(self._selected.executor.command)
 
     def _run_python_doctor(self, command: str) -> bool:
+        if getattr(self, "plugin_mutation_active", lambda: False)():
+            self.pythonDoctorWarning.emit("插件正在变更，请等待操作完成后再检查依赖。")
+            return False
         if self._python_doctor_process is not None:
             self._append_console("Python Doctor：正在检查依赖，请稍候。\n")
             return False
@@ -681,7 +684,7 @@ class AppController(QObject):
             self._report_python_doctor_result(
                 PythonDoctorResult(
                     checked_modules=plan.checked_modules,
-                    environment_error="Python 解释器不可用",
+                    environment_error="Python 插件不可用，请在设置的插件管理中安装或修复",
                 )
             )
             return True
@@ -775,11 +778,14 @@ class AppController(QObject):
     @Slot(str, result=bool)
     def installPythonDependencies(self, package_text: str) -> bool:
         """Install packages into the interpreter currently used by user scripts."""
+        if getattr(self, "plugin_mutation_active", lambda: False)():
+            self.pythonDependencyInstallFinished.emit(False, "插件正在变更，请稍后重试。")
+            return False
         if self._python_package_install is not None:
             return False
         executable = self.execution.python_environment.executable()
         if not executable:
-            message = "Python 环境不可用，请先在设置中配置 Python 解释器。"
+            message = "Python 插件不可用，请先在设置的插件管理中安装。"
             self._append_console(f"Python 依赖安装失败：{message}\n")
             self.pythonDependencyInstallFinished.emit(False, message)
             return False

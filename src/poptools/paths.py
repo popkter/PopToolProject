@@ -16,6 +16,28 @@ from pathlib import Path
 from platformdirs import user_data_path
 
 ANDROID_TOOLS_DIR_ENV = "POPTOOLS_ANDROID_TOOLS_DIR"
+_managed_paths: AppPaths | None = None
+
+
+def configure_plugin_paths(paths: AppPaths) -> None:
+    global _managed_paths
+    _managed_paths = paths
+
+
+def plugin_record(paths: AppPaths, plugin: str) -> dict:
+    record_file = paths.plugins_dir / plugin / "installed.json"
+    if not record_file.exists():
+        return {}
+    record = json.loads(record_file.read_text(encoding="utf-8"))
+    directory = record.get("directory", "")
+    if directory and (Path(directory).name != directory or directory in {".", ".."}):
+        raise ValueError("插件安装记录包含无效目录")
+    return record
+
+
+def managed_plugin_directory(paths: AppPaths, plugin: str) -> Path:
+    record = plugin_record(paths, plugin)
+    return paths.plugins_dir / plugin / record.get("directory", "missing")
 
 
 def platform_key() -> str:
@@ -49,6 +71,8 @@ def installed_runtime_path(*parts: str) -> Path:
 
 
 def bundled_android_tools_dir() -> Path:
+    if sys.platform == "win32" and _managed_paths is not None:
+        return managed_plugin_directory(_managed_paths, "android") / "runtime"
     override = os.environ.get(ANDROID_TOOLS_DIR_ENV)
     if override:
         return Path(override)
@@ -225,10 +249,14 @@ class AppPaths:
 
     @property
     def python_runtime_dir(self) -> Path:
+        if sys.platform == "win32" and plugin_record(self, "python"):
+            return managed_plugin_directory(self, "python") / "runtime"
         return self.python_dir / "runtime"
 
     @property
     def python_venv_dir(self) -> Path:
+        if sys.platform == "win32" and plugin_record(self, "python"):
+            return managed_plugin_directory(self, "python") / "env"
         return self.python_dir / "venv"
 
     @property

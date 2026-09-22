@@ -170,7 +170,7 @@ class ExecutionManager(QObject):
                 return None
             program = self.python_environment.execution_executable()
             if not program:
-                self.output.emit("Python 环境不可用，请在设置中配置 Python 解释器。\n")
+                self.output.emit("Python 插件不可用，请在设置的插件管理中安装。\n")
                 return None
             source = self._resolve_source(command_parts[0])
             if source.is_file():
@@ -179,7 +179,18 @@ class ExecutionManager(QObject):
             else:
                 arguments = ["-c", rendered_command, *arguments]
         elif executor.kind == ExecutorKind.POWERSHELL:
-            program = shutil.which("pwsh") or shutil.which("powershell")
+            if sys.platform == "win32":
+                from poptools.infrastructure.plugin_service import PluginService
+                service = PluginService(self.paths)
+                program = (
+                    str(service.executable("powershell"))
+                    if service.available("powershell") else None
+                )
+                if not program:
+                    self.output.emit("请在设置的插件管理中安装 PowerShell。\n")
+                    return None
+            else:
+                program = shutil.which("pwsh") or shutil.which("powershell")
             utf8_setup = (
                 "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
                 "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
@@ -255,6 +266,9 @@ class ExecutionManager(QObject):
             bundled = bundled_adb_path()
             if bundled.exists():
                 return str(bundled)
+            if sys.platform == "win32":
+                self.output.emit("请在设置的插件管理中安装 Android 工具（ADB + scrcpy）。\n")
+                return None
             prepared = sorted(
                 (
                     candidate

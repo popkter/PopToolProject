@@ -24,21 +24,40 @@ QtObject {
     readonly property color tertiaryContainerHover: darkMode ? "#4A326E" : "#E7DAFF"
     readonly property color tertiaryText: darkMode ? "#E3D2FF" : "#6F42C1"
     readonly property color surface: darkMode ? "#11161E" : "#F8FAFC"
-    readonly property color sidebar: darkMode ? "#171D26" : "#F4F6F8"
+    readonly property color sidebar: darkMode ? "#171D26" : "#FFFFFF"
+    readonly property color workspaceBackground: darkMode ? surface : "#FBFCFE"
+    readonly property color navigationHover: darkMode ? surfaceContainerHigh : "#EEF1F5"
+    readonly property color navigationBorder: darkMode ? outlineVariant : "#E0E5EB"
+    readonly property color navigationActiveBorder: darkMode ? primary : "#88BFFF"
+    readonly property color navigationIcon: darkMode ? textSecondary : "#53606F"
+    readonly property color navigationActiveIcon: darkMode ? primaryText : "#1478E8"
+    readonly property color listSelected: darkMode ? primaryContainer : "#E5F0FF"
+    readonly property color listAlternate: darkMode ? "transparent" : "#FAFBFC"
+    readonly property color inputBorder: darkMode ? outline : "#A8CFFF"
+    readonly property color terminalToolbar: darkMode ? surface : "#FFFFFF"
+    readonly property color terminalBackground: "#2B313D"
+    readonly property color terminalTabSelected: darkMode ? surfaceContainerHigh : "#E3E7EC"
+    readonly property color terminalTabBorder: darkMode ? outlineVariant : "#E1E5EA"
+    readonly property color terminalTabText: darkMode ? textPrimary : "#404750"
+    readonly property color terminalTabMuted: darkMode ? textSecondary : "#6B737D"
+    readonly property color terminalTabAction: darkMode ? textSecondary : "#7A838D"
+    readonly property color terminalTabHover: darkMode ? surfaceContainerHigh : "#E8ECF1"
+    readonly property color terminalTabDivider: darkMode ? outlineVariant : "#D8DDE3"
+    readonly property color terminalDropHighlight: "#331B78F2"
     readonly property color navigationSelected: darkMode ? "#16365F" : "#DCEAFF"
     readonly property color surfaceContainerLow: darkMode ? "#171E28" : "#FFFFFF"
     readonly property color surfaceContainer: darkMode ? "#1D2530" : "#F5F7FA"
     readonly property color surfaceContainerHigh: darkMode ? "#26313F" : "#EDF1F5"
-    readonly property color outline: darkMode ? "#435064" : "#D6DEE8"
-    readonly property color outlineVariant: darkMode ? "#303B4B" : "#E4E9F0"
+    readonly property color outline: darkMode ? "#435064" : "#D9DEE7"
+    readonly property color outlineVariant: darkMode ? "#303B4B" : "#E0E4EA"
     readonly property color popupSurface: darkMode ? "#1B232E" : "#FFFFFF"
     readonly property color popupHover: darkMode ? "#26313F" : "#F4F6F9"
     readonly property color popupSelected: darkMode ? "#173A66" : "#E8F2FF"
     readonly property color popupShadow: darkMode ? "#99000000" : "#290F172A"
     readonly property color dialogShadow: darkMode ? "#B3000000" : "#380F172A"
     readonly property color scrim: darkMode ? "#8F070B12" : "#470F172A"
-    readonly property color textPrimary: darkMode ? "#F3F6FA" : "#101722"
-    readonly property color textSecondary: darkMode ? "#93A0B3" : "#7C899B"
+    readonly property color textPrimary: darkMode ? "#F3F6FA" : "#0B0F17"
+    readonly property color textSecondary: darkMode ? "#93A0B3" : "#7B8496"
     readonly property color success: darkMode ? "#5FD49A" : "#29AF6F"
     readonly property color successForeground: darkMode ? "#071D13" : "#FFFFFF"
     readonly property color successContainer: darkMode ? "#123D2A" : "#E8F8EF"
@@ -50,7 +69,7 @@ QtObject {
     readonly property color consoleBackground: "#10151D"
     readonly property color consoleText: "#E5E7EB"
     readonly property color consoleMuted: "#728298"
-    readonly property color consoleHeaderBackground: "#252C36"
+    readonly property color consoleHeaderBackground: "#202731"
     readonly property color consoleTag: "#66AFFF"
     readonly property color consoleWarning: "#FFCE66"
     readonly property color consoleError: "#FF8585"
@@ -59,8 +78,8 @@ QtObject {
     property int fontDisplay: 40
     property int fontPageTitle: 30
     property int fontTitleLarge: 22
-    property int fontDialogTitle: 22
-    property int fontSectionTitle: 18
+    property int fontDialogTitle: 24
+    property int fontSectionTitle: 19
     property int fontComponentTitle: 15
     property int fontButton: 14
     property int fontBody: 14
@@ -69,6 +88,9 @@ QtObject {
     property int fontCode: 13
     property int fontCaption: 12
     property int fontMicro: 10
+    readonly property int fontSmall: 11
+    readonly property int fontTitleSmall: 16
+    readonly property int fontDetailTitle: 24
     property int radiusNone: 0
     property int radiusTiny: 4
     property int radiusSmall: 7
@@ -121,4 +143,60 @@ QtObject {
     readonly property color buttonShadow: primaryHover
     readonly property color buttonHighlight: "transparent"
     property int unit: 8
+
+    // PopTools / Page 1: Screen / 自定义, Screen / 终端, Screen / 设置.
+    // Dimensions are logical pixels; responsive rules use available content width.
+    readonly property int windowMinimumWidth: 960
+    readonly property int windowMinimumHeight: 720
+    readonly property int titleBarHeight: 40
+    readonly property int navigationRailWidth: 72
+    readonly property int navigationItemHeight: 44
+    readonly property int navigationLogoSize: 40
+    readonly property int workspaceInset: 28
+    readonly property int workspaceGap: 16
+    readonly property int scriptPanelGap: 18
+    readonly property int settingsHeaderHeight: 80
+    readonly property int dialogWidth: 548
+    readonly property int fontDialogDescription: 18
+    readonly property int fontPageDescription: 15
+    readonly property color runtimeBadge: darkMode ? primaryContainer : "#EFF4FC"
+    readonly property color runtimeBadgeText: darkMode ? primaryText : "#4D75A9"
+    readonly property color dangerAction: darkMode ? errorContainer : "#33FF0000"
+    readonly property int pageHeaderHeight: 66
+    readonly property int pageHeaderCompactHeight: 54
+    readonly property int workspaceTitleSize: 36
+    readonly property int controlHeightSmall: 36
+    readonly property int controlHeight: 40
+    readonly property int controlHeightLarge: 48
+    readonly property int inputHeight: 42
+    readonly property int iconSmall: 16
+    readonly property int iconMedium: 20
+    readonly property int iconLarge: 24
+    readonly property int scriptListMinimumWidth: 290
+    readonly property int scriptListMaximumWidth: 438
+    readonly property real scriptListWidthRatio: 0.356
+    readonly property int scriptRowHeight: 40
+    readonly property int settingsColumnMinimumWidth: 440
+    readonly property int settingsTwoColumnWidth: settingsColumnMinimumWidth * 2 + workspaceGap
+    readonly property int terminalTabMinimumWidth: 120
+    readonly property int terminalTabMaximumWidth: 180
+    readonly property int terminalToolbarHeight: 38
+    readonly property int menuWidth: 180
+    readonly property int menuItemHeight: 38
+    readonly property int radiusControl: 7
+    readonly property int radiusCard: 12
+    readonly property int radiusConsole: 8
+    readonly property int detailPanelPadding: 24
+    readonly property int detailActionWidth: 94
+    readonly property int detailRunWidth: 108
+    readonly property int detailCompactWidth: 440
+    readonly property int consoleHeaderHeight: 42
+    readonly property int consoleFooterHeight: 28
+    readonly property int consoleMaximumHeight: 348
+    readonly property int consoleMinimumHeight: 152
+    readonly property int detailFormReservedHeight: 380
+    readonly property int detailFormMaximumVisibleHeight: 240
+    readonly property int motionFast: 120
+    readonly property int motionStandard: 180
+    readonly property int motionSpinner: 750
 }

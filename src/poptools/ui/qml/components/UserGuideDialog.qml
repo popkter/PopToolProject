@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtWebEngine
 import "../theme"
 
 AppDialog {
@@ -9,128 +8,145 @@ AppDialog {
     objectName: "userGuideDialog"
     required property var controller
     required property var parentWindow
-    property bool loadFailed: false
-    property bool pageLoaded: false
-    readonly property string guideTheme: JSON.stringify({
-        "dark": Theme.darkMode,
-        "colors": {
-            "ink": String(Theme.textPrimary), "muted": String(Theme.textSecondary),
-            "green": String(Theme.primaryText), "line": String(Theme.outlineVariant),
-            "paper": String(Theme.surface), "lime": String(Theme.primaryForeground),
-            "canvas": String(Theme.surfaceContainer), "card": String(Theme.surfaceContainerLow),
-            "accent": String(Theme.primary), "soft": String(Theme.primaryContainer),
-            "border": String(Theme.outline), "code-bg": String(Theme.consoleBackground),
-            "code-text": String(Theme.consoleText), "code-muted": String(Theme.consoleMuted),
-            "error": String(Theme.errorColor)
-        }
-    })
-    onGuideThemeChanged: applyGuideTheme()
-
-    function applyGuideTheme() {
-        if (pageLoaded && webViewLoader.item)
-            webViewLoader.item.runJavaScript("window.applyAppTheme && window.applyAppTheme(" + guideTheme + ");")
-    }
-
-    function runGuideJavaScript(script, callback) {
-        if (webViewLoader.item)
-            webViewLoader.item.runJavaScript(script, callback)
-    }
-
-    width: Math.min(900, parentWindow.width - 24)
-    height: Math.min(840, parentWindow.height - 24)
-    anchors.centerIn: Overlay.overlay
-    modal: true
+    property int sectionIndex: 0
+    property string copyStatus: ""
+    readonly property var sections: controller.userGuideSections
+    readonly property var section: sections[sectionIndex]
+    width: Math.min(860, parentWindow.width - Theme.space24)
+    height: Math.min(780, parentWindow.height - Theme.space24)
     closePolicy: Popup.CloseOnEscape
-    padding: 0
-    // The help page is opaque and rectangular. Avoid an offscreen shadow
-    // texture around WebEngine, which can leave a black rectangle outside it.
-    background: Rectangle {
-        color: Theme.surface
-        radius: 0
-    }
-
-    onAboutToHide: {
-        if (pageLoaded)
-            controller.markUserGuideSeen()
-    }
-    onAboutToShow: {
-        pageLoaded = false
-        loadFailed = false
-    }
-
+    onAboutToShow: { sectionIndex = 0; copyStatus = ""; guideScroll.contentY = 0 }
+    onAboutToHide: controller.markUserGuideSeen()
+    onSectionIndexChanged: { guideScroll.contentY = 0; copyStatus = "" }
     function finishGuide() { close() }
-
-    contentItem: Item {
-        clip: true
-        Loader {
-            id: webViewLoader
-            anchors.fill: parent
-            active: root.opened
-            asynchronous: false
-
-            sourceComponent: Component {
-                WebEngineView {
-                    id: guideView
-                    objectName: "userGuideWebView"
-                    url: root.controller.userGuideUrl
-                    // Keep the backing surface opaque. Together with delayed
-                    // creation this prevents exposed black Chromium tiles.
-                    backgroundColor: Theme.surface
-                    settings.javascriptCanAccessClipboard: true
-                    settings.localContentCanAccessRemoteUrls: false
-                    Keys.priority: Keys.BeforeItem
-                    Keys.onPressed: function(event) {
-                        if (event.key === Qt.Key_F12)
-                            event.accepted = true
-                    }
-                    onContextMenuRequested: function(request) {
-                        request.accepted = true
-                    }
-                    onNavigationRequested: function(request) {
-                        if (request.url.toString() === root.controller.userGuideUrl.toString() + "?guide-action=close") {
-                            request.reject()
-                            root.finishGuide()
-                            return
-                        }
-                        // Keep the guide and its section links inside this local document.
-                        if (request.url.toString().split("#")[0] !== root.controller.userGuideUrl.toString())
-                            request.reject()
-                    }
-                    onLoadingChanged: function(request) {
-                        if (request.status === WebEngineView.LoadSucceededStatus) {
-                            root.pageLoaded = true
-                            root.loadFailed = false
-                            root.applyGuideTheme()
-                        } else if (request.status === WebEngineView.LoadFailedStatus) {
-                            root.loadFailed = true
-                        }
-                    }
+    function copied(text) {
+        controller.copyGuideText(text)
+        copyStatus = "已复制，可粘贴到脚本编辑器"
+        copyTimer.restart()
+    }
+    Timer { id: copyTimer; interval: 3000; onTriggered: root.copyStatus = "" }
+    contentItem: ColumnLayout {
+        spacing: Theme.space16
+        RowLayout {
+            Layout.fillWidth: true; spacing: Theme.space12
+            MaterialIcon { icon: "menu_book"; iconSize: 28; color: Theme.primary }
+            ColumnLayout {
+                Layout.fillWidth: true; spacing: Theme.space4
+                Text { text: "使用手册"; color: Theme.textPrimary; font.pixelSize: Theme.fontDialogTitle; font.weight: Font.DemiBold }
+                Text {
+                    Layout.fillWidth: true; text: "了解功能、编写脚本，以及管理运行环境"
+                    color: Theme.textSecondary; font.pixelSize: Theme.fontPageDescription; wrapMode: Text.Wrap
                 }
             }
-        }
-        BusyIndicator {
-            anchors.centerIn: parent
-            running: webViewLoader.item && webViewLoader.item.loading
-            visible: running
-        }
-        ColumnLayout {
-            anchors.centerIn: parent
-            visible: root.loadFailed
-            Text {
-                text: "手册加载失败，请重试。"
-                color: Theme.textPrimary
-            }
             PrimaryButton {
-                text: "关闭"
+                objectName: "closeUserGuideButton"
+                Layout.preferredWidth: Theme.controlHeight
+                Layout.preferredHeight: Theme.controlHeight
+                compact: true
+                text: "关闭使用手册"; iconName: "close"
+                glyphSize: Theme.iconMedium
+                tonal: true
+                foregroundColor: Theme.textSecondary
+                border.width: 0
+                radius: height / 2
+                color: hovered ? Theme.surfaceContainerHigh : "transparent"
+                Accessible.name: "关闭使用手册"
                 onClicked: root.finishGuide()
             }
-            PrimaryButton {
-                text: "重新加载"
-                onClicked: {
-                    root.loadFailed = false
-                    if (webViewLoader.item)
-                        webViewLoader.item.reload()
+        }
+        Flow {
+            Layout.fillWidth: true; spacing: Theme.space8
+            Repeater {
+                model: root.sections
+                delegate: PrimaryButton {
+                    required property var modelData
+                    required property int index
+                    objectName: "guideSection_" + modelData.id
+                    text: modelData.title; iconName: modelData.icon
+                    implicitHeight: Theme.controlHeightSmall; labelFontSize: Theme.fontSupporting
+                    tonal: true
+                    color: root.sectionIndex === index ? Theme.primaryContainer : Theme.surfaceContainerLow
+                    foregroundColor: root.sectionIndex === index ? Theme.primaryText : Theme.textSecondary
+                    onClicked: root.sectionIndex = index
                 }
+            }
+        }
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.outlineVariant }
+        Flickable {
+            id: guideScroll
+            objectName: "guideScroll"
+            Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+            contentWidth: width; contentHeight: guideContent.implicitHeight
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: ScrollBar { }
+            ColumnLayout {
+                id: guideContent
+                width: guideScroll.width - Theme.space16; spacing: Theme.space12
+                Repeater {
+                    model: root.section ? root.section.cards : []
+                    delegate: Rectangle {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        implicitHeight: cardContent.implicitHeight + Theme.space32
+                        radius: Theme.radiusCard; color: Theme.surfaceContainerLow; border.color: Theme.outlineVariant
+                        ColumnLayout {
+                            id: cardContent
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.space16 }
+                            spacing: Theme.space8
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: Theme.space8
+                                MaterialIcon { visible: !!modelData.icon; icon: modelData.icon || "info"; iconSize: 20; color: Theme.primary }
+                                Text {
+                                    Layout.fillWidth: true; text: modelData.title
+                                    color: Theme.textPrimary; font.pixelSize: Theme.fontTitleSmall
+                                    font.weight: Font.DemiBold; wrapMode: Text.Wrap
+                                }
+                                PrimaryButton {
+                                    visible: !!modelData.code
+                                    text: "复制"; iconName: "content_copy"; tonal: true; implicitHeight: Theme.controlHeightSmall
+                                    onClicked: root.copied(modelData.code)
+                                }
+                            }
+                            Text {
+                                Layout.fillWidth: true; text: modelData.body || ""
+                                textFormat: Text.PlainText; wrapMode: Text.Wrap
+                                color: Theme.textSecondary; font.pixelSize: Theme.fontBody
+                            }
+                            TextArea {
+                                Layout.fillWidth: true; visible: !!modelData.code
+                                text: modelData.code || ""; readOnly: true; selectByMouse: true
+                                wrapMode: TextEdit.Wrap; textFormat: TextEdit.PlainText
+                                font.family: "Cascadia Mono"; font.pixelSize: Theme.fontCode
+                                color: Theme.consoleText; padding: Theme.space12
+                                background: Rectangle { radius: Theme.radiusConsole; color: Theme.consoleBackground }
+                            }
+                        }
+                    }
+                }
+                Loader {
+                    Layout.fillWidth: true
+                    active: root.section && root.section.id === "syntax"
+                    sourceComponent: GuideTemplatePreview {
+                        controller: root.controller
+                        onCopyRequested: function(text) { root.copied(text) }
+                    }
+                }
+            }
+        }
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.outlineVariant }
+        RowLayout {
+            Layout.fillWidth: true; spacing: Theme.space12
+            Text {
+                objectName: "guideCopyStatus"
+                Layout.fillWidth: true
+                text: root.copyStatus || "可随时从「设置 → 关于 → 用户手册」重新打开"
+                color: root.copyStatus ? Theme.success : Theme.textSecondary
+                font.pixelSize: Theme.fontCaption; wrapMode: Text.Wrap
+            }
+            PrimaryButton {
+                objectName: "finishUserGuideButton"
+                text: "我知道了"; iconName: ""; implicitHeight: Theme.controlHeightLarge
+                onClicked: root.finishGuide()
             }
         }
     }

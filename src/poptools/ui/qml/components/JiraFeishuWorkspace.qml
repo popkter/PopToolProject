@@ -82,7 +82,7 @@ ColumnLayout {
         font.weight: Font.Medium
     }
 
-    component AppField: TextField {
+    component AppField: AppTextField {
         Layout.fillWidth: true
         Layout.preferredHeight: 46
         leftPadding: Theme.space16
@@ -534,7 +534,7 @@ ColumnLayout {
                             AppField { id: appSecret; echoMode: TextInput.Password; onTextEdited: controller.markCurrentProfileDirty(); onEditingFinished: controller.updateField("feishu", "app_secret", text) }
                         }
                     }
-                    CheckBox {
+                    AppCheckBox {
                         id: atAssignee
                         text: "在消息中 @ 负责人（需要有效 open_id）"
                         checked: true

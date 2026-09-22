@@ -80,6 +80,18 @@ def make_controller(tmp_path: Path) -> DeveloperConsoleController:
     )
 
 
+def test_powershell_terminal_does_not_require_python_plugin(tmp_path: Path, monkeypatch):
+    controller = make_controller(tmp_path)
+    monkeypatch.setattr(controller.python_environment, "execution_executable", lambda: None)
+    monkeypatch.setattr(controller.python_environment, "executable", lambda: None)
+    with patch(
+        "poptools.viewmodels.developer_console_controller.ConPtySession", FakeStartedSession
+    ):
+        assert controller.ensureStarted()
+    assert FakeStartedSession.last_start[3]["POPTOOLS_PYTHON"] == ""
+    assert FakeStartedSession.last_start[3]["POPTOOLS_PIP"] == ""
+
+
 def test_terminal_output_is_routed_to_its_own_native_session(tmp_path: Path) -> None:
     controller = make_controller(tmp_path)
     routed: list[tuple[str, str]] = []
@@ -369,3 +381,28 @@ def test_bulk_terminal_tab_close_operations_keep_requested_tab(tmp_path: Path) -
     assert [tab["tabId"] for tab in controller.terminalTabs] == [second_id]
     assert controller.activeTerminalTabId == second_id
     assert controller._tab_by_id(third_id) is None
+
+def test_last_terminal_tab_can_close_and_stays_empty(tmp_path, qtbot):
+    controller = make_controller(tmp_path)
+    stopped = []
+    tab = controller._tabs[0]
+    tab.session = SimpleNamespace(stop_process=lambda: stopped.append(True))
+    controller._terminal_ready = True
+    assert controller.closeTerminalTab(tab.tab_id)
+    assert stopped == [True]
+    assert controller.terminalTabs == []
+    assert controller.activeTerminalTabId == ""
+    assert not controller.running
+    assert not controller.ensureStarted()
+    controller.terminalDetached()
+    controller.terminalReady()
+    qtbot.wait(10)
+    assert controller.terminalTabs == []
+    assert not controller._ensure_tab_started(tab)
+    with patch(
+        "poptools.viewmodels.developer_console_controller.ConPtySession", FakeStartedSession
+    ):
+        assert controller.createTerminalTab()
+        qtbot.waitUntil(lambda: controller.running)
+    assert len(controller.terminalTabs) == 1
+    assert controller.activeTerminalTabId != tab.tab_id

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, Slot
 
 from poptools.domain.models import ToolDefinition
 
@@ -114,6 +114,18 @@ class ToolListModel(QAbstractListModel):
 
     def first_tool_id(self) -> str:
         return self._display_tools[0].id if self._display_tools else ""
+
+    @Slot(int, str, result=str)
+    def adjacentToolId(self, direction: int, kind_filter: str) -> str:
+        tools = [tool for tool in self._display_tools
+                 if kind_filter == "all" or tool.executor.kind.value == kind_filter]
+        if not tools:
+            return ""
+        current = next((i for i, tool in enumerate(tools) if tool.id == self._selected_id), -1)
+        if current < 0:
+            return tools[0 if direction > 0 else -1].id
+        target = max(0, min(len(tools) - 1, current + (1 if direction > 0 else -1)))
+        return tools[target].id
 
     def _filtered_tools(self) -> list[ToolDefinition]:
         return [

@@ -15,8 +15,8 @@ Rectangle {
     property color foregroundColor: "transparent"
     property real labelFontSize: Theme.fontButton
     property int labelFontWeight: Font.DemiBold
-    property real glyphSize: 25
-    property real contentSpacing: compact ? 0 : 10
+    property real glyphSize: Theme.iconMedium
+    property real contentSpacing: compact ? 0 : Theme.controlSpacing
     property real disabledOpacity: 1
     property bool contentFillWidth: false
     property real contentHorizontalPadding: 0
@@ -25,37 +25,26 @@ Rectangle {
     readonly property bool pressed: mouseArea.pressed
     readonly property color contentColor: foregroundColor.a > 0 ? foregroundColor
                                           : !enabled ? Theme.textSecondary
-                                          : dangerStyle ? "white"
+                                          : dangerStyle ? Theme.primaryForeground
                                           : successStyle ? Theme.successForeground
                                           : tonal ? Theme.primaryText : Theme.primaryForeground
     signal clicked()
 
-    implicitHeight: 58
-    implicitWidth: compact ? 58 : 180
+    implicitHeight: Theme.controlHeight
+    implicitWidth: compact ? Theme.controlHeight : Math.max(Theme.controlHeight, buttonLabel.implicitWidth + (iconName.length > 0 ? glyphSize + contentSpacing : 0) + Theme.space32)
     opacity: enabled ? 1 : disabledOpacity
-    radius: Theme.radiusMedium
+    radius: Theme.radiusControl
     color: !enabled ? (Theme.buttonDisabled || Theme.surfaceContainerHigh)
                     : dangerStyle ? (mouseArea.containsMouse ? Qt.darker(Theme.errorColor, 1.08) : Theme.errorColor)
                     : successStyle ? (mouseArea.containsMouse ? Qt.darker(Theme.success, 1.08) : Theme.success)
                     : tonal ? (mouseArea.containsMouse ? Theme.primaryContainerHover : Theme.primaryContainer)
                             : (mouseArea.containsMouse ? Theme.primaryHover : Theme.primary)
-    border.width: mouseArea.pressed ? 2 : 1
+    border.width: mouseArea.pressed ? Theme.borderWidthMedium : Theme.borderWidthThin
     border.color: !enabled ? Theme.outline
                     : mouseArea.pressed ? Theme.buttonShadow
                     : dangerStyle ? Theme.errorColor
                     : mouseArea.containsMouse ? Theme.primaryHover
                     : Theme.primary
-
-    // XP-style highlight edge for 3D effect
-    Rectangle {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: mouseArea.pressed ? 0 : 1
-        color: mouseArea.pressed ? "transparent" : (Theme.buttonHighlight || "#FFFFFF")
-        visible: !root.tonal && !root.successStyle && !root.dangerStyle
-        opacity: mouseArea.containsMouse ? 0.8 : 0.5
-    }
 
     RowLayout {
         anchors.verticalCenter: parent.verticalCenter
@@ -73,6 +62,7 @@ Rectangle {
             color: root.contentColor
         }
         Text {
+            id: buttonLabel
             Layout.fillWidth: root.contentFillWidth
             Layout.minimumWidth: 0
             visible: !root.compact
@@ -88,7 +78,7 @@ Rectangle {
         target: buttonIcon
         from: 0
         to: 360
-        duration: 750
+        duration: Theme.motionSpinner
         loops: Animation.Infinite
         running: root.iconSpinning && buttonIcon.visible
         onRunningChanged: {

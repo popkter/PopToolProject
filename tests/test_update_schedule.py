@@ -39,6 +39,22 @@ def test_daily_checks_once_per_local_calendar_day(tmp_path):
     controller.shutdown()
 
 
+def test_startup_checks_once_per_process_even_on_same_day(tmp_path):
+    now = [local_timestamp(2026, 9, 10, 12)]
+    store, controller, calls = make_controller(tmp_path, now)
+    controller.setUpdateCheckFrequency("startup")
+    assert controller.checkForUpdatesAutomatically()
+    assert not controller.checkForUpdatesAutomatically()
+    assert calls == [False]
+    controller.shutdown()
+
+    _, reopened, reopened_calls = make_controller(tmp_path, now)
+    assert reopened.updateCheckFrequency == "startup"
+    assert reopened.checkForUpdatesAutomatically()
+    assert reopened_calls == [False]
+    reopened.shutdown()
+
+
 def test_weekly_checks_once_per_monday_based_week(tmp_path):
     now = [local_timestamp(2026, 9, 9, 12)]  # Wednesday
     store, controller, calls = make_controller(tmp_path, now)

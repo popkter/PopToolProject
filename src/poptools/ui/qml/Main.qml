@@ -7,8 +7,8 @@ import "theme"
 
 ApplicationWindow {
     id: window
-    minimumWidth: 960
-    minimumHeight: 720
+    minimumWidth: Theme.windowMinimumWidth
+    minimumHeight: Theme.windowMinimumHeight
     width: Math.max(minimumWidth, Math.round(Screen.width * 0.8))
     height: Math.max(minimumHeight, Math.round(Screen.height * 0.8))
     visible: true
@@ -33,7 +33,7 @@ ApplicationWindow {
 
     property var parameterValues: ({})
     property string toolSearchQuery: ""
-    readonly property real primaryNavWidth: 64
+    readonly property real primaryNavWidth: Theme.navigationRailWidth
     readonly property real toolListWidth: Math.max(
         minimumToolListWidth,
         Math.min(maximumNavigationWidth,
@@ -110,6 +110,11 @@ ApplicationWindow {
         developerSelected = false
         settingsSelected = true
         hideScrcpyWindow()
+    }
+
+    Connections {
+        target: androidController
+        function onPluginManagementRequested() { window.openSettingsDialog() }
     }
 
     function openCommandEditorForCreate(command, kind) {
@@ -469,9 +474,9 @@ ApplicationWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 40
+        height: Theme.titleBarHeight
         color: window.developerSelected
-            ? (Theme.darkMode ? Theme.sidebar : "#F7F8FA") : Theme.surface
+            ? (Theme.sidebar) : Theme.workspaceBackground
         z: 900
 
         Rectangle {
@@ -479,7 +484,7 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: window.primaryNavWidth
-            color: Theme.darkMode ? Theme.sidebar : "#F7F8FA"
+            color: Theme.sidebar
             z: -1
         }
 
@@ -500,16 +505,16 @@ ApplicationWindow {
         RowLayout {
             id: windowButtons
             anchors.left: parent.left
-            anchors.leftMargin: 12
+            anchors.leftMargin: 9
             anchors.top: parent.top
-            anchors.topMargin: 14
-            spacing: 6
+            anchors.topMargin: 12
+            spacing: 8
             z: 2
 
             Rectangle {
-                Layout.preferredWidth: 12
-                Layout.preferredHeight: 12
-                radius: 6
+                Layout.preferredWidth: 14
+                Layout.preferredHeight: 14
+                radius: Theme.radiusControl
                 color: "#FF5F57"
                 MaterialIcon {
                     anchors.centerIn: parent; icon: "close"; iconSize: 9
@@ -520,9 +525,9 @@ ApplicationWindow {
                 }
             }
             Rectangle {
-                Layout.preferredWidth: 12
-                Layout.preferredHeight: 12
-                radius: 6
+                Layout.preferredWidth: 14
+                Layout.preferredHeight: 14
+                radius: Theme.radiusControl
                 color: "#FFBD2E"
                 MaterialIcon {
                     anchors.centerIn: parent; icon: "remove"; iconSize: 9
@@ -533,9 +538,9 @@ ApplicationWindow {
                 }
             }
             Rectangle {
-                Layout.preferredWidth: 12
-                Layout.preferredHeight: 12
-                radius: 6
+                Layout.preferredWidth: 14
+                Layout.preferredHeight: 14
+                radius: Theme.radiusControl
                 color: "#28C840"
                 MaterialIcon {
                     anchors.centerIn: parent
@@ -558,7 +563,7 @@ ApplicationWindow {
             anchors.verticalCenter: parent.verticalCenter
             text: "UTerminal"
             color: Theme.darkMode ? Theme.textPrimary : "#252A31"
-            font.pixelSize: 14
+            font.pixelSize: Theme.fontBody
             font.weight: Font.DemiBold
         }
     }
@@ -575,21 +580,21 @@ ApplicationWindow {
             Layout.minimumWidth: window.primaryNavWidth
             Layout.maximumWidth: window.primaryNavWidth
             Layout.fillHeight: true
-            color: Theme.darkMode ? Theme.sidebar : "#F7F8FA"
+            color: Theme.sidebar
             clip: false
             z: 2
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.leftMargin: Theme.space12
-                anchors.rightMargin: Theme.space12
-                anchors.topMargin: Theme.space8
+                anchors.leftMargin: 14
+                anchors.rightMargin: 14
+                anchors.topMargin: 6
                 anchors.bottomMargin: Theme.space12
-                spacing: Theme.space8
+                spacing: Theme.space20
 
                 Item {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 40
+                    Layout.preferredHeight: 44
 
                     RowLayout {
                         anchors.top: parent.top
@@ -598,16 +603,10 @@ ApplicationWindow {
                         height: 40
                         spacing: 0
 
-                        Image {
+                        AppMark {
                             id: appLogo
                             Layout.preferredWidth: 40
                             Layout.preferredHeight: 40
-                            source: Qt.resolvedUrl("../../resources/icons/app-icon-ui.png")
-                            sourceSize.width: 116
-                            sourceSize.height: 116
-                            fillMode: Image.PreserveAspectFit
-                            smooth: true
-                            mipmap: true
                             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
                         }
 
@@ -621,7 +620,7 @@ ApplicationWindow {
                                 Layout.minimumWidth: 0
                                 text: "泡泡工具箱"
                                 color: Theme.textPrimary
-                                font.pixelSize: 20
+                                font.pixelSize: Theme.fontDetailTitle
                                 font.weight: Font.Bold
                                 elide: Text.ElideRight
                             }
@@ -654,13 +653,14 @@ ApplicationWindow {
                     Layout.minimumWidth: 0
                     label: "自定义"
                     shortcutText: "Ctrl+Q"
-                    iconName: "build"
+                    iconName: "code"
                     compact: window.compactPrimaryNav
                     dense: window.compactHeight
                     selected: !window.developerSelected && !window.settingsSelected
                         && appController.section === "custom"
                     onClicked: window.openCustomScriptsPage()
                 }
+
                 NavItem {
                     Layout.fillWidth: true
                     Layout.minimumWidth: 0
@@ -696,7 +696,6 @@ ApplicationWindow {
                 Item {
                     Layout.fillHeight: true
                 }
-
             }
         }
 
@@ -780,6 +779,8 @@ ApplicationWindow {
                     Layout.fillHeight: true
                     controller: settingsController
                     updateBackend: updateController
+                    terminalBackend: developerConsoleController
+                    onPluginManageRequested: powershellPluginDialog.open()
                     onTerminalEnableRequested: window.requestTerminalEnable()
                     onUserHelpRequested: window.openUserGuideDialog()
                 }
@@ -903,6 +904,7 @@ ApplicationWindow {
         sourceComponent: PythonDoctorDialog {
             controller: appController
             parentWindow: window
+            onPluginManagementRequested: window.openSettingsDialog()
             onClosed: pythonDoctorDialogLoader.active = false
         }
     }

@@ -112,6 +112,7 @@ class UpdateController(QObject):
         self.client = client or GitHubReleaseClient()
         self._current_version = current_version
         self._clock = clock
+        self._startup_check_started = False
         self._auto_check_enabled = (
             getattr(sys, "frozen", False)
             or os.environ.get("POPTOOLS_ENABLE_UPDATE_CHECK") == "1"
@@ -142,7 +143,7 @@ class UpdateController(QObject):
 
     @Slot(str)
     def setUpdateCheckFrequency(self, value: str) -> None:
-        if value not in {"daily", "weekly", "never"}:
+        if value not in {"daily", "weekly", "never", "startup"}:
             return
         self.config_store.set_update_check_frequency(value)
         self.stateChanged.emit()
@@ -211,10 +212,14 @@ class UpdateController(QObject):
             return False
         now = self._clock()
         period_start = self._auto_check_period_start(now, frequency)
-        if self.config_store.last_auto_update_check_at() >= period_start:
+        if frequency == "startup":
+            if self._startup_check_started:
+                return False
+        elif self.config_store.last_auto_update_check_at() >= period_start:
             return False
         started = self._start_check(manual=False)
         if started:
+            self._startup_check_started = True
             self.config_store.set_last_auto_update_check_at(now)
         return started
 

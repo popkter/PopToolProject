@@ -264,10 +264,10 @@ class ConfigStore:
     def update_check_frequency(self) -> str:
         app = self.load_config().get("app", {})
         value = app.get("update_check_frequency", "weekly") if isinstance(app, dict) else "weekly"
-        return value if value in {"daily", "weekly", "never"} else "weekly"
+        return value if value in {"daily", "weekly", "never", "startup"} else "weekly"
 
     def set_update_check_frequency(self, value: str) -> None:
-        if value not in {"daily", "weekly", "never"}:
+        if value not in {"daily", "weekly", "never", "startup"}:
             raise ValueError("Invalid update frequency")
         config = self.load_config()
         if not isinstance(config.get("app"), dict):

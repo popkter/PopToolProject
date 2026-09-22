@@ -7,7 +7,7 @@ MenuItem {
 
     property bool destructive: false
 
-    implicitHeight: 38
+    implicitHeight: Theme.menuItemHeight
     leftPadding: Theme.space12
     rightPadding: Theme.space12
 

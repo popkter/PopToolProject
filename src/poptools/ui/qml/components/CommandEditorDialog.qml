@@ -236,7 +236,7 @@ AppDialog {
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 22
-                anchors.rightMargin: 16
+                anchors.rightMargin: Theme.space16
                 spacing: 14
                 Rectangle {
                     Layout.preferredWidth: 48
@@ -313,7 +313,7 @@ AppDialog {
                         Layout.preferredWidth: 440
                         spacing: 6
                         Text { text: "命令名称"; color: Theme.textPrimary; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold }
-                        TextField {
+                        AppTextField {
                             id: titleField
                             FilePathDropArea { target: titleField }
                             AppTextEditMenu { target: titleField }
@@ -357,7 +357,7 @@ AppDialog {
                                     y: iconButton.height + 8
                                     width: Math.min(300, root.width - 44)
                                     height: 214
-                                    padding: 8
+                                    padding: Theme.space8
                                     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
                                     background: AppPopupSurface { }
@@ -430,7 +430,7 @@ AppDialog {
                     Layout.rightMargin: 22
                     spacing: 6
                     Text { text: "功能说明"; color: Theme.textPrimary; font.pixelSize: Theme.fontLabel; font.weight: Font.DemiBold }
-                    TextField {
+                    AppTextField {
                         id: descriptionField
                         FilePathDropArea { target: descriptionField }
                         AppTextEditMenu { target: descriptionField }
@@ -503,7 +503,7 @@ AppDialog {
                             Layout.preferredHeight: 54
                             Layout.leftMargin: 18
                             Layout.rightMargin: 16
-                            spacing: 8
+                            spacing: Theme.space8
 
                             Text {
                                 text: "脚本内容"
@@ -592,8 +592,8 @@ AppDialog {
             Layout.preferredHeight: 76
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 20
-                anchors.rightMargin: 20
+                anchors.leftMargin: Theme.space20
+                anchors.rightMargin: Theme.space20
                 spacing: 10
 
                 Item { Layout.fillWidth: true }

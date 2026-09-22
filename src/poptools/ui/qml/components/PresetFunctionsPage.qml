@@ -121,15 +121,15 @@ Rectangle {
 
         WorkspacePageHeader {
             Layout.fillWidth: true
-            Layout.preferredHeight: 68
-            Layout.minimumHeight: 68
-            Layout.maximumHeight: 68
+            Layout.preferredHeight: Theme.pageHeaderHeight
+            Layout.minimumHeight: Theme.pageHeaderHeight
+            Layout.maximumHeight: Theme.pageHeaderHeight
             title: "预设"
             description: "快速调用常用 Android 调试功能"
-            titlePixelSize: 28
+            titlePixelSize: Theme.workspaceTitleSize
             actionWidth: Math.min(390, root.width * 0.38)
 
-            TextField {
+            AppTextField {
                 Layout.preferredWidth: Math.min(390, root.width * 0.38)
                 Layout.preferredHeight: 40
                 leftPadding: 40

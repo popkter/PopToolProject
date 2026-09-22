@@ -67,6 +67,9 @@ class ExecutionCoordinator(QObject):
         self._ordinary_limit = max(1, min(limit, 5))
 
     def start(self, tool: ToolDefinition, values: dict[str, Any], device_serial: str = "") -> bool:
+        if getattr(self, "plugin_mutation_active", lambda: False)():
+            self.output.emit(tool.id, "插件正在变更，请等待操作完成后再运行。\n")
+            return False
         if self.is_scrcpy(tool):
             if self._scrcpy.active:
                 self.output.emit(tool.id, "投屏正在运行，请先停止。\n")

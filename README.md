@@ -16,6 +16,7 @@
 - **Python 环境**：应用维护独立 Python 运行时和虚拟环境，并通过 Python Doctor 检查、安装脚本依赖。
 - **内置终端**：可选 PowerShell 7 或 macOS Shell，支持多个独立会话，共用应用的 ADB 与 Python 环境。
 - **外观设置**：支持跟随系统、浅色和深色模式。
+- **使用手册**：从“设置 → 关于 → 用户手册”打开原生弹窗，支持章节阅读、脚本模板复制和参数替换预览；随应用切换明暗主题，无需浏览器引擎。
 - **应用更新**：支持每天、每周或关闭自动检查，可选择正式版或 Beta 渠道，并在应用内下载、校验和安装更新。
 - **桌面集成**：单实例运行、系统托盘、预设工具与最近使用脚本快捷入口。
 
@@ -200,9 +201,19 @@ print(keyword, count * 2)
 
 批量迁移只处理脚本相关文件，不覆盖外观、更新、设备选择、Jira 飞书方案等应用设置。
 
+## Windows 插件管理
+
+在“设置 → 插件”中统一安装、检查更新、修复和卸载 Python、Android 工具（ADB + scrcpy）及 PowerShell。PowerShell 在两种安装包中均需按需安装。首次安装和检查更新访问官方 NuGet 或 GitHub；更新跟随官方稳定版，由用户手动确认执行，不自动安装预发布版本。
+
+插件保存在用户数据目录的 `plugins` 下，不修改系统环境。集成版附带插件可彻底卸载，重启或更新应用不会装回。Python 卸载会删除其环境及依赖，但保留用户脚本、配置和输出。Python 升级先迁移依赖，验证通过再启用；迁移失败保留旧版本并显示原因。运行中的插件不能被更新或卸载，请先结束相关任务；ADB 后台服务仍在运行时，可先点击 Android 插件的“停止设备服务”；再次手动刷新设备会恢复扫描。
+
+纯净版未安装 Android 工具时不会扫描设备；未安装 Python 时仍能使用其他功能。安装 PowerShell 插件即可使用终端，不要求同时安装 Python。
+
+Windows 本地构建：`packaging/build.ps1 -Edition Both`（默认），也可选择 `Bundled` 或 `Clean`。纯净版构建不需要 Python、scrcpy 的插件发行包。macOS 打包方式保持不变。
+
 ## Python 环境与依赖
 
-应用准备独立 Python 运行时，并在用户数据目录维护专属虚拟环境。自定义 Python 脚本、Python Doctor、依赖安装和终端中的 `python`/`pip` 使用同一环境，不修改系统 Python。
+安装 Python 插件后，应用在用户数据目录维护独立 Python 运行时和专属虚拟环境。自定义 Python 脚本、Python Doctor、依赖安装和终端中的 `python`/`pip` 使用同一环境，不修改系统 Python。
 
 Python 脚本内容既可以是源码，也可以是 `.py` 文件路径。路径包含空格时使用引号：
 
@@ -266,7 +277,7 @@ adb devices
 - 可以下次提醒、跳过当前版本、立即下载、取消下载、稍后安装或安装并重启；选择“稍后安装”后，下次启动会先校验并自动应用已下载的更新；
 - 下载文件会校验大小以及 GitHub digest 或配套 SHA-256。
 
-Windows 仅发布 `PopTools-Setup.exe`。安装器会一次性释放应用、Qt、独立 Python 和 scrcpy，后续启动直接使用安装目录中的文件；应用内更新同样下载并静默运行该安装器。macOS 根据架构使用 `PopTools-macos-arm64.zip` 或 `PopTools-macos-x64.zip`。
+Windows 同时发布集成版 `PopTools-Setup.exe`（附带 Python、Android 工具）和纯净版 `PopTools-Clean-Setup.exe`（不附带可选插件）。两者都能独立启动，应用自身必需的 Python 库不属于可卸载插件。自动更新保持当前发行类型；切换安装包不会删除用户已有插件。macOS 根据架构使用 `PopTools-macos-arm64.zip` 或 `PopTools-macos-x64.zip`。
 
 ## 数据位置与隐私
 

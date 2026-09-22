@@ -1,4 +1,6 @@
 ﻿param(
+    [ValidateSet("Bundled", "Clean", "Both")]
+    [string]$Edition = "Both",
     [switch]$SkipTests,
     [switch]$SkipInstaller,
     [switch]$KeepRunningApp,
@@ -174,21 +176,23 @@ function Expand-VerifiedRuntime {
     }
 }
 
-if (-not (Test-Path -LiteralPath $PythonRuntimePackage)) {
-    New-Item -ItemType Directory -Path $PythonVendorDir -Force | Out-Null
-    Write-Host "Downloading the private Python runtime package..."
-    Invoke-WebRequest -Uri $PythonManifest.url -OutFile $PythonRuntimePackage
-}
-$PythonRuntimePackageHash = (Get-FileHash -LiteralPath $PythonRuntimePackage -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($PythonRuntimePackageHash -ne $PythonManifest.sha256) {
-    throw "Private Python runtime package checksum mismatch: $PythonRuntimePackage"
-}
-if (-not (Test-Path -LiteralPath $ScrcpyRuntimePackage -PathType Leaf)) {
-    throw "Bundled scrcpy package is missing: $ScrcpyRuntimePackage"
-}
-$ScrcpyRuntimePackageHash = (Get-FileHash -LiteralPath $ScrcpyRuntimePackage -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($ScrcpyRuntimePackageHash -ne $ScrcpyManifest.sha256) {
-    throw "Bundled scrcpy package checksum mismatch: $ScrcpyRuntimePackage"
+if ($Edition -ne "Clean") {
+    if (-not (Test-Path -LiteralPath $PythonRuntimePackage)) {
+        New-Item -ItemType Directory -Path $PythonVendorDir -Force | Out-Null
+        Write-Host "Downloading the private Python runtime package..."
+        Invoke-WebRequest -Uri $PythonManifest.url -OutFile $PythonRuntimePackage
+    }
+    $PythonRuntimePackageHash = (Get-FileHash -LiteralPath $PythonRuntimePackage -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($PythonRuntimePackageHash -ne $PythonManifest.sha256) {
+        throw "Private Python runtime package checksum mismatch: $PythonRuntimePackage"
+    }
+    if (-not (Test-Path -LiteralPath $ScrcpyRuntimePackage -PathType Leaf)) {
+        throw "Bundled scrcpy package is missing: $ScrcpyRuntimePackage"
+    }
+    $ScrcpyRuntimePackageHash = (Get-FileHash -LiteralPath $ScrcpyRuntimePackage -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($ScrcpyRuntimePackageHash -ne $ScrcpyManifest.sha256) {
+        throw "Bundled scrcpy package checksum mismatch: $ScrcpyRuntimePackage"
+    }
 }
 
 if (-not (Test-Path -LiteralPath $VenvPython)) {
@@ -368,34 +372,40 @@ try {
     if (-not (Test-Path -LiteralPath $BuiltExe -PathType Leaf)) {
         throw "PyInstaller one-folder entry point is missing: $BuiltExe"
     }
-    $RuntimeOutput = Join-Path $OneFolderOutput "runtime"
-    New-Item -ItemType Directory -Path $RuntimeOutput -Force | Out-Null
-    Expand-VerifiedRuntime `
-        -Archive $PythonRuntimePackage `
-        -InnerDirectory $PythonRuntimeInnerDirectory `
-        -Destination (Join-Path $RuntimeOutput "python")
-    Expand-VerifiedRuntime `
-        -Archive $ScrcpyRuntimePackage `
-        -InnerDirectory $ScrcpyRuntimeInnerDirectory `
-        -Destination (Join-Path $RuntimeOutput "scrcpy")
-    Copy-Item -LiteralPath $PythonManifestPath `
-        -Destination (Join-Path $RuntimeOutput "python\manifest.json")
-    Copy-Item -LiteralPath (Join-Path $PythonVendorDir "PYTHON-LICENSE.txt") `
-        -Destination (Join-Path $RuntimeOutput "python\LICENSE.txt")
-    Copy-Item -LiteralPath $ScrcpyManifestPath `
-        -Destination (Join-Path $RuntimeOutput "scrcpy\manifest.json")
-    Copy-Item -LiteralPath (Join-Path $ScrcpyVendorDir "scrcpy-LICENSE.txt") `
-        -Destination (Join-Path $RuntimeOutput "scrcpy\LICENSE.txt")
-    if (-not (Test-Path -LiteralPath (Join-Path $RuntimeOutput "python\python.exe"))) {
-        throw "Prepared Python runtime is missing python.exe"
-    }
-    foreach ($RequiredScrcpyFile in @("adb.exe", "scrcpy.exe", "scrcpy-server", "SDL3.dll")) {
-        if (-not (Test-Path -LiteralPath (Join-Path $RuntimeOutput "scrcpy\$RequiredScrcpyFile"))) {
-            throw "Prepared scrcpy runtime is missing $RequiredScrcpyFile"
+    if ($Edition -ne "Clean") {
+        $RuntimeOutput = Join-Path $ProjectRoot "build\plugin-seeds"
+        New-Item -ItemType Directory -Path $RuntimeOutput -Force | Out-Null
+        Expand-VerifiedRuntime `
+            -Archive $PythonRuntimePackage `
+            -InnerDirectory $PythonRuntimeInnerDirectory `
+            -Destination (Join-Path $RuntimeOutput "python")
+        Expand-VerifiedRuntime `
+            -Archive $ScrcpyRuntimePackage `
+            -InnerDirectory $ScrcpyRuntimeInnerDirectory `
+            -Destination (Join-Path $RuntimeOutput "scrcpy")
+        Copy-Item -LiteralPath $PythonManifestPath `
+            -Destination (Join-Path $RuntimeOutput "python\manifest.json")
+        Copy-Item -LiteralPath (Join-Path $PythonVendorDir "PYTHON-LICENSE.txt") `
+            -Destination (Join-Path $RuntimeOutput "python\LICENSE.txt")
+        Copy-Item -LiteralPath $ScrcpyManifestPath `
+            -Destination (Join-Path $RuntimeOutput "scrcpy\manifest.json")
+        Copy-Item -LiteralPath (Join-Path $ScrcpyVendorDir "scrcpy-LICENSE.txt") `
+            -Destination (Join-Path $RuntimeOutput "scrcpy\LICENSE.txt")
+        if (-not (Test-Path -LiteralPath (Join-Path $RuntimeOutput "python\python.exe"))) {
+            throw "Prepared Python runtime is missing python.exe"
         }
+        foreach ($RequiredScrcpyFile in @("adb.exe", "scrcpy.exe", "scrcpy-server", "SDL3.dll")) {
+            if (-not (Test-Path -LiteralPath (Join-Path $RuntimeOutput "scrcpy\$RequiredScrcpyFile"))) {
+                throw "Prepared scrcpy runtime is missing $RequiredScrcpyFile"
+            }
+        }
+        $PythonSeed = @{version=$PythonManifest.version; url=$PythonManifest.url; digest=$PythonManifest.sha256; algorithm="sha256"; inner="tools"}
+        $AndroidSeed = @{version=$ScrcpyManifest.version; url="https://github.com/Genymobile/scrcpy/releases/download/v$($ScrcpyManifest.version)/$($ScrcpyManifest.archive)"; digest=$ScrcpyManifest.sha256; algorithm="sha256"; inner=$ScrcpyRuntimeInnerDirectory}
+        [IO.File]::WriteAllText((Join-Path $RuntimeOutput "python-package.json"), ($PythonSeed | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $RuntimeOutput "android-package.json"), ($AndroidSeed | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
     }
     Write-Host (
-        "One-folder application and installed runtimes created at dist\泡泡工具箱"
+        "Application core created at dist\泡泡工具箱; optional plugin seeds prepared separately"
     )
 
     if (-not $SkipInstaller) {
@@ -411,16 +421,24 @@ try {
             throw "Inno Setup 6 was not found; the required Windows installer cannot be created."
         }
         else {
-            & $InnoCompiler "/DMyAppVersion=$BuildVersion" "/DMyAppVersionInfoVersion=$VersionInfoVersion" "packaging\poptools.iss"
-            if ($LASTEXITCODE -ne 0) { throw "Inno Setup build failed" }
-            $InstallerHash = (Get-FileHash -LiteralPath $InstallerOutput -Algorithm SHA256).Hash.ToLowerInvariant()
-            [System.IO.File]::WriteAllText(
-                $InstallerChecksum,
-                "$InstallerHash  泡泡工具箱-Setup.exe`n",
-                [System.Text.UTF8Encoding]::new($false)
-            )
-            Write-Host "Per-user installer created at dist\泡泡工具箱-Setup.exe"
-            Write-Host "Installer checksum created at dist\泡泡工具箱-Setup.exe.sha256"
+            $Editions = if ($Edition -eq "Both") { @("Bundled", "Clean") } else { @($Edition) }
+            foreach ($BuildEdition in $Editions) {
+                $OutputName = if ($BuildEdition -eq "Clean") { "PopTools-Clean-Setup" } else { "PopTools-Setup" }
+                $MetadataFile = Join-Path $ProjectRoot "build\edition-$BuildEdition.json"
+                [IO.File]::WriteAllText($MetadataFile, (@{edition=$BuildEdition} | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+                & $InnoCompiler "/DEdition=$BuildEdition" "/DOutputName=$OutputName" "/DMyAppVersion=$BuildVersion" "/DMyAppVersionInfoVersion=$VersionInfoVersion" "packaging\poptools.iss"
+                if ($LASTEXITCODE -ne 0) { throw "Inno Setup $BuildEdition build failed" }
+                $InstallerOutput = Join-Path $ProjectRoot "dist\$OutputName.exe"
+                $InstallerChecksum = "$InstallerOutput.sha256"
+                $InstallerHash = (Get-FileHash -LiteralPath $InstallerOutput -Algorithm SHA256).Hash.ToLowerInvariant()
+                [System.IO.File]::WriteAllText(
+                    $InstallerChecksum,
+                    "$InstallerHash  $OutputName.exe`n",
+                    [System.Text.UTF8Encoding]::new($false)
+                )
+                Write-Host "Per-user $BuildEdition installer created: $InstallerOutput"
+                Write-Host "Installer checksum created: $InstallerChecksum"
+            }
         }
     }
 }

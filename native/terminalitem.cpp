@@ -31,7 +31,7 @@ constexpr int kFontItalic = 1 << 1;
 constexpr int kFontStrike = 1 << 2;
 constexpr int kFontUnderline = 1 << 3;
 // Match the terminal surface defined by the latest UI specification.
-const QColor kDefaultBackground(0x10, 0x15, 0x1d);
+const QColor kDefaultBackground(0x2b, 0x31, 0x3d);
 const QColor kDefaultForeground(0xe5, 0xe7, 0xeb);
 const QColor kCursorColor(0xe5, 0xe7, 0xeb);
 const QColor kSelectionColor(0x66, 0x60, 0xc8, 0x80);

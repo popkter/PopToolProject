@@ -11,6 +11,7 @@ AppDialog {
     property string packageNames: ""
     property string installStatus: ""
     property bool installing: false
+    signal pluginManagementRequested()
 
     width: Math.min(540, parentWindow.width - 32)
     height: Math.min(460, parentWindow.height - 32)
@@ -40,7 +41,7 @@ AppDialog {
                 anchors.fill: parent
                 anchors.leftMargin: 18
                 anchors.rightMargin: 18
-                spacing: 12
+                spacing: Theme.space12
                 MaterialIcon { icon: "fact_check"; iconSize: 26; color: Theme.primary }
                 Text {
                     Layout.fillWidth: true
@@ -58,6 +59,14 @@ AppDialog {
             Layout.margins: 18
             spacing: 9
 
+            PrimaryButton {
+                Layout.fillWidth: true
+                text: "打开插件管理"
+                iconName: "extension"
+                visible: root.message.indexOf("插件") >= 0
+                onClicked: { root.close(); root.pluginManagementRequested() }
+            }
+
             Text {
                 Layout.fillWidth: true
                 text: root.message
@@ -73,7 +82,7 @@ AppDialog {
                 font.pixelSize: Theme.fontCaption
             }
 
-            TextField {
+            AppTextField {
                 Layout.fillWidth: true
                 readOnly: true
                 text: root.controller.pythonEnvironmentDirectory

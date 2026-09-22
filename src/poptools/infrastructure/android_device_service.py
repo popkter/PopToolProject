@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from dataclasses import dataclass
 
 from PySide6.QtCore import QObject, QTimer, Signal
@@ -79,7 +80,7 @@ def find_adb_executable() -> str | None:
     bundled = bundled_adb_path()
     if bundled.exists():
         return str(bundled)
-    return shutil.which("adb")
+    return None if sys.platform == "win32" else shutil.which("adb")
 
 
 class AndroidDeviceService(QObject):
@@ -244,4 +245,3 @@ class AndroidProcessService(QObject):
             return
         self._processes = processes
         self.processesChanged.emit()
-

@@ -15,7 +15,7 @@ Dialog {
     }
 
     background: AppPopupSurface {
-        cornerRadius: Theme.radiusLarge
+        cornerRadius: Theme.radiusCard
         dialogSurface: true
     }
 }

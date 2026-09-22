@@ -10,7 +10,6 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
   "PySide6-Essentials==6.11.1",
-  "PySide6-Addons==6.11.1",
   "platformdirs>=4.4,<5",
   "pydantic>=2.12,<3",
   "pypinyin>=0.55,<1",
@@ -54,7 +53,7 @@ poptools = [
   "resources/tools/*.ps1",
   "resources/python/*.py",
   "resources/fonts/*",
-  "resources/help/*.html",
+  "resources/help/*.json",
   "resources/icons/*",
 ]
 

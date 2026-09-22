@@ -89,9 +89,10 @@ jobs:
       - name: Prepare stable asset names
         run: |
           New-Item -ItemType Directory -Path dist\release-assets -Force | Out-Null
-          Copy-Item "dist\泡泡工具箱-Setup.exe" "dist\release-assets\PopTools-Setup.exe"
-          $hash = (Get-FileHash "dist\release-assets\PopTools-Setup.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
-          [IO.File]::WriteAllText("dist\release-assets\PopTools-Setup.exe.sha256", "$hash  PopTools-Setup.exe`n")
+          foreach ($name in @("PopTools-Setup.exe", "PopTools-Clean-Setup.exe")) {
+            Copy-Item "dist\$name" "dist\release-assets\$name"
+            Copy-Item "dist\$name.sha256" "dist\release-assets\$name.sha256"
+          }
       - if: failure()
         uses: actions/upload-artifact@v4.6.2
         with:
@@ -173,7 +174,7 @@ jobs:
         working-directory: release-assets
         run: |
           checksums=()
-          [[ "${{ inputs.build_windows }}" == "true" ]] && checksums+=(PopTools-Setup.exe.sha256)
+          [[ "${{ inputs.build_windows }}" == "true" ]] && checksums+=(PopTools-Setup.exe.sha256 PopTools-Clean-Setup.exe.sha256)
           [[ "${{ inputs.build_macos }}" == "true" ]] && checksums+=(PopTools-macos-arm64.zip.sha256 PopTools-macos-x64.zip.sha256)
           if [[ ${#checksums[@]} -gt 0 ]]; then
             sha256sum --check "${checksums[@]}"
@@ -200,6 +201,8 @@ jobs:
             arguments+=(
               "release-assets/PopTools-Setup.exe#泡泡工具箱-Setup.exe"
               "release-assets/PopTools-Setup.exe.sha256#泡泡工具箱-Setup.exe.sha256"
+              "release-assets/PopTools-Clean-Setup.exe#泡泡工具箱-纯净版-Setup.exe"
+              "release-assets/PopTools-Clean-Setup.exe.sha256#泡泡工具箱-纯净版-Setup.exe.sha256"
             )
           fi
           if [[ "$BUILD_MACOS" == "true" ]]; then

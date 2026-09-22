@@ -21,18 +21,18 @@ AppDialog {
             : Math.min(300, parentWindow.height - 24)
     anchors.centerIn: Overlay.overlay
     modal: true
-    padding: 24
+    padding: Theme.space24
     closePolicy: controller.state === "downloading"
                  || controller.state === "downloaded"
                  || controller.state === "installing"
                  ? Popup.NoAutoClose : Popup.CloseOnEscape
 
     contentItem: ColumnLayout {
-        spacing: 16
+        spacing: Theme.space16
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 12
+            spacing: Theme.space12
             Rectangle {
                 Layout.preferredWidth: 48
                 Layout.preferredHeight: 48
@@ -80,8 +80,8 @@ AppDialog {
             ColumnLayout {
                 id: releaseContent
                 anchors.fill: parent
-                anchors.margins: 16
-                spacing: 8
+                anchors.margins: Theme.space16
+                spacing: Theme.space8
                 Text {
                     Layout.fillWidth: true
                     text: root.controller.releaseName
@@ -155,27 +155,15 @@ AppDialog {
                 font.pixelSize: Theme.fontComponentTitle
                 horizontalAlignment: Text.AlignHCenter
             }
-            ProgressBar {
+            AppProgressBar {
                 visible: root.controller.state === "downloading"
                 Layout.fillWidth: true
                 from: 0
                 to: 100
                 value: root.controller.downloadProgress
                 indeterminate: root.controller.totalSize.length === 0
-                background: Rectangle {
-                    implicitHeight: 10
-                    radius: Theme.radiusTiny
-                    color: Theme.surfaceContainerHigh
-                }
-                contentItem: Item {
-                    implicitHeight: 10
-                    Rectangle {
-                        width: parent.width * root.controller.downloadProgress / 100
-                        height: parent.height
-                        radius: height / 2
-                        color: Theme.primary
-                    }
-                }
+                
+                
             }
             Text {
                 visible: root.controller.state === "downloading"
@@ -200,7 +188,7 @@ AppDialog {
             RowLayout {
                 anchors.fill: parent
                 anchors.margins: 18
-                spacing: 12
+                spacing: Theme.space12
                 MaterialIcon { icon: "error"; iconSize: 28; color: Theme.errorColor }
                 Text {
                     Layout.fillWidth: true
@@ -218,13 +206,13 @@ AppDialog {
             Item { Layout.fillWidth: true }
             PrimaryButton {
                 visible: root.controller.state === "available"
-                implicitWidth: 112; implicitHeight: 48; radius: height / 2
+                implicitWidth: 112; implicitHeight: Theme.controlHeightLarge; radius: Theme.radiusControl
                 text: "下次提醒"; iconName: "schedule"; tonal: true
                 onClicked: root.close()
             }
             PrimaryButton {
                 visible: root.controller.state === "available"
-                implicitWidth: 128; implicitHeight: 48; radius: height / 2
+                implicitWidth: 128; implicitHeight: Theme.controlHeightLarge; radius: Theme.radiusControl
                 text: "跳过此版本"; iconName: "skip_next"; tonal: true
                 onClicked: {
                     root.controller.skipVersion()
@@ -233,19 +221,19 @@ AppDialog {
             }
             PrimaryButton {
                 visible: root.controller.state === "available"
-                implicitWidth: 122; implicitHeight: 48; radius: height / 2
+                implicitWidth: 122; implicitHeight: Theme.controlHeightLarge; radius: Theme.radiusControl
                 text: "立即更新"; iconName: "download"
                 onClicked: root.controller.downloadUpdate()
             }
             PrimaryButton {
                 visible: root.controller.state === "downloading"
-                implicitWidth: 120; implicitHeight: 48; radius: height / 2
+                implicitWidth: 120; implicitHeight: Theme.controlHeightLarge; radius: Theme.radiusControl
                 text: "取消下载"; iconName: "close"; tonal: true
                 onClicked: root.controller.cancelDownload()
             }
             PrimaryButton {
                 visible: root.controller.state === "downloaded"
-                implicitWidth: 116; implicitHeight: 48; radius: height / 2
+                implicitWidth: 116; implicitHeight: Theme.controlHeightLarge; radius: Theme.radiusControl
                 text: "稍后安装"; iconName: "schedule"; tonal: true
                 onClicked: {
                     if (root.controller.installLater())
@@ -254,19 +242,19 @@ AppDialog {
             }
             PrimaryButton {
                 visible: root.controller.state === "downloaded"
-                implicitWidth: 150; implicitHeight: 48; radius: height / 2
+                implicitWidth: 150; implicitHeight: Theme.controlHeightLarge; radius: Theme.radiusControl
                 text: "安装并重启"; iconName: "restart_alt"
                 onClicked: root.controller.installAndRestart()
             }
             PrimaryButton {
                 visible: root.controller.state === "error"
-                implicitWidth: 104; implicitHeight: 48; radius: height / 2
+                implicitWidth: 104; implicitHeight: Theme.controlHeightLarge; radius: Theme.radiusControl
                 text: "关闭"; iconName: "close"; tonal: true
                 onClicked: root.close()
             }
             PrimaryButton {
                 visible: root.controller.state === "error"
-                implicitWidth: 112; implicitHeight: 48; radius: height / 2
+                implicitWidth: 112; implicitHeight: Theme.controlHeightLarge; radius: Theme.radiusControl
                 text: "重试"; iconName: "refresh"
                 onClicked: root.controller.retryUpdate()
             }

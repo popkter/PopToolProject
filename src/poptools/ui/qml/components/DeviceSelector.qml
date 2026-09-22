@@ -35,6 +35,7 @@ Column {
     function openDeviceMenu() {
         if (!root.controller || !root.toolId) return
         root.controller.refreshAndroidDevices()
+        if (root.deviceState.pluginMissing) return
         positionDeviceMenu()
         devicePopup.open()
         Qt.callLater(positionDeviceMenu)
@@ -43,14 +44,14 @@ Column {
     Text {
         text: "目标设备" + (root.requiredDevice ? " *" : "")
         color: Theme.textPrimary
-        font.pixelSize: 12
+        font.pixelSize: Theme.fontCaption
         font.weight: Font.DemiBold
     }
     Rectangle {
         id: selector
         width: parent.width
         height: 41
-        radius: 8
+        radius: Theme.radiusConsole
         color: selectorMouse.containsMouse ? Theme.surfaceContainer : Theme.surfaceContainerLow
         border.color: Theme.outlineVariant
         RowLayout {
@@ -67,14 +68,14 @@ Column {
                 Layout.minimumWidth: 0
                 text: root.deviceState.label
                 color: Theme.textPrimary
-                font.pixelSize: 13
+                font.pixelSize: Theme.fontSupporting
                 elide: Text.ElideMiddle
             }
             Text {
                 text: root.deviceState.available ? "已连接"
                     : root.deviceState.serial ? "不可用" : "未选择"
                 color: root.deviceState.available ? Theme.success : Theme.textSecondary
-                font.pixelSize: 11
+                font.pixelSize: Theme.fontSmall
             }
             MaterialIcon {
                 icon: devicePopup.opened ? "expand_less" : "expand_more"
@@ -97,7 +98,7 @@ Column {
             : root.deviceState.serial ? "原设备不可用，请重新连接或选择其他设备。"
             : "运行前请选择已连接的 Android 设备。"
         color: Theme.textSecondary
-        font.pixelSize: 11
+        font.pixelSize: Theme.fontSmall
         wrapMode: Text.WordWrap
     }
 
@@ -106,12 +107,12 @@ Column {
         objectName: "toolDevicePopup"
         parent: Overlay.overlay
         width: Math.min(root.width, Overlay.overlay ? Overlay.overlay.width - 16 : root.width)
-        padding: 8
+        padding: Theme.space8
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         background: AppPopupSurface { }
         onHeightChanged: { if (opened) root.positionDeviceMenu() }
         contentItem: ColumnLayout {
-            spacing: 8
+            spacing: Theme.space8
             RowLayout {
                 Layout.fillWidth: true
                 Text {
@@ -152,7 +153,7 @@ Column {
                     objectName: "deviceRow_" + modelData.serial
                     width: deviceList.width
                     height: 48
-                    radius: 6
+                    radius: Theme.radiusControl
                     color: modelData.serial === root.deviceState.serial
                         ? Theme.primaryContainer
                         : rowMouse.containsMouse ? Theme.surfaceContainerHigh : "transparent"

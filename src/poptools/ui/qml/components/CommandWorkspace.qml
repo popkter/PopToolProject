@@ -199,7 +199,7 @@ ColumnLayout {
 
                         Component {
                             id: normalField
-                            TextField {
+                            AppTextField {
                                 id: normalTextField
                                 readonly property bool pathPickerVisible:
                                     modelData.kind === "file" || modelData.kind === "directory"
@@ -392,7 +392,7 @@ ColumnLayout {
                                 radius: Theme.radiusMedium
                                 color: Theme.surface
                                 border.color: Theme.outline
-                                Switch {
+                                AppSwitch {
                                     anchors.fill: parent
                                     anchors.leftMargin: Theme.space12
                                     anchors.rightMargin: Theme.space12

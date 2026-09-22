@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import cast
@@ -21,7 +22,7 @@ from PySide6.QtWidgets import QFileDialog
 from poptools.infrastructure.config_store import ConfigStore
 from poptools.infrastructure.python_environment import PythonEnvironment
 from poptools.infrastructure.theme_catalog import ThemeCatalog
-from poptools.paths import package_root
+from poptools.paths import bundled_adb_path, bundled_scrcpy_path, package_root
 from poptools.runners import ExecutionCoordinator
 
 
@@ -35,6 +36,7 @@ class SettingsController(QObject):
     terminalEnabledChanged = Signal()
     userGuideSeenChanged = Signal()
     scriptsImported = Signal()
+    pluginsChanged = Signal()
     consoleMessage = Signal(str)
 
     def __init__(
@@ -63,12 +65,21 @@ class SettingsController(QObject):
             config_store.set_theme_style(self._theme_style)
         self._terminal_enabled = config_store.terminal_enabled()
         self._system_dark_theme = False
+        self._plugin_controller = None
+        if sys.platform == "win32":
+            from poptools.infrastructure.plugin_service import PluginService
+            from poptools.viewmodels.plugin_controller import PluginController
+            self._plugin_controller = PluginController(PluginService(config_store.paths), self)
 
         application = cast(QGuiApplication | None, QGuiApplication.instance())
         if application is not None:
             style_hints = application.styleHints()
             self._system_dark_theme = style_hints.colorScheme() == Qt.ColorScheme.Dark
             style_hints.colorSchemeChanged.connect(self._on_system_color_scheme_changed)
+
+    @Property(QObject, notify=pluginsChanged)
+    def pluginManager(self):
+        return self._plugin_controller
 
     @Property(str, constant=True)
     def configurationDirectory(self) -> str:
@@ -85,6 +96,30 @@ class SettingsController(QObject):
     @Property(str)
     def pythonEnvironmentStatus(self) -> str:
         return self.python_environment.state().status
+
+    @Property(list, notify=configurationStatusChanged)
+    def runtimePlugins(self) -> list[dict[str, object]]:
+        if self._plugin_controller:
+            return [{**row, "available": row["installed"]}
+                    for row in self._plugin_controller.plugins]
+        python = self.python_environment.state()
+        return [
+            {"name": "Python", "available": python.available,
+             "path": python.executable, "status": python.status},
+            {"name": "adb-platform-tools", "available": bundled_adb_path().is_file(),
+             "path": str(bundled_adb_path()), "status": "随应用提供的 Android 调试工具"},
+            {"name": "scrcpy", "available": bundled_scrcpy_path().is_file(),
+             "path": str(bundled_scrcpy_path()), "status": "随应用提供的屏幕镜像工具"},
+        ]
+
+    @Slot(str, result=bool)
+    def openRuntimeDirectory(self, name: str) -> bool:
+        for plugin in self.runtimePlugins:
+            if plugin["name"] == name and plugin["available"]:
+                return QDesktopServices.openUrl(
+                    QUrl.fromLocalFile(str(Path(str(plugin["path"])).parent))
+                )
+        return False
 
     @Property(int, notify=customScriptConcurrencyChanged)
     def customScriptConcurrency(self) -> int:
@@ -110,9 +145,31 @@ class SettingsController(QObject):
     def userGuideSeen(self) -> bool:
         return self.config_store.user_guide_seen()
 
-    @Property(QUrl, constant=True)
-    def userGuideUrl(self) -> QUrl:
-        return QUrl.fromLocalFile(str(package_root() / "resources" / "help" / "guide.html"))
+    @Property("QVariantList", constant=True)
+    def userGuideSections(self) -> list[dict]:
+        source = package_root() / "resources" / "help" / "guide.json"
+        return json.loads(source.read_text(encoding="utf-8"))
+
+    @Slot(str, "QVariantMap", result="QVariantMap")
+    def previewGuideTemplate(self, template: str, values: dict) -> dict:
+        from poptools.domain.parameter_templates import render_template, synchronize_parameters
+        try:
+            parameters = synchronize_parameters([template])
+            resolved = {p.id: values.get(p.id, p.default or "") for p in parameters}
+            return {"parameters": [p.model_dump(mode="json") for p in parameters],
+                    "result": render_template(template, resolved), "error": ""}
+        except ValueError as exc:
+            return {"parameters": [], "result": "", "error": str(exc)}
+
+    @Slot(str)
+    def copyGuideText(self, text: str) -> None:
+        QGuiApplication.clipboard().setText(text)
+
+    @Slot(str, result=str)
+    def chooseGuidePath(self, kind: str) -> str:
+        if kind == "directory":
+            return QFileDialog.getExistingDirectory(None, "选择文件夹")
+        return QFileDialog.getOpenFileName(None, "选择文件")[0]
 
     @Property(bool, notify=themeChanged)
     def darkTheme(self) -> bool:

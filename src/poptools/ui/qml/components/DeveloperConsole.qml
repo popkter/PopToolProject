@@ -12,9 +12,9 @@ Item {
     required property var controller
     required property var parentWindow
     signal createScriptRequested(string command, string kind)
-    readonly property int terminalToolbarControlHeight: 40
-    readonly property real terminalTabMaximumWidth: 240
-    readonly property real terminalTabMinimumWidth: 120
+    readonly property int terminalToolbarControlHeight: 32
+    readonly property real terminalTabMaximumWidth: Theme.terminalTabMaximumWidth
+    readonly property real terminalTabMinimumWidth: Theme.terminalTabMinimumWidth
     readonly property real responsiveTerminalTabWidth: {
         var tabCount = Math.max(1, root.controller.terminalTabs.length)
         var addButtonWidth = terminalTabAddButton.width
@@ -169,7 +169,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             radius: 0
-            color: Theme.consoleBackground
+            color: Theme.terminalBackground
             clip: true
 
             ColumnLayout {
@@ -178,18 +178,19 @@ Item {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 44
+                    Layout.preferredHeight: Theme.terminalToolbarHeight
                     radius: 0
-                    color: Theme.darkMode ? Theme.surface : "#F0F1F3"
+                    color: Theme.terminalToolbar
 
                     RowLayout {
                         z: 1
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.bottom: parent.bottom
+                        anchors.top: parent.top
+                        anchors.topMargin: 2
                         height: root.terminalToolbarControlHeight
-                        anchors.leftMargin: 8
-                        anchors.rightMargin: 8
+                        anchors.leftMargin: Theme.space4
+                        anchors.rightMargin: Theme.space8
                         spacing: 0
 
                         Item {
@@ -220,7 +221,7 @@ Item {
                                 Row {
                                     id: terminalTabs
                                     anchors.verticalCenter: parent.verticalCenter
-                                    spacing: 4
+                                    spacing: Theme.space8
                                     Repeater {
                                         model: root.controller.terminalTabs
                                         delegate: Rectangle {
@@ -228,43 +229,43 @@ Item {
                                             required property int index
                                             required property var modelData
                                             width: root.responsiveTerminalTabWidth
-                                            height: 34
-                                            radius: 6
-                                            color: modelData.active ? Theme.surfaceContainerLow
+                                            height: 32
+                                            radius: Theme.radiusControl
+                                            color: modelData.active ? Theme.terminalBackground
                                                 : tabHover.hovered
-                                                  ? (Theme.darkMode ? Theme.surfaceContainerHigh : "#E3E7EC")
-                                                  : "transparent"
+                                                  ? (Theme.terminalTabSelected)
+                                                  : Theme.terminalTabSelected
                                             border.width: modelData.active ? 1 : 0
-                                            border.color: Theme.darkMode ? Theme.outlineVariant : "#E1E5EA"
+                                            border.color: Theme.terminalTabBorder
                                             HoverHandler { id: tabHover }
                                             RowLayout {
                                                 z: 1
-                                                anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 8; spacing: 6
+                                                anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: Theme.space8; spacing: 6
                                                 Text {
                                                     Layout.fillWidth: true
                                                     Layout.minimumWidth: 0
                                                     visible: root.renamingTabId !== tab.modelData.tabId
                                                     text: tab.modelData.title || "Android 调试"
                                                     color: tab.modelData.active
-                                                        ? (Theme.darkMode ? Theme.textPrimary : "#404750")
-                                                        : (Theme.darkMode ? Theme.textSecondary : "#6B737D")
-                                                    font.pixelSize: 13
+                                                        ? Theme.consoleText
+                                                        : (Theme.terminalTabMuted)
+                                                    font.pixelSize: Theme.fontSupporting
                                                     elide: Text.ElideRight
                                                 }
-                                                TextField {
+                                                AppTextField {
                                                     id: renameField
                                                     Layout.fillWidth: true
                                                     Layout.minimumWidth: 0
                                                     Layout.preferredHeight: 28
                                                     visible: root.renamingTabId === tab.modelData.tabId
-                                                    color: Theme.darkMode ? Theme.textPrimary : "#404750"
-                                                    font.pixelSize: 13
+                                                    color: Theme.terminalTabText
+                                                    font.pixelSize: Theme.fontSupporting
                                                     leftPadding: 6; rightPadding: 6; topPadding: 0; bottomPadding: 0
                                                     selectByMouse: true
                                                     background: Rectangle {
-                                                        radius: 4
+                                                        radius: Theme.radiusTiny
                                                         color: Theme.surfaceContainerLow
-                                                        border.color: Theme.darkMode ? Theme.primary : "#1478E8"
+                                                        border.color: Theme.primary
                                                         border.width: 1
                                                     }
                                                     onVisibleChanged: if (visible) {
@@ -283,7 +284,7 @@ Item {
                                                     }
                                                 }
                                                 PrimaryButton {
-                                                    visible: root.controller.terminalTabs.length > 1
+                                                    visible: true
                                                     opacity: tab.modelData.active || tabHover.hovered ? 1 : 0
                                                     enabled: opacity > 0
                                                     Layout.preferredWidth: 20
@@ -293,12 +294,12 @@ Item {
                                                     iconName: "close"
                                                     glyphSize: 15
                                                     tonal: true
-                                                    foregroundColor: Theme.darkMode ? Theme.textSecondary : "#7A838D"
+                                                    foregroundColor: Theme.terminalTabAction
                                                     color: hovered
-                                                        ? (Theme.darkMode ? Theme.surfaceContainerHigh : "#E8ECF1")
+                                                        ? (Theme.terminalTabHover)
                                                         : "transparent"
                                                     border.width: 0
-                                                    radius: 4
+                                                    radius: Theme.radiusTiny
                                                     onClicked: root.controller.closeTerminalTab(tab.modelData.tabId)
                                                 }
                                             }
@@ -328,7 +329,7 @@ Item {
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 width: 1
                                                 height: 20
-                                                color: Theme.darkMode ? Theme.outlineVariant : "#D8DDE3"
+                                                color: Theme.terminalTabDivider
                                                 opacity: 1
                                                 visible: !tab.modelData.active
                                                     && tab.index < root.controller.terminalTabs.length - 1
@@ -342,9 +343,7 @@ Item {
                             PrimaryButton {
                                 id: terminalTabAddButton
                                 z: 4
-                                x: Math.max(0, Math.min(
-                                    terminalTabs.implicitWidth + terminalTabs.spacing,
-                                    parent.width - width))
+                                x: Math.max(0, parent.width - width)
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 32
                                 height: 32
@@ -354,10 +353,10 @@ Item {
                                 iconName: "add"
                                 glyphSize: 20
                                 tonal: true
-                                foregroundColor: Theme.darkMode ? Theme.primaryText : "#1478E8"
+                                foregroundColor: Theme.navigationActiveIcon
                                 border.width: 1
-                                border.color: hovered ? (Theme.darkMode ? Theme.primary : "#88BFFF")
-                                    : (Theme.darkMode ? Theme.outlineVariant : "#E0E5EB")
+                                border.color: hovered ? (Theme.navigationActiveBorder)
+                                    : (Theme.navigationBorder)
                                 color: pressed ? Theme.primaryContainerHover
                                     : hovered ? Theme.primaryContainer : Theme.surfaceContainerLow
                                 enabled: root.controller.canCreateTerminalTab
@@ -394,13 +393,14 @@ Item {
 
                     TerminalView {
                         id: terminalView
+                        visible: root.controller.terminalTabs.length > 0
                         anchors.fill: parent
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-                        anchors.topMargin: 8
+                        anchors.leftMargin: Theme.space8
+                        anchors.rightMargin: Theme.space8
+                        anchors.topMargin: Theme.space8
                         anchors.bottomMargin: 10
                         sessionId: root.controller.activeTerminalTabId
-                        fontSize: 14
+                        fontSize: Theme.fontBody
                         focus: true
                         Accessible.role: Accessible.EditableText
                         Accessible.name: "开发者终端"
@@ -415,8 +415,37 @@ Item {
                         onContextMenuRequested: function(x, y) { terminalContextMenu.popup(x, y) }
                     }
 
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        width: Math.min(360, parent.width - Theme.space32)
+                        visible: root.controller.terminalTabs.length === 0
+                        spacing: Theme.space16
+                        MaterialIcon {
+                            Layout.alignment: Qt.AlignHCenter
+                            icon: "terminal"; iconSize: 40; color: Theme.consoleMuted
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "没有打开的终端"
+                            color: Theme.consoleText; font.pixelSize: Theme.fontSectionTitle
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: "可以前往设置管理插件，或新建终端继续使用。"
+                            color: Theme.consoleMuted; font.pixelSize: Theme.fontBody
+                            horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
+                        }
+                        PrimaryButton {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "新建终端"; iconName: "add"
+                            onClicked: root.controller.createTerminalTab()
+                        }
+                    }
+
                     DropArea {
                         id: terminalPathDropArea
+                        enabled: root.controller.terminalTabs.length > 0
                         anchors.fill: terminalView
                         z: 2
                         onEntered: function(drag) {
@@ -438,7 +467,7 @@ Item {
                             anchors.fill: parent
                             visible: terminalPathDropArea.containsDrag
                             radius: Theme.radiusSmall
-                            color: "#331B78F2"
+                            color: Theme.terminalDropHighlight
                             border.color: Theme.primary
                             border.width: 2
 
@@ -487,6 +516,12 @@ Item {
                                 !root.controller.powerShellHistoryListViewEnabled)
                         }
                         AppMenuItem { text: "停止当前命令"; destructive: true; enabled: root.controller.running; onTriggered: root.controller.interrupt() }
+                        AppMenuItem {
+                            text: "停止所有终端会话"
+                            destructive: true
+                            enabled: root.controller.terminalTabs.some(function(tab) { return tab.running })
+                            onTriggered: root.controller.stop()
+                        }
                     }
                 }
             }

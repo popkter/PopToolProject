@@ -131,6 +131,8 @@ class DeveloperConsoleController(QObject):
         self._plugin_install_thread: PowerShellPluginInstallThread | None = None
         self._plugin_install_progress = 0
         self._plugin_install_status = ""
+        self._plugin_manager = None
+        self._managed_terminal_install_requested = False
         self._create_tab(activate=True)
 
     @Property(str, notify=outputChanged)
@@ -178,21 +180,28 @@ class DeveloperConsoleController(QObject):
 
     @Property(bool, notify=pluginStateChanged)
     def pluginInstalling(self) -> bool:
+        if self._plugin_manager:
+            return "powershell" in self._plugin_manager._jobs
         return self._plugin_install_thread is not None
 
     @Property(int, notify=pluginStateChanged)
     def pluginInstallProgress(self) -> int:
+        if self._plugin_manager:
+            return self._plugin_manager._progress.get("powershell", 0)
         return self._plugin_install_progress
 
     @Property(str, notify=pluginStateChanged)
     def pluginInstallStatus(self) -> str:
+        if self._plugin_manager:
+            return (self._plugin_manager._errors.get("powershell")
+                    or self._plugin_manager._actions.get("powershell", ""))
         return self._plugin_install_status
 
-    @Property(str, constant=True)
+    @Property(str, notify=pluginStateChanged)
     def pluginVersion(self) -> str:
         return self._plugin.package.version if self._plugin is not None else "macOS Shell"
 
-    @Property(str, constant=True)
+    @Property(str, notify=pluginStateChanged)
     def pluginDirectory(self) -> str:
         return str(self._plugin.install_directory) if self._plugin is not None else ""
 
@@ -234,6 +243,11 @@ class DeveloperConsoleController(QObject):
 
     @Slot(result=bool)
     def installPowerShellPlugin(self) -> bool:
+        if self._plugin_manager:
+            self._managed_terminal_install_requested = self._plugin_manager.operate(
+                "powershell", "install"
+            )
+            return self._managed_terminal_install_requested
         if self._plugin is None:
             self.terminalAccessGranted.emit()
             return True
@@ -256,6 +270,9 @@ class DeveloperConsoleController(QObject):
 
     @Slot(result=bool)
     def cancelPowerShellPluginInstall(self) -> bool:
+        if self._plugin_manager:
+            self._plugin_manager.cancel("powershell")
+            return True
         thread = self._plugin_install_thread
         if thread is None:
             return False
@@ -264,14 +281,24 @@ class DeveloperConsoleController(QObject):
         self.pluginStateChanged.emit()
         return True
 
+    def onManagedPluginCompleted(self, plugin, success, message):
+        if plugin == "powershell" and self._managed_terminal_install_requested:
+            self._managed_terminal_install_requested = False
+            self.pluginInstallFinished.emit(success, message)
+            if success and self.pluginInstalled:
+                self.terminalAccessGranted.emit()
+
     @Slot(result=bool)
     def ensureStarted(self) -> bool:
         tab = self._active_tab()
         if tab is None:
-            tab = self._create_tab(activate=True)
+            return False
         return self._ensure_tab_started(tab)
 
     def _ensure_tab_started(self, tab: TerminalTabState) -> bool:
+        if self._plugin_manager and self._plugin_manager.mutating:
+            self._append_to_tab(tab, "插件正在变更，请等待操作完成后再打开终端。\n")
+            return False
         if tab not in self._tabs or self._shutdown_pending:
             return False
         if tab.session is not None:
@@ -288,11 +315,6 @@ class DeveloperConsoleController(QObject):
             arguments = ["-i"]
         else:
             shell = self._plugin.executable
-            if not python_executable or not pip_executable:
-                message = "Python 环境不可用，请重新启动应用完成初始化。\n"
-                if not tab.output.endswith(message):
-                    self._append_to_tab(tab, message)
-                return False
             # Keep PowerShell's normal startup behavior so the four standard
             # $PROFILE scopes are loaded before the PopTools bootstrap script.
             arguments = [
@@ -303,16 +325,11 @@ class DeveloperConsoleController(QObject):
                 "-File",
                 str(resource_path("tools", "powershell-terminal-profile.ps1")),
             ]
-        if not python_executable or not pip_executable:
-            message = "Python 环境不可用，请重新启动应用完成初始化。\n"
-            if not tab.output.endswith(message):
-                self._append_to_tab(tab, message)
-            return False
         environment = self._terminal_environment()
         environment.update(
             {
-                "POPTOOLS_PYTHON": python_executable,
-                "POPTOOLS_PIP": pip_executable,
+                "POPTOOLS_PYTHON": python_executable or "",
+                "POPTOOLS_PIP": pip_executable or "",
                 "PYTHONUTF8": "1",
                 "PYTHONIOENCODING": "utf-8",
                 "PYTHONUNBUFFERED": "1",
@@ -361,6 +378,7 @@ class DeveloperConsoleController(QObject):
 
     def _terminal_environment(self) -> dict[str, str]:
         environment = self.python_environment.execution_environment()
+        environment.pop("POPTOOLS_ADB", None)
         adb_executable = bundled_adb_path()
         if adb_executable.is_file():
             environment["POPTOOLS_ADB"] = str(adb_executable)
@@ -616,7 +634,7 @@ class DeveloperConsoleController(QObject):
             self._closing_tabs[tab.tab_id] = tab
             tab.session.stop_process()
         if not self._tabs:
-            self._create_tab(activate=True, emit=False)
+            self._active_tab_id = ""
         elif was_active:
             self._active_tab_id = self._tabs[min(index, len(self._tabs) - 1)].tab_id
         self.terminalTabsChanged.emit()

@@ -79,7 +79,7 @@ ColumnLayout {
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
     }
-    TextField {
+    AppTextField {
         id: recordingDirectoryField
         Layout.fillWidth: true
         Layout.leftMargin: Theme.space40
@@ -92,7 +92,7 @@ ColumnLayout {
         leftPadding: 13
         rightPadding: 45
         background: Rectangle {
-            radius: 7
+            radius: Theme.radiusSmall
             color: Theme.surfaceContainerLow
             border.color: parent.activeFocus ? Theme.primary : "#A8CFFF"
             border.width: parent.activeFocus ? 2 : 1
@@ -118,7 +118,7 @@ ColumnLayout {
             tonal: true
             foregroundColor: Theme.primaryText
             border.width: 0
-            radius: 6
+            radius: Theme.radiusControl
             z: 201
             color: hovered ? Theme.primaryContainerHover : Theme.primaryContainer
             onClicked: root.controller.chooseRecordingOutputDirectory()

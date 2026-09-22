@@ -71,6 +71,13 @@ UNUSED_CONTROL_STYLE_BINARIES = (
 def keep_qt_entry(entry):
     destination = entry[0].replace("\\", "/").lower()
     destination = destination.replace("pyside6/qt/qml/", "pyside6/qml/")
+    # The user guide uses native Qt Quick controls, so no browser runtime is needed.
+    if any(token in destination for token in ("webengine", "webchannel", "webview")):
+        return False
+    if destination.startswith(("pyside6/resources/", "pyside6/qt/resources/")):
+        filename = destination.rsplit("/", 1)[-1]
+        if filename == "icudtl.dat" or "devtools" in filename or ".debug." in filename or filename.startswith("v8_context_snapshot"):
+            return False
     # Qt uses the Windows ICU compatibility DLLs from System32. Build-machine
     # tools such as Poppler may prepend incompatible ICU DLLs to PATH, which
     # PyInstaller would otherwise collect beside the application.
@@ -171,6 +178,10 @@ analysis = Analysis(
         "PIL",
         "PyInstaller",
         "PySide6.QtWebEngineWidgets",
+        "PySide6.QtWebEngineCore",
+        "PySide6.QtWebEngineQuick",
+        "PySide6.QtWebChannel",
+        "PySide6.QtWebView",
     ],
     noarchive=False,
     optimize=1,

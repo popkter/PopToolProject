@@ -24,10 +24,16 @@ GITHUB_LATEST_RELEASE_URL = (
 
 
 def update_asset_name(
-    system: str | None = None, machine: str | None = None
+    system: str | None = None, machine: str | None = None, edition: str | None = None
 ) -> str:
     host = (system or sys.platform).lower()
     if host in {"win32", "windows"}:
+        if edition is None and getattr(sys, "frozen", False):
+            metadata = Path(sys.executable).parent / "edition.json"
+            if metadata.exists():
+                edition = json.loads(metadata.read_text(encoding="utf-8")).get("edition")
+        if edition == "Clean":
+            return "PopTools-Clean-Setup.exe"
         return "PopTools-Setup.exe"
     if host in {"darwin", "macos"}:
         architecture = "arm64" if (machine or platform.machine()).lower() in {

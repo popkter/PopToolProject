@@ -77,15 +77,35 @@ def _prepare_installed_runtime() -> int:
     paths = AppPaths.from_environment()
     try:
         paths.ensure()
-        prepare_bundled_android_tools(paths)
-        prepare_managed_python(paths)
+        if sys.platform == "win32":
+            from poptools.infrastructure.plugin_service import PluginService
+            service = PluginService(paths)
+            service.migrate()
+            service.seed()
+        else:
+            prepare_bundled_android_tools(paths)
+            prepare_managed_python(paths)
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"runtime preparation failed: {exc}", file=sys.stderr)
+        paths.logs_dir.mkdir(parents=True, exist_ok=True)
+        (paths.logs_dir / "plugin-preparation.log").write_text(str(exc), encoding="utf-8")
         return 1
     return 0
 
 
 def main() -> int:
+    if "--migrate-plugins" in sys.argv:
+        from poptools.infrastructure.plugin_service import PluginService
+        try:
+            directory = Path(sys.argv[sys.argv.index("--migrate-plugins") + 1])
+            PluginService(AppPaths.from_environment()).migrate(directory)
+            return 0
+        except Exception as exc:
+            print(f"Plugin migration failed: {exc}", file=sys.stderr)
+            logs = AppPaths.from_environment().logs_dir
+            logs.mkdir(parents=True, exist_ok=True)
+            (logs / "plugin-migration.log").write_text(str(exc), encoding="utf-8")
+            return 1
     if "--prepare-runtime" in sys.argv:
         return _prepare_installed_runtime()
 
@@ -119,9 +139,6 @@ def main() -> int:
         return 0
 
     try:
-        from PySide6.QtWebEngineQuick import QtWebEngineQuick
-
-        QtWebEngineQuick.initialize()
         app = QApplication(sys.argv)
         pending_update_result = apply_pending_update(
             ConfigStore(paths),
@@ -152,9 +169,20 @@ def main() -> int:
         )
         app.setWindowIcon(tray_controller.icon)
 
-        prepare_bundled_android_tools(paths)
         python_setup_error = ""
-        if getattr(sys, "frozen", False):
+        if sys.platform == "win32":
+            from poptools.infrastructure.plugin_service import PluginService
+            service = PluginService(paths)
+            try:
+                service.recover()
+                service.migrate()
+                service.seed()
+            except (OSError, RuntimeError, ValueError) as exc:
+                python_setup_error = str(exc)
+                logger.exception("插件初始化失败，保留现有环境")
+        else:
+            prepare_bundled_android_tools(paths)
+        if sys.platform != "win32" and getattr(sys, "frozen", False):
             try:
                 prepare_managed_python(paths)
             except (OSError, RuntimeError, ValueError) as exc:
@@ -173,7 +201,7 @@ def main() -> int:
         app.aboutToQuit.connect(jira_feishu_controller.shutdown)
         tray_controller.set_app_controller(controller)
         if python_setup_error:
-            settings_controller.setStatus(f"Python 环境初始化失败：{python_setup_error}")
+            settings_controller.setStatus(f"运行环境初始化失败：{python_setup_error}")
 
         engine = QQmlApplicationEngine()
         engine.rootContext().setContextProperty("appController", controller)

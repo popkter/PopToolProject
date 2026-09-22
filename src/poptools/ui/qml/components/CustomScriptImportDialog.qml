@@ -14,8 +14,10 @@ AppDialog {
     property string errorMessage: ""
     signal scriptReplaced(string title)
 
-    width: Math.min(368, parentWindow.width - 24)
-    height: Math.min(root.replacementMode ? 236 : 216, parentWindow.height - 24)
+    width: Math.min(Theme.dialogWidth, parentWindow.width - 24)
+    height: Math.min(body.implicitHeight + topPadding + bottomPadding, parentWindow.height - 24)
+    leftPadding: Theme.space16
+    rightPadding: Theme.space16
     anchors.centerIn: Overlay.overlay
     modal: true
     closePolicy: Popup.CloseOnEscape
@@ -38,17 +40,13 @@ AppDialog {
     onClosed: root.controller.cancelScriptImportReplacement()
 
     contentItem: ColumnLayout {
-        spacing: Theme.space12
+        id: body
+        spacing: Theme.space16
 
         RowLayout {
             Layout.fillWidth: true
             spacing: Theme.space12
 
-            MaterialIcon {
-                icon: root.replacementMode ? "content_copy" : "error"
-                iconSize: 24
-                color: root.replacementMode ? Theme.primary : Theme.errorColor
-            }
             Text {
                 Layout.fillWidth: true
                 text: root.replacementMode ? "发现相同 ID 的脚本" : "无法导入脚本"
@@ -64,34 +62,35 @@ AppDialog {
                     + root.existingTitle + "”使用相同 ID。是否替换现有脚本？"
                   : root.errorMessage
             color: Theme.textSecondary
-            font.pixelSize: Theme.fontBody
+            font.pixelSize: Theme.fontDialogDescription
             wrapMode: Text.WordWrap
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: 1
-            color: Theme.outlineVariant
         }
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: Theme.space12
+            spacing: Theme.space16
 
             PrimaryButton {
                 Layout.fillWidth: true
-                implicitHeight: 44
+                Layout.preferredWidth: 0
+                implicitHeight: Theme.controlHeightLarge
+                radius: Theme.radiusMedium
                 text: root.replacementMode ? "取消" : "关闭"
-                iconName: "close"
+                iconName: ""
                 tonal: true
+                color: Theme.surfaceContainerLow
+                border.color: Theme.outline
+                foregroundColor: Theme.textPrimary
                 onClicked: root.close()
             }
             PrimaryButton {
                 Layout.fillWidth: true
+                Layout.preferredWidth: 0
                 visible: root.replacementMode
-                implicitHeight: 44
+                implicitHeight: Theme.controlHeightLarge
+                radius: Theme.radiusMedium
                 text: "确认替换"
-                iconName: "sync"
+                iconName: ""
                 onClicked: {
                     var result = root.controller.confirmScriptImportReplacement()
                     if (result.status === "error") {

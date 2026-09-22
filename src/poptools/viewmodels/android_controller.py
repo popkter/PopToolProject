@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 
 from poptools.infrastructure.android_device_service import (
@@ -7,12 +9,14 @@ from poptools.infrastructure.android_device_service import (
     AndroidProcessService,
 )
 from poptools.infrastructure.config_store import ConfigStore
+from poptools.paths import bundled_adb_path
 
 
 class AndroidController(QObject):
     """Share discovery while keeping device preferences isolated by tool ID."""
 
     stateChanged = Signal()
+    pluginManagementRequested = Signal()
 
     def __init__(
         self,
@@ -24,6 +28,7 @@ class AndroidController(QObject):
         super().__init__(parent)
         self.config_store = config_store
         self._device_service = device_service or AndroidDeviceService(self)
+        self._managed_discovery = device_service is None and sys.platform == "win32"
         self._process_service = process_service or AndroidProcessService(self)
         self._tool_devices = config_store.android_tool_devices()
         self._manual_device_refreshing = False
@@ -34,7 +39,7 @@ class AndroidController(QObject):
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setInterval(5000)
         self._refresh_timer.timeout.connect(self._refresh_android_devices_silently)
-        self._refresh_timer.start()
+        self.refreshPluginAvailability()
         self._on_devices_changed()
         # The service already starts work asynchronously. Calling it directly avoids
         # leaving a context-free singleShot callback behind when a short-lived
@@ -51,6 +56,9 @@ class AndroidController(QObject):
 
     @Slot(str, result="QVariantMap")
     def deviceForTool(self, tool_id: str) -> dict[str, object]:
+        if self._managed_discovery and not bundled_adb_path().is_file():
+            return {"serial": "", "available": False, "pluginMissing": True,
+                    "label": "请先安装 Android 工具插件"}
         serial = self._tool_devices.get(tool_id, "")
         devices = self._device_service.devices
         if tool_id and not serial and len(devices) == 1:
@@ -76,6 +84,14 @@ class AndroidController(QObject):
     @Slot()
     def refreshAndroidDevices(self) -> None:
         """Refresh from an explicit user action and expose its progress to QML."""
+        if not getattr(self, "resume_plugin_discovery", lambda: True)():
+            return
+        if not getattr(self, "plugin_discovery_allowed", lambda: True)():
+            self.pluginManagementRequested.emit()
+            return
+        if self._managed_discovery and not bundled_adb_path().is_file():
+            self.pluginManagementRequested.emit()
+            return
         already_refreshing = self._device_service.refreshing
         self._manual_device_refreshing = True
         self._device_service.refresh()
@@ -107,7 +123,22 @@ class AndroidController(QObject):
 
     def _refresh_android_devices_silently(self) -> None:
         """Poll devices without publishing a transient scanning state to the UI."""
+        if not getattr(self, "plugin_discovery_allowed", lambda: True)():
+            return
+        if self._managed_discovery and not bundled_adb_path().is_file():
+            return
         self._device_service.refresh()
+
+    def refreshPluginAvailability(self):
+        if not getattr(self, "plugin_discovery_allowed", lambda: True)():
+            self._refresh_timer.stop()
+            return
+        if self._managed_discovery and not bundled_adb_path().is_file():
+            self._refresh_timer.stop()
+            self._device_service._set_devices([])
+        elif not self._refresh_timer.isActive():
+            self._refresh_timer.start()
+        self.stateChanged.emit()
 
     def _on_device_refreshing_changed(self) -> None:
         if not self._manual_device_refreshing:

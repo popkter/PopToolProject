@@ -141,7 +141,7 @@ DesktopScrollView {
                 }
             }
 
-            TextField {
+            AppTextField {
                 id: colorInput
                 objectName: "colorValueInput"
                 Layout.fillWidth: true
@@ -328,7 +328,7 @@ DesktopScrollView {
                 font.pixelSize: Theme.fontBody
             }
 
-            Slider {
+            AppSlider {
                 id: alphaSlider
                 Layout.fillWidth: true
                 from: 0

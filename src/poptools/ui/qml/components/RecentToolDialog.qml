@@ -83,7 +83,7 @@ Window {
     Rectangle {
         id: contentRect
         anchors.fill: parent
-        anchors.margins: 8
+        anchors.margins: Theme.space8
         radius: Theme.radiusLarge
         color: Theme.darkMode ? Theme.surfaceContainer : Theme.surface
         clip: true
@@ -111,9 +111,9 @@ Window {
                 // Title text
                 Text {
                     anchors.left: parent.left
-                    anchors.leftMargin: 20
+                    anchors.leftMargin: Theme.space20
                     anchors.right: titleButtons.left
-                    anchors.rightMargin: 12
+                    anchors.rightMargin: Theme.space12
                     anchors.verticalCenter: parent.verticalCenter
                     text: appController.selectedTool.title || "运行工具"
                     color: Theme.textPrimary
@@ -128,7 +128,7 @@ Window {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
-                    spacing: 4
+                    spacing: Theme.space4
 
                     // ── Custom command run button ─────────
                     PrimaryButton {
@@ -214,7 +214,7 @@ Window {
                     id: bodyContent
                     anchors.fill: parent
                     anchors.bottomMargin: consolePanel.visible ? consolePanel.height : 0
-                    spacing: 12
+                    spacing: Theme.space12
 
                     Text {
                         Layout.fillWidth: true
