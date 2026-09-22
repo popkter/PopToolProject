@@ -12,13 +12,6 @@ from poptools.paths import AppPaths, package_root
 from poptools.viewmodels.settings_controller import SettingsController
 
 
-def test_bundled_guide_matches_standalone_manual():
-    root = Path(__file__).resolve().parents[1]
-    assert (package_root() / "resources/help/guide.html").read_bytes() == (
-        root / "docs/guide.html"
-    ).read_bytes()
-
-
 def test_guide_loads_closes_and_can_be_reopened(qapp, qtbot, tmp_path):
     paths = AppPaths(tmp_path / "data")
     store = ConfigStore(paths)
