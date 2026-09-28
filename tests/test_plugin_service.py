@@ -6,6 +6,7 @@ import json
 import sys
 import zipfile
 from dataclasses import asdict
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -102,19 +103,65 @@ def test_checksum_failure_never_activates(service, monkeypatch):
     assert service.record("powershell") == {}
 
 
-def test_verified_download_and_extraction(service, monkeypatch):
+@pytest.mark.parametrize("inner", ["", "tools"])
+def test_verified_download_and_extraction(service, monkeypatch, inner):
     contents = io.BytesIO()
     with zipfile.ZipFile(contents, "w") as archive:
-        archive.writestr("pwsh.exe", b"binary")
+        archive.writestr(f"{inner}/pwsh.exe" if inner else "pwsh.exe", b"binary")
+        archive.writestr(
+            f"{inner}/Modules/module.txt" if inner else "Modules/module.txt", b"module"
+        )
     data = contents.getvalue()
     response = io.BytesIO(data)
     response.headers = {"Content-Length": str(len(data))}
     monkeypatch.setattr(plugins.urllib.request, "urlopen", lambda *args, **kwargs: response)
     candidate = PluginPackage(
-        "7.6.6", "https://example.test/pwsh.zip", hashlib.sha256(data).hexdigest()
+        "7.6.6", "https://example.test/pwsh.zip", hashlib.sha256(data).hexdigest(), inner=inner
     )
     service.install("powershell", candidate)
     assert service.executable("powershell").read_bytes() == b"binary"
+    directory = service.directory("powershell")
+    assert (directory / "runtime/Modules/module.txt").read_bytes() == b"module"
+    assert not (directory / "download.zip").exists()
+    assert not (directory / "unpacked").exists()
+    assert not (directory / ".pending").exists()
+
+
+@pytest.mark.parametrize("validation_fails", [False, True])
+def test_powershell_download_does_not_rename_locked_directory(
+    service, tmp_path, monkeypatch, validation_fails
+):
+    service.install("powershell", package(), source=runtime(tmp_path))
+    previous = service.record("powershell")
+    contents = io.BytesIO()
+    with zipfile.ZipFile(contents, "w") as archive:
+        archive.writestr("pwsh.exe", b"updated binary")
+    data = contents.getvalue()
+    response = io.BytesIO(data)
+    response.headers = {}
+    monkeypatch.setattr(plugins.urllib.request, "urlopen", lambda *args, **kwargs: response)
+
+    def deny_directory_rename(path, destination):
+        raise PermissionError(13, "[WinError 5] Access is denied", str(path))
+
+    monkeypatch.setattr(Path, "rename", deny_directory_rename)
+    candidate = PluginPackage(
+        "7.6.6", "https://example.test/pwsh.zip", hashlib.sha256(data).hexdigest()
+    )
+    if validation_fails:
+        def fail(*args):
+            raise RuntimeError("invalid binary")
+
+        monkeypatch.setattr(service, "_run", fail)
+        with pytest.raises(RuntimeError, match="invalid binary"):
+            service.install("powershell", candidate)
+        assert service.record("powershell") == previous
+        assert service.executable("powershell").read_bytes() == b"executable"
+    else:
+        service.install("powershell", candidate)
+        assert service.executable("powershell").read_bytes() == b"updated binary"
+        assert service.record("powershell")["package"]["version"] == "7.6.6"
+    assert not list(service.paths.plugins_dir.glob("*/*/.pending"))
 
 
 def test_busy_process_and_duplicate_operation_blocked(service, tmp_path, monkeypatch):

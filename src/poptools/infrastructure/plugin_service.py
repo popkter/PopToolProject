@@ -280,13 +280,16 @@ class PluginService:
                         progress(min(65, int(count * 65 / total)) if total else 5)
                 if digest.hexdigest().lower() != package.digest.lower():
                     raise ValueError("插件下载校验失败")
-                extracted = target / "unpacked"
+                # Flat archives (PowerShell) already have the runtime layout. Extract
+                # at the final path so Windows scanners holding directory handles
+                # cannot make a subsequent directory rename fail with WinError 5.
+                extracted = target / "unpacked" if package.inner else runtime
                 self._extract(archive, extracted)
                 inner = (extracted / package.inner).resolve()
                 if not inner.is_relative_to(extracted.resolve()):
                     raise ValueError("插件目录无效")
-                inner.rename(runtime)
-                if extracted.exists():
+                if package.inner:
+                    inner.rename(runtime)
                     shutil.rmtree(extracted)
                 archive.unlink()
             progress(75)
